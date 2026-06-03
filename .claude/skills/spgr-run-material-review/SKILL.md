@@ -1,0 +1,53 @@
+---
+name: spgr-run-material-review
+description: Produce a material-review report that checks an Android app against Google Play policy and Material Design guidelines, recording policy-rejection-risk findings (Data Safety Form inaccuracies, undeclared or unjustified permissions, deceptive UI), Material Design conformance findings (navigation, color, typography, motion), and advisory recommendations, with a PASS or GATE verdict that blocks submission on any policy-rejection-risk finding. Use when the App Store Agent must clear an Android build for Google Play submission, or when the Mobile Developer or QA agent needs a Play policy and Material Design check against the data safety draft before a release proceeds.
+---
+
+# run-material-review
+
+## Purpose
+
+Check an Android build against two failure modes before Google Play submission: policy violations that cause outright rejection, and Material Design gaps that lower quality ratings and user reviews. Google Play rejects more often on policy than on UX, and the Data Safety Form is the single highest rejection risk because third-party SDK data collection is routinely under-declared. Treat the App Store vertical here as a gate. Any finding in the policy-rejection-risk category blocks submission until resolved. Material Design conformance and advisory findings are reported but do not block.
+
+Produce the review as a review report artifact. Recommendations to the Mobile Developer or QA agent flow through a consultation artifact, not by editing their artifacts directly.
+
+## Inputs
+
+| Field | Description |
+|-------|-------------|
+| `apk_or_aab` | The Android build, read for the declared permission set and integrated SDKs |
+| `app_screens` | App screens or screen inventory, reviewed for Material Design conformance and deceptive UI patterns |
+| `data_safety_draft` | The draft Data Safety Form, reviewed for accuracy against actual data collection |
+| `permission_justifications` | Per-permission justification and the feature each permission serves, if supplied |
+
+## Outputs
+
+| Artifact | Description |
+|----------|-------------|
+| `material-review` | Review report listing findings by category and severity, the data-safety reconciliation table, and a PASS or GATE verdict, written via spgr-write-artifact |
+| `consultation` | Per-finding remediation routed to the owning agent via spgr-tag-vertical-agent when a fix belongs to the Mobile Developer or QA agent |
+
+## Procedure
+
+1. Read the inputs with spgr-read-file for the build and screens, and spgr-read-artifact for the data safety draft if it is an artifact. If the build, the screens, or the data safety draft is missing, raise spgr-escalate with a precise list of what is absent and stop. Do not infer a permission set or a data-collection profile from assumption.
+
+2. Reconcile the Data Safety Form. Extract the declared permission set from the manifest and enumerate every integrated third-party SDK. For each data type the app collects, each API it calls, and each SDK's own data collection, confirm the draft declares it. Record under-declared data types and SDK collection as policy-rejection-risk findings. This is the highest-priority check.
+
+3. Audit permissions. Flag any permission requested at app launch rather than at the point of need (for example camera requested before any camera feature is used) as a policy-rejection-risk finding. Flag any sensitive permission with no justification or no feature that requires it.
+
+4. Scan for deceptive UI patterns. Flag misleading interaction patterns, disguised ads, and dark patterns as policy-rejection-risk findings.
+
+5. Review Material Design conformance against the screens: navigation pattern violations, color-system misuse including absent Material You dynamic color support on Android 12 and later, typography-scale violations, and motion-design issues. Record these as Material-Design-conformance findings.
+
+6. Record remaining best-practice items as advisory findings.
+
+7. Set the verdict. GATE if any policy-rejection-risk finding is open. PASS only when that category is empty. Material-Design-conformance and advisory findings never change the verdict on their own.
+
+8. Write the report with spgr-write-artifact and run spgr-validate-artifact inline. Log the verdict with spgr-log-decision. For each finding owned by another agent, open a consultation through spgr-tag-vertical-agent rather than editing that agent's artifact. On a GATE verdict, raise spgr-escalate to surface the blocking findings to the release path.
+
+## Notes
+
+- Output type is a review report (envelope artifact). The `material-review` content schema is registered in a later increment, so spgr-validate-artifact applies envelope-only validation for now (header, confidence map, decision log, version).
+- Categorize every finding as policy-rejection-risk, material-design-conformance, or advisory. Only policy-rejection-risk gates the verdict.
+- The Data Safety Form reconciliation is the priority check. A first-pass form can be generated by parsing declared permissions and integrated SDKs, then confirmed against the draft.
+- Version the report with spgr-version-artifact on re-review of an updated build.
