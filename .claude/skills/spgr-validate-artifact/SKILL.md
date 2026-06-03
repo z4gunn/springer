@@ -34,4 +34,5 @@ Hold the line on the typed-artifact contract. A receiving agent validates before
 ## Notes
 
 - The schema registry and validator live at `schemas/` (see [schemas/validate.py](../../../schemas/validate.py)). Do not restate field lists here. The registry is the single source of truth for required fields and types.
+- Validation has two modes. When a content schema is registered for the artifact type, the validator applies it (mode `content`). When no content schema exists yet, the validator falls back to validating the shared envelope header only (mode `envelope-only`), so the header, confidence map, decision log, and version are still checked while content is treated as opaque until a schema is added. Report the mode so the caller knows whether content was checked.
 - Validation never edits the artifact. It reports. The caller decides whether to fix, re-version, or escalate.

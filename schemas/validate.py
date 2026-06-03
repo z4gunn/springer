@@ -62,20 +62,28 @@ def schema_path_for(artifact_type, schema_version):
 
 
 def validate_artifact(artifact_path, artifact_type=None, schema_version=None):
-    """Return a list of human-readable issue strings. Empty list means valid."""
+    """Validate an artifact and return (issues, mode).
+
+    issues is a list of human-readable strings, empty means valid. mode is
+    "content" when a registered content schema was applied, or "envelope-only"
+    when no content schema exists for the type yet, so only the shared envelope
+    header is validated and content is treated as opaque until a schema is added.
+    """
     try:
         artifact = json.loads(Path(artifact_path).read_text())
     except (OSError, json.JSONDecodeError) as exc:
-        return [f"cannot read or parse artifact: {exc}"]
+        return [f"cannot read or parse artifact: {exc}"], "error"
 
     artifact_type = artifact_type or artifact.get("artifact_type")
     schema_version = schema_version or artifact.get("schema_version")
     if not artifact_type or not schema_version:
-        return ["artifact_type and schema_version are required (in args or artifact header)"]
+        return ["artifact_type and schema_version are required (in args or artifact header)"], "error"
 
     sp = schema_path_for(artifact_type, schema_version)
+    mode = "content"
     if not sp.exists():
-        return [f"no schema in registry for type '{artifact_type}' version '{schema_version}' ({sp.name})"]
+        sp = SCHEMA_DIR / "_envelope-v1.json"
+        mode = "envelope-only"
 
     schema = json.loads(sp.read_text())
     registry = load_registry()
@@ -84,7 +92,7 @@ def validate_artifact(artifact_path, artifact_type=None, schema_version=None):
     for err in sorted(validator.iter_errors(artifact), key=lambda e: list(e.path)):
         loc = "/".join(str(p) for p in err.path) or "(root)"
         issues.append(f"{loc}: {err.message}")
-    return issues
+    return issues, mode
 
 
 def self_check():
@@ -176,13 +184,14 @@ def main(argv):
         return 1
     artifact_type = argv[2] if len(argv) > 2 else None
     schema_version = argv[3] if len(argv) > 3 else None
-    issues = validate_artifact(argv[1], artifact_type, schema_version)
+    issues, mode = validate_artifact(argv[1], artifact_type, schema_version)
     if issues:
         print(f"INVALID: {argv[1]}")
         for issue in issues:
             print(f"  - {issue}")
         return 1
-    print(f"VALID: {argv[1]}")
+    suffix = " (envelope-only, no content schema registered for this type yet)" if mode == "envelope-only" else ""
+    print(f"VALID: {argv[1]}{suffix}")
     return 0
 
 
