@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/bug-report-v1.json",
+  "title": "SPGR Bug Report v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "bug-report" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": [
+        "bug_id", "title", "severity", "steps_to_reproduce",
+        "expected_behavior", "actual_behavior", "environment", "regression_test"
+      ],
+      "properties": {
+        "bug_id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "severity": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
+        "priority": { "type": "string" },
+        "story_ref": { "type": ["string", "null"] },
+        "steps_to_reproduce": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "expected_behavior": { "type": "string", "minLength": 1 },
+        "actual_behavior": { "type": "string", "minLength": 1 },
+        "environment": { "type": "string", "minLength": 1 },
+        "root_cause_hypothesis": { "type": "string" },
+        "regression_test": {
+          "type": "object",
+          "required": ["name", "status"],
+          "properties": {
+            "name": { "type": "string" },
+            "status": {
+              "type": "string",
+              "enum": ["failing-before-fix", "passing-after-fix", "not-written-with-reason"]
+            },
+            "reason_if_absent": { "type": ["string", "null"] }
+          }
+        }
+      }
+    }
+  }
+}

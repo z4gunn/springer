@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/uat-report-v1.json",
+  "title": "SPGR UAT Report v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "uat-report" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["summary", "per_story", "sign_off_block", "deployment_gate_status"],
+      "properties": {
+        "summary": {
+          "type": "object",
+          "required": ["total_stories", "accepted", "rejected", "conditional", "sign_off_status"],
+          "properties": {
+            "total_stories": { "type": "integer", "minimum": 0 },
+            "accepted": { "type": "integer", "minimum": 0 },
+            "rejected": { "type": "integer", "minimum": 0 },
+            "conditional": { "type": "integer", "minimum": 0 },
+            "sign_off_status": {
+              "type": "string",
+              "enum": ["signed-off", "pending", "rejected"]
+            }
+          }
+        },
+        "per_story": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["story_id", "ac_status", "sign_off_status"],
+            "properties": {
+              "story_id": { "type": "string" },
+              "title": { "type": "string" },
+              "ac_status": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["ac_id", "status"],
+                  "properties": {
+                    "ac_id": { "type": "string" },
+                    "status": { "type": "string", "enum": ["pass", "fail", "conditional"] }
+                  }
+                }
+              },
+              "tester_notes": { "type": "string" },
+              "sign_off_status": { "type": "string", "enum": ["accepted", "rejected", "requires-changes"] },
+              "rejection_reason": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "blocking_issues": { "type": "array", "items": { "type": "string" } },
+        "sign_off_block": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "role", "environment", "date", "decision"],
+            "properties": {
+              "name": { "type": "string" },
+              "role": { "type": "string" },
+              "environment": { "type": "string" },
+              "date": { "type": "string" },
+              "decision": { "type": "string", "enum": ["accepted", "rejected", "requires-changes"] }
+            }
+          }
+        },
+        "deployment_gate_status": { "type": "string", "enum": ["go", "hold"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/code-review-v1.json",
+  "title": "SPGR Code Review v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "code-review" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["pr_ref", "axes_checked", "findings", "summary", "verdict"],
+      "properties": {
+        "pr_ref": { "type": "string", "minLength": 1 },
+        "story_ref": { "type": ["string", "null"] },
+        "axes_checked": {
+          "type": "object",
+          "required": ["architecture", "xp", "style", "docstring"],
+          "properties": {
+            "architecture": { "type": "boolean" },
+            "xp": { "type": "boolean" },
+            "style": { "type": "boolean" },
+            "docstring": { "type": "boolean" }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["file", "line", "severity", "description", "remediation"],
+            "properties": {
+              "file": { "type": "string" },
+              "line": { "type": ["integer", "string"] },
+              "severity": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
+              "axis": {
+                "type": "string",
+                "enum": ["architecture", "xp", "style", "docstring", "correctness", "security"]
+              },
+              "description": { "type": "string" },
+              "remediation": { "type": "string" }
+            }
+          }
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "verdict": { "type": "string", "enum": ["APPROVE", "REQUEST_CHANGES", "COMMENT"] }
+      }
+    }
+  }
+}

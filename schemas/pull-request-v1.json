@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/pull-request-v1.json",
+  "title": "SPGR Pull Request v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "pull-request" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["pr_id", "story_ids", "source_branch", "base_branch", "what", "how_to_test", "checklist"],
+      "properties": {
+        "pr_id": { "type": "string", "minLength": 1 },
+        "story_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "source_branch": { "type": "string", "minLength": 1 },
+        "base_branch": { "type": "string", "minLength": 1 },
+        "what": { "type": "string", "minLength": 1 },
+        "how_to_test": { "type": "string", "minLength": 1 },
+        "risks_and_mitigations": { "type": "string" },
+        "checklist": {
+          "type": "object",
+          "required": ["test_first_followed", "tests_passing", "lint_clean"],
+          "properties": {
+            "test_first_followed": { "type": "boolean" },
+            "tests_passing": { "type": "boolean" },
+            "lint_clean": { "type": "boolean" },
+            "docs_updated": { "type": "boolean" },
+            "agents_notified": { "type": "boolean" }
+          }
+        },
+        "vertical_consultations": { "type": "array", "items": { "type": "string" } },
+        "is_draft": { "type": "boolean" }
+      }
+    }
+  }
+}
