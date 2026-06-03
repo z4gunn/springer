@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/prd-v1.json",
+  "title": "SPGR Product Requirements Document v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "prd" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": [
+        "problem_statement",
+        "goals",
+        "personas",
+        "scope",
+        "out_of_scope",
+        "success_metrics"
+      ],
+      "properties": {
+        "problem_statement": {
+          "type": "object",
+          "required": ["text"],
+          "properties": {
+            "text": { "type": "string", "minLength": 1 },
+            "evidence_refs": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "goals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["goal", "success_metric"],
+            "properties": {
+              "goal": { "type": "string" },
+              "success_metric": { "type": "string" },
+              "measurement_method": { "type": "string" }
+            }
+          }
+        },
+        "personas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["persona_id", "primary_use_case"],
+            "properties": {
+              "persona_id": { "type": "string" },
+              "primary_use_case": { "type": "string" }
+            }
+          }
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["feature", "rationale"],
+            "properties": {
+              "feature": { "type": "string" },
+              "rationale": { "type": "string" }
+            }
+          }
+        },
+        "out_of_scope": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["item", "reason_excluded"],
+            "properties": {
+              "item": { "type": "string" },
+              "reason_excluded": { "type": "string" }
+            }
+          }
+        },
+        "user_stories_overview": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "nfr_summary": {
+          "type": "object",
+          "properties": {
+            "performance": { "type": "string" },
+            "security": { "type": "string" },
+            "availability": { "type": "string" },
+            "scalability": { "type": "string" },
+            "compliance": { "type": "string" }
+          }
+        },
+        "success_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["metric", "target", "measurement"],
+            "properties": {
+              "metric": { "type": "string" },
+              "target": { "type": "string" },
+              "measurement": { "type": "string" }
+            }
+          }
+        },
+        "open_questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["question"],
+            "properties": {
+              "question": { "type": "string" },
+              "owner": { "type": "string" },
+              "deadline": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

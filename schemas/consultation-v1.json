@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/consultation-v1.json",
+  "title": "SPGR Vertical Consultation v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "consultation" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": [
+        "consultation_id",
+        "vertical_agent",
+        "question",
+        "artifact_ref",
+        "section",
+        "response_urgency",
+        "action_required"
+      ],
+      "properties": {
+        "consultation_id": { "type": "string", "minLength": 1 },
+        "vertical_agent": { "type": "string", "minLength": 1 },
+        "question": { "type": "string", "minLength": 1 },
+        "artifact_ref": { "type": "string", "minLength": 1 },
+        "section": { "type": "string", "minLength": 1 },
+        "context": { "type": ["string", "null"] },
+        "response_urgency": {
+          "type": "string",
+          "enum": ["blocking", "non-blocking"]
+        },
+        "recommendation": { "type": ["string", "null"] },
+        "confidence": {
+          "$ref": "https://springer.local/schemas/_envelope-v1.json#/$defs/confidence_value"
+        },
+        "action_required": { "type": "boolean" },
+        "amended_section": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

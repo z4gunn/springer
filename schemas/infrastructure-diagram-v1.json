@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/infrastructure-diagram-v1.json",
+  "title": "SPGR Infrastructure Diagram v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "infrastructure-diagram" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["cloud_provider", "environments", "mermaid"],
+      "properties": {
+        "cloud_provider": { "type": "string", "minLength": 1 },
+        "regions": { "type": "array", "items": { "type": "string" } },
+        "services": { "type": "array", "items": { "type": "string" } },
+        "networking": {
+          "type": "object",
+          "properties": {
+            "vpcs": { "type": "array", "items": { "type": "string" } },
+            "subnets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "visibility"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "visibility": {
+                    "type": "string",
+                    "enum": ["public", "private"]
+                  }
+                }
+              }
+            },
+            "security_groups": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "cdn": { "type": ["string", "null"] },
+        "load_balancers": { "type": "array", "items": { "type": "string" } },
+        "dns": { "type": ["string", "null"] },
+        "iam_roles": { "type": "array", "items": { "type": "string" } },
+        "environments": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "public_facing_surfaces": { "type": "array", "items": { "type": "string" } },
+        "mermaid": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Mermaid source for the infrastructure topology."
+        }
+      }
+    }
+  }
+}

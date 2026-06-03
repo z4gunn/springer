@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/architecture-decision-v1.json",
+  "title": "SPGR Architecture Decision (Approved Baseline) v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "architecture-decision" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["selected_option_ref", "rationale", "immutable", "downstream_constraints"],
+      "properties": {
+        "selected_option_ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "option_id from the architecture-options artifact, or a described hybrid."
+        },
+        "options_artifact_ref": { "type": ["string", "null"] },
+        "rationale": { "type": "string", "minLength": 1 },
+        "immutable": {
+          "const": true,
+          "description": "Approved architecture is an immutable constraint. Deviation triggers a scope-change escalation."
+        },
+        "downstream_constraints": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "adr_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

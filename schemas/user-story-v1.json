@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/user-story-v1.json",
+  "title": "SPGR User Story v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "user-story" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": [
+        "story_id",
+        "title",
+        "as_a",
+        "i_want",
+        "so_that",
+        "persona_ref",
+        "prd_goal_ref",
+        "invest_check",
+        "estimated_size"
+      ],
+      "properties": {
+        "story_id": {
+          "type": "string",
+          "pattern": "^STORY-[0-9]{4}-[0-9]+$",
+          "description": "STORY-{YYYY}-{seq}."
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "as_a": { "type": "string", "minLength": 1 },
+        "i_want": { "type": "string", "minLength": 1 },
+        "so_that": { "type": "string", "minLength": 1 },
+        "persona_ref": { "type": "string", "minLength": 1 },
+        "prd_goal_ref": { "type": "string", "minLength": 1 },
+        "invest_check": {
+          "type": "object",
+          "required": [
+            "independent",
+            "negotiable",
+            "valuable",
+            "estimable",
+            "small",
+            "testable"
+          ],
+          "properties": {
+            "independent": { "type": "boolean" },
+            "negotiable": { "type": "boolean" },
+            "valuable": { "type": "boolean" },
+            "estimable": { "type": "boolean" },
+            "small": { "type": "boolean" },
+            "testable": { "type": "boolean" }
+          }
+        },
+        "invest_failures": { "type": "array", "items": { "type": "string" } },
+        "split_recommendation": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "object",
+            "required": ["title", "as_a", "i_want", "so_that"],
+            "properties": {
+              "title": { "type": "string" },
+              "as_a": { "type": "string" },
+              "i_want": { "type": "string" },
+              "so_that": { "type": "string" }
+            }
+          }
+        },
+        "estimated_size": {
+          "type": "string",
+          "enum": ["small", "medium", "large"]
+        }
+      }
+    }
+  }
+}

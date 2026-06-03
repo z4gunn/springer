@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/nfr-v1.json",
+  "title": "SPGR Non-Functional Requirements v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "nfr" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["performance", "availability", "security", "scalability"],
+      "properties": {
+        "performance": {
+          "type": "object",
+          "properties": {
+            "api_latency_p99": { "type": "string" },
+            "api_latency_p95": { "type": "string" },
+            "page_load": { "type": "string" },
+            "throughput_rps": { "type": "string" },
+            "concurrency": { "type": "string" }
+          }
+        },
+        "availability": {
+          "type": "object",
+          "properties": {
+            "uptime_pct": { "type": "string" },
+            "max_downtime_per_month": { "type": "string" },
+            "rpo": { "type": "string" },
+            "rto": { "type": "string" }
+          }
+        },
+        "security": {
+          "type": "object",
+          "properties": {
+            "auth_model": { "type": "string" },
+            "encryption_at_rest": { "type": "string" },
+            "encryption_in_transit": { "type": "string" },
+            "vulnerability_policy": { "type": "string" }
+          }
+        },
+        "compliance": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["framework"],
+            "properties": {
+              "framework": { "type": "string" },
+              "obligations": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "scalability": {
+          "type": "object",
+          "properties": {
+            "launch_users": { "type": "integer" },
+            "year_1_users": { "type": "integer" },
+            "launch_rps": { "type": "integer" },
+            "year_1_rps": { "type": "integer" }
+          }
+        },
+        "accessibility": {
+          "type": "object",
+          "properties": {
+            "standard": { "type": "string" },
+            "exceptions": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "data_retention": {
+          "type": "object",
+          "properties": {
+            "retention_period": { "type": "string" },
+            "deletion_method": { "type": "string" },
+            "deletion_sla": { "type": "string" }
+          }
+        },
+        "platform_support": {
+          "type": "object",
+          "properties": {
+            "ios_min": { "type": "string" },
+            "android_min": { "type": "string" },
+            "browsers": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  }
+}

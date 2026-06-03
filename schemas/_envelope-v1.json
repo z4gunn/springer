@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/_envelope-v1.json",
+  "title": "SPGR Artifact Envelope v1",
+  "description": "Shared header every SPGR artifact carries. Per-type schemas compose this with allOf and override the content object with their own field schema.",
+  "type": "object",
+  "required": [
+    "artifact_id",
+    "artifact_type",
+    "schema_version",
+    "producing_agent",
+    "timestamp",
+    "version",
+    "version_type",
+    "confidence_map",
+    "decision_log",
+    "content"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for this artifact instance."
+    },
+    "artifact_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Registry key. Selects the per-type schema, file schemas/{artifact_type}-{schema_version}.json."
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^v[0-9]+$",
+      "description": "Major schema version token used for registry lookup, for example v1."
+    },
+    "producing_agent": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Slug of the agent that produced this artifact, for example spgr-agent-architect."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation or last-write time in ISO 8601."
+    },
+    "parent_artifact_ref": {
+      "type": ["string", "null"],
+      "description": "artifact_id of the upstream artifact this one derives from, or null for a root artifact."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v[0-9]+\\.[0-9]+(-(draft|candidate))?$",
+      "description": "Artifact instance version, for example v0.1-draft, v1.0. Distinct from schema_version."
+    },
+    "version_type": {
+      "type": "string",
+      "enum": ["draft", "candidate", "approved", "archived"],
+      "description": "Lifecycle state. version-artifact stamps approved on human approval."
+    },
+    "checksum": {
+      "type": ["string", "null"],
+      "description": "Content checksum stamped by version-artifact when version_type becomes approved, for tamper detection."
+    },
+    "confidence_map": {
+      "type": "object",
+      "description": "Per-section confidence signal. Keys are content section names.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/confidence_value"
+      }
+    },
+    "decision_log": {
+      "type": "array",
+      "description": "Append-only audit trail. log-decision appends entries.",
+      "items": {
+        "$ref": "#/$defs/decision_entry"
+      }
+    },
+    "content": {
+      "type": "object",
+      "description": "Artifact body. Generic here, overridden by each per-type schema."
+    }
+  },
+  "$defs": {
+    "confidence_value": {
+      "type": "string",
+      "enum": ["confirmed", "proposed", "needs-human-input"]
+    },
+    "decision_entry": {
+      "type": "object",
+      "required": ["entry_id", "timestamp", "decision", "rationale", "decision_maker"],
+      "additionalProperties": false,
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "description": "DEC-{artifact_id}-{seq}."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "decision": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "alternatives_considered": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["option", "reason_rejected"],
+            "additionalProperties": false,
+            "properties": {
+              "option": {
+                "type": "string"
+              },
+              "reason_rejected": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "decision_maker": {
+          "type": "string",
+          "description": "Agent slug or human identifier."
+        },
+        "artifact_ref": {
+          "type": ["string", "null"]
+        },
+        "artifact_section": {
+          "type": ["string", "null"]
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence_value"
+        },
+        "downstream_impact": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

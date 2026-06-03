@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/hil-checkpoint-v1.json",
+  "title": "SPGR Human-in-the-Loop Checkpoint v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "hil-checkpoint" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": [
+        "checkpoint_id",
+        "checkpoint_type",
+        "artifact_ref",
+        "decision_prompt",
+        "options",
+        "pipeline_status"
+      ],
+      "properties": {
+        "checkpoint_id": { "type": "string", "minLength": 1 },
+        "checkpoint_type": {
+          "type": "string",
+          "enum": [
+            "architecture-options-selection",
+            "architecture-confirmation",
+            "prd-approval",
+            "design-direction-selection",
+            "pr-merge",
+            "security-compliance-flag",
+            "scope-change"
+          ]
+        },
+        "artifact_ref": { "type": "string", "minLength": 1 },
+        "decision_prompt": { "type": "string", "minLength": 1 },
+        "context_summary": { "type": ["string", "null"] },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["option", "consequence"],
+            "properties": {
+              "option": { "type": "string" },
+              "consequence": { "type": "string" }
+            }
+          }
+        },
+        "urgency": {
+          "type": "string",
+          "enum": ["routine", "urgent", "critical"]
+        },
+        "pipeline_status": {
+          "type": "string",
+          "enum": ["paused", "resumed"]
+        },
+        "response_received": {
+          "type": ["object", "null"],
+          "required": ["option"],
+          "properties": {
+            "option": { "type": "string" },
+            "notes": { "type": ["string", "null"] }
+          }
+        },
+        "resume_instruction": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

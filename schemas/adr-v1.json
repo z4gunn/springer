@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/adr-v1.json",
+  "title": "SPGR Architecture Decision Record v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "adr" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["adr_number", "title", "status", "context", "decision", "consequences"],
+      "properties": {
+        "adr_number": {
+          "type": "string",
+          "pattern": "^ADR-[0-9]{3}$",
+          "description": "ADR-NNN, sequential."
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["Proposed", "Accepted", "Deprecated", "Superseded"]
+        },
+        "context": { "type": "string", "minLength": 1 },
+        "decision": { "type": "string", "minLength": 1 },
+        "consequences": {
+          "type": "object",
+          "required": ["positive", "negative"],
+          "properties": {
+            "positive": { "type": "array", "items": { "type": "string" } },
+            "negative": { "type": "array", "items": { "type": "string" } },
+            "neutral": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "supersedes": { "type": ["string", "null"] },
+        "superseded_by": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

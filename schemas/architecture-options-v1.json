@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/architecture-options-v1.json",
+  "title": "SPGR Architecture Options v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "architecture-options" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["options"],
+      "properties": {
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "description": "Two or more genuinely distinct options. Distinct means different topology class, API paradigm, or data model.",
+          "items": {
+            "type": "object",
+            "required": [
+              "option_id",
+              "name",
+              "topology",
+              "data_model",
+              "api_style",
+              "auth_model",
+              "infrastructure",
+              "tradeoff_profile"
+            ],
+            "properties": {
+              "option_id": { "type": "string" },
+              "name": { "type": "string" },
+              "topology": { "type": "string" },
+              "data_model": { "type": "string" },
+              "api_style": { "type": "string" },
+              "auth_model": { "type": "string" },
+              "infrastructure": { "type": "string" },
+              "strengths": { "type": "array", "items": { "type": "string" } },
+              "weaknesses": { "type": "array", "items": { "type": "string" } },
+              "tradeoff_profile": {
+                "type": "object",
+                "required": [
+                  "initial_complexity",
+                  "scalability_ceiling",
+                  "reversibility_cost",
+                  "monthly_cost_at_scale",
+                  "required_expertise"
+                ],
+                "properties": {
+                  "initial_complexity": {
+                    "type": "string",
+                    "enum": ["S", "M", "L", "XL"]
+                  },
+                  "scalability_ceiling": { "type": "string" },
+                  "reversibility_cost": { "type": "string" },
+                  "monthly_cost_at_scale": {
+                    "type": "object",
+                    "required": ["estimate", "assumptions"],
+                    "properties": {
+                      "estimate": { "type": "string" },
+                      "assumptions": { "type": "string" }
+                    }
+                  },
+                  "required_expertise": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "scoring_matrix": {
+          "type": ["object", "null"],
+          "properties": {
+            "criteria": { "type": "array", "items": { "type": "string" } },
+            "scores": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["option_id", "weighted_total"],
+                "properties": {
+                  "option_id": { "type": "string" },
+                  "weighted_total": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "feasibility_note": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

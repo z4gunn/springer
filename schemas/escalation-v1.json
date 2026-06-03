@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/escalation-v1.json",
+  "title": "SPGR Escalation v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "escalation" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": [
+        "escalation_id",
+        "escalation_type",
+        "description",
+        "urgency",
+        "routing_target",
+        "originating_agent",
+        "status"
+      ],
+      "properties": {
+        "escalation_id": {
+          "type": "string",
+          "pattern": "^ESC-[0-9]{8}-[0-9]{4}$",
+          "description": "ESC-{YYYYMMDD}-{4-digit-seq}."
+        },
+        "escalation_type": {
+          "type": "string",
+          "enum": [
+            "missing-input",
+            "contradictory-input",
+            "constraint-conflict",
+            "scope-change",
+            "policy-compliance-security",
+            "blocked",
+            "system"
+          ]
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "artifact_ref": { "type": ["string", "null"] },
+        "urgency": {
+          "type": "string",
+          "enum": ["routine", "urgent", "critical"]
+        },
+        "routing_target": {
+          "type": "string",
+          "description": "human, orchestrator, or an agent slug."
+        },
+        "originating_agent": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["open", "resolved"]
+        },
+        "resolution_notes": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

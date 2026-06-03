@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/system-diagram-v1.json",
+  "title": "SPGR System Diagram (C4) v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "system-diagram" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["c4_level1_context", "c4_level2_component"],
+      "properties": {
+        "c4_level1_context": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Mermaid source for the C4 system context diagram."
+        },
+        "c4_level2_component": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Mermaid source for the C4 component diagram."
+        },
+        "actors": { "type": "array", "items": { "type": "string" } },
+        "external_systems": { "type": "array", "items": { "type": "string" } },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "responsibility"],
+            "properties": {
+              "name": { "type": "string" },
+              "responsibility": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
