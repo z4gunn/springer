@@ -1,31 +1,12 @@
 # Springer - Agent Rules
 
+This file is the operative ruleset for AI agents working in this repository. It loads every session and OVERRIDES default behavior. For the project overview, motivation, methodology, and the agent and skill catalog written for people, see README.md. This file is the rules, conventions, and procedures an agent needs to build or change an artifact here.
+
 ## Overview
 
-This document defines the rules for building Springer. Springer is an AI software development team, comprised of a library of Claude Code skills and agents, where each agent models a traditional dev-team role (e.g. product manager, architect, developer, QA, DevOps) and the vertical specialties that span those roles.
+Springer is an AI software development team, comprised of a library of Claude Code skills and agents, where each agent models a traditional dev-team role (e.g. product manager, architect, developer, QA, DevOps) and the vertical specialties that span those roles. The team executes the full software lifecycle on any greenfield SaaS or mobile application, from idea to production, and the human enters only at deliberate checkpoints.
 
-The team executes the full software lifecycle on any greenfield SaaS or mobile application, from idea to production. The human enters only at deliberate checkpoints. This repository is Phase 2, the build phase. The work is to implement the 27 agents and 188 skills specified in Phase 1 as working Claude Code skills and agents. The Phase 1 specs are the source of truth and live in the ecg-intel vault (see Spec Source below). Each spec is translated into one working artifact in this repository.
-
-## Motivation
-
-This section states why Springer is built the way it is.
-
-Most agentic-coding tools fall into one of two failure modes. They over-automate, removing human judgment where it is needed, or they under-automate, placing a human gate at every handoff, which defeats the purpose. Springer takes a different position. The way to remove human bottlenecks is not more trust. It is contract clarity. When every agent-to-agent handoff is a typed artifact with required fields and explicit confidence signals, a downstream agent can proceed without asking when its input is complete, and can escalate with precision when its input is not. The human stays in the loop only at the decisions that require judgment.
-
-The second position is architecture first. Architecture is the most consequential decision in a project and the most expensive to reverse. For that reason it is the primary human checkpoint, and every downstream agent is constrained by the approved architecture.
-
-## Methodology Foundation
-
-This section names the source of each design layer. Springer is comprised of a deliberate hybrid that takes the strongest contribution from four established methodologies rather than adopting any one of them whole.
-
-| Layer | Source | Applied where |
-|-------|--------|---------------|
-| Phase structure, role definitions, phase gates | **SDLC** | Agent roster, handoff sequence, dependency graph |
-| Requirement language (stories, acceptance criteria, DoD) | **Scrum** | Product Manager agent output. Review gates become the human checkpoints |
-| Engineering discipline (test-first, YAGNI, simple design, CI, small releases) | **XP** | Inviolable behavioral rules in the developer, QA, and reviewer agents |
-| Work tracking (WIP limits, flow, blocked-item management) | **Kanban** | Orchestrator agent |
-| Architecture decision model (ADR, immutable once approved) | **SDLC and ADR practice** | Architecture agent output, and the constraint on all downstream agents |
-| Creative latitude (no prescribed visual formula) | **None, by design** | Design agent produces multiple directions, the human selects |
+This repository holds the build: 27 agents and 194 skills, each translated from a Phase 1 spec into one working Claude Code artifact. The Phase 1 specs are the source of truth and live in the ecg-intel vault (see Spec Source below). When adding or changing an artifact, map from its spec rather than inventing. The motivation and methodology behind these rules are in README.md and are not restated here.
 
 ## Core Design Principles
 
@@ -44,7 +25,8 @@ This section describes where each kind of file lives.
 
 ```
 springer/
-  CLAUDE.md              this file, loaded every session
+  README.md              project overview for people (overview, motivation, methodology, agent and skill catalog)
+  CLAUDE.md              this file, the operative ruleset for AI, loaded every session
   .claude/
     skills/<name>/SKILL.md   built skills, auto-loaded in this repo
     agents/<name>.md         built agents, auto-loaded in this repo
@@ -53,7 +35,10 @@ springer/
     SKILL.template.md
     agent.template.md
   schemas/               artifact JSON Schemas, built first (see Build Order)
+  runs/                  the run store where a project's artifacts accumulate
 ```
+
+A repo-level README.md is intentional and is not an auxiliary file in the no-README sense. The no-README rule in Universal Rules below applies inside a skill or agent directory, not at the repository root.
 
 Spec source (read-only): Phase 1 specs live in `~/Repos/ecg-intel/vault/40-projects/springer/`, as `skills/spgr-skill-*.md` and `agents/spgr-agent-*.md`. Each spec contains a "Phase 2 Build Notes" section, which is the build brief for that artifact. Specs are not edited from this repository.
 
