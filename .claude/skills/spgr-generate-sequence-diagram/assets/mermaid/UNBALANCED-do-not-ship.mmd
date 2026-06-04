@@ -1,0 +1,9 @@
+%% Deliberately broken fixture for testing lint-sequence.sh. Do not ship this as output.
+%% It has an alt with no end, and an activate with no deactivate. Mermaid renders the
+%% activate-without-deactivate case to clean SVG with exit 0, so the lint must catch it.
+sequenceDiagram
+  participant A
+  participant B
+  activate B
+  alt success
+    A->>B: ok

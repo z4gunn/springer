@@ -1,0 +1,14 @@
+%% Golden template: asynchronous fire-and-forget.
+%% Source scenario: a producer emits an event and does not block on a reply.
+%% Open arrow (-)) is the async message. The caller continues without waiting.
+%% Reserve the async open arrow for genuinely non-blocking calls. A blocking call that
+%% happens to be slow is still synchronous and uses ->> instead.
+sequenceDiagram
+  autonumber
+  participant Producer as Checkout Service
+  participant Bus as Event Bus
+  participant Consumer as Email Worker
+  Producer-)Bus: publish OrderPlaced
+  Note over Producer: returns immediately, does not wait
+  Bus-)Consumer: deliver OrderPlaced
+  Consumer-)Consumer: send confirmation email

@@ -1,0 +1,14 @@
+@startuml
+' Golden template: asynchronous fire-and-forget.
+' Source scenario: a producer emits an event and does not block on a reply.
+' Open arrow (->>) is the async message. The caller continues without waiting.
+' Reserve the async arrow for genuinely non-blocking calls.
+autonumber
+participant "Checkout Service" as Producer
+participant "Event Bus" as Bus
+participant "Email Worker" as Consumer
+Producer ->> Bus : publish OrderPlaced
+note over Producer : returns immediately, does not wait
+Bus ->> Consumer : deliver OrderPlaced
+Consumer ->> Consumer : send confirmation email
+@enduml

@@ -1,0 +1,14 @@
+%% Golden template: synchronous request-response.
+%% Source scenario: a client makes one blocking call through an API and gets a value back.
+%% Solid filled arrow (->>) is a synchronous call. Dashed open arrow (-->>) is the return.
+%% The +/- suffix opens and closes the activation bar in one line, which keeps activate
+%% and deactivate balanced. autonumber is on because call ordering is part of the contract.
+sequenceDiagram
+  autonumber
+  participant Client
+  participant API as API Gateway
+  participant Service as Order Service
+  Client->>+API: GET /orders/42
+  API->>+Service: fetchOrder(42)
+  Service-->>-API: order
+  API-->>-Client: 200 order

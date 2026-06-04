@@ -1,0 +1,28 @@
+@startuml
+' Golden template: combined fragments alt, opt, and loop.
+' Source scenario: a login that branches on credential validity, optionally records a
+' device, and retries a downstream lookup. Each fragment is closed with end.
+' Keep nesting shallow. When a scenario needs deep nesting, split the happy path and
+' the error path into two diagrams instead.
+autonumber
+participant User
+participant "Auth Service" as Auth
+participant "Token Store" as Store
+User -> Auth : POST /login (credentials)
+activate Auth
+alt credentials valid
+  loop up to 3 attempts
+    Auth -> Store : persist session
+    activate Store
+    Store --> Auth : ack
+    deactivate Store
+  end
+  opt remember this device
+    Auth -> Auth : record device fingerprint
+  end
+  Auth --> User : 200 session token
+else credentials invalid
+  Auth --> User : 401 unauthorized
+end
+deactivate Auth
+@enduml

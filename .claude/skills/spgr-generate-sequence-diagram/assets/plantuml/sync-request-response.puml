@@ -1,0 +1,16 @@
+@startuml
+' Golden template: synchronous request-response.
+' Source scenario: a client makes one blocking call through an API and gets a value back.
+' Solid arrow (->) is the synchronous call. Dashed arrow (-->) is the return.
+' autoactivate on draws and balances the activation bars from the call and return arrows,
+' so there is no manual activate or deactivate to leave unbalanced.
+autonumber
+autoactivate on
+participant Client
+participant "API Gateway" as API
+participant "Order Service" as Service
+Client -> API : GET /orders/42
+API -> Service : fetchOrder(42)
+Service --> API : order
+API --> Client : 200 order
+@enduml
