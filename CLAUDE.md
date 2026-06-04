@@ -48,6 +48,7 @@ springer/
   .claude/
     skills/<name>/SKILL.md   built skills, auto-loaded in this repo
     agents/<name>.md         built agents, auto-loaded in this repo
+    references/<name>.md     shared cross-skill references (e.g. diagram-standards), cited by absolute path
   templates/             golden starters, build from these and not from a blank file
     SKILL.template.md
     agent.template.md
@@ -55,6 +56,8 @@ springer/
 ```
 
 Spec source (read-only): Phase 1 specs live in `~/Repos/ecg-intel/vault/40-projects/springer/`, as `skills/spgr-skill-*.md` and `agents/spgr-agent-*.md`. Each spec contains a "Phase 2 Build Notes" section, which is the build brief for that artifact. Specs are not edited from this repository.
+
+External skill dependency (read-only): The `spgr-render-diagram-excalidraw` skill builds on the globally installed `excalidraw-diagram` skill at `~/.claude/skills/excalidraw-diagram/`, reusing its color palette, element templates, and render methodology by absolute path. That skill must be present for render-diagram-excalidraw to run. It is not vendored into this repository.
 
 ## Build Standards
 
