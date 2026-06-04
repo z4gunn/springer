@@ -1,0 +1,21 @@
+@startuml
+' Golden template: PlantUML activity (beta) with formal fork/join for true concurrency.
+' Source: replace this line with the workflow spec or artifact this diagram is drawn from.
+' Question answered: which steps run concurrently and where do they synchronize before the flow continues?
+start
+:Receive order;
+fork
+  :Reserve inventory;
+fork again
+  :Authorize payment;
+fork again
+  :Send order-received email;
+end fork
+:Confirm order;
+if (All steps succeeded?) then (yes)
+  :Mark order confirmed;
+else (else)
+  :Roll back and flag for review;
+endif
+stop
+@enduml

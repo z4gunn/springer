@@ -1,0 +1,23 @@
+@startuml
+' Golden template: PlantUML activity (beta) with swimlanes, used when more than one actor participates.
+' Source: replace this line with the workflow spec or artifact this diagram is drawn from.
+' Question answered: who performs each step in a multi-actor approval process, and where does it branch?
+' Declare the first swimlane before start so the start node lands in a named lane.
+|Customer|
+start
+:Submit purchase request;
+|Manager|
+:Review request;
+if (Approved?) then (yes)
+  |Finance|
+  :Issue purchase order;
+  |Vendor|
+  :Fulfill order;
+else (else)
+  |Customer|
+  :Receive rejection notice;
+endif
+|Customer|
+:Close request;
+stop
+@enduml

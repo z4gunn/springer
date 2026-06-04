@@ -1,0 +1,11 @@
+%% Golden template: simple Mermaid flowchart, single actor, one decision with exhaustive guards.
+%% Source: replace this line with the workflow spec or artifact this diagram is drawn from.
+%% Question answered: what is the control flow of a single-actor process with one branch?
+flowchart TD
+    start([Start]) --> validate[Validate submitted form]
+    validate --> check{All fields valid?}
+    check -->|yes| persist[Save record]
+    check -->|else| reject[Return validation errors]
+    persist --> notify[Send confirmation]
+    notify --> done([End])
+    reject --> done
