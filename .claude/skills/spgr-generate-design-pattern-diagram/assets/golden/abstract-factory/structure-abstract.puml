@@ -1,0 +1,33 @@
+@startuml abstract-factory-structure-abstract
+' Abstract Factory, Creational. Abstract structure: canonical GoF roles only.
+' Copy this file and adapt it. Import the shared preamble for uniform styling.
+!include ../../pattern-preamble.iuml
+
+interface AbstractFactory CREATIONAL_ROLE(AbstractFactory) {
+  +createProductA() : AbstractProductA
+  +createProductB() : AbstractProductB
+}
+class ConcreteFactory CREATIONAL_ROLE(ConcreteFactory) {
+  +createProductA() : AbstractProductA
+  +createProductB() : AbstractProductB
+}
+interface AbstractProductA CREATIONAL_ROLE(AbstractProduct)
+interface AbstractProductB CREATIONAL_ROLE(AbstractProduct)
+class ConcreteProductA CREATIONAL_ROLE(ConcreteProduct)
+class ConcreteProductB CREATIONAL_ROLE(ConcreteProduct)
+class Client CREATIONAL_ROLE(Client)
+
+AbstractFactory <|.. ConcreteFactory
+AbstractProductA <|.. ConcreteProductA
+AbstractProductB <|.. ConcreteProductB
+ConcreteFactory ..> ConcreteProductA : creates
+ConcreteFactory ..> ConcreteProductB : creates
+Client --> AbstractFactory
+Client --> AbstractProductA
+Client --> AbstractProductB
+
+note as N
+  Intent: create a family of related products without naming their concrete classes.
+  Consequence: adding a product to the family changes the factory interface and every concrete factory.
+end note
+@enduml

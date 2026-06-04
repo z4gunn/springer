@@ -1,0 +1,32 @@
+@startuml observer-structure-abstract
+' Observer, Behavioral. Abstract structure: canonical GoF roles only.
+' Subject holds many Observers and notifies each on state change.
+!include ../../pattern-preamble.iuml
+
+interface Subject BEHAVIORAL_ROLE(Subject) {
+  +attach(o : Observer)
+  +detach(o : Observer)
+  +notify()
+}
+class ConcreteSubject BEHAVIORAL_ROLE(ConcreteSubject) {
+  -state
+  +getState()
+  +setState(s)
+}
+interface Observer BEHAVIORAL_ROLE(Observer) {
+  +update()
+}
+class ConcreteObserver BEHAVIORAL_ROLE(ConcreteObserver) {
+  +update()
+}
+
+Subject <|.. ConcreteSubject
+Observer <|.. ConcreteObserver
+Subject o-- "0..*" Observer : observers
+ConcreteObserver --> ConcreteSubject : reads state
+
+note as N
+  Intent: notify a varying set of dependents when one object's state changes.
+  Consequence: update order is unspecified; a notify can cascade into further updates.
+end note
+@enduml

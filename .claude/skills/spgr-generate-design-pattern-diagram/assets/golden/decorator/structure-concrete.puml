@@ -1,0 +1,39 @@
+@startuml decorator-structure-concrete
+' Decorator, Structural. Concrete structure: real classes bound to roles.
+' Example: an HTTP data source wrapped with compression and caching.
+' Source: src/io/datasource/*.ts (cite the real files when you adapt this).
+!include ../../pattern-preamble.iuml
+
+interface DataSource <<Component>> {
+  +read() : Bytes
+  +write(b : Bytes)
+}
+class FileDataSource <<ConcreteComponent>> {
+  +read() : Bytes
+  +write(b : Bytes)
+}
+abstract class DataSourceDecorator <<Decorator>> {
+  #wrapped : DataSource
+  +read() : Bytes
+  +write(b : Bytes)
+}
+class CompressionDecorator <<ConcreteDecorator>> {
+  +read() : Bytes
+  +write(b : Bytes)
+}
+class EncryptionDecorator <<ConcreteDecorator>> {
+  +read() : Bytes
+  +write(b : Bytes)
+}
+
+DataSource <|.. FileDataSource
+DataSource <|.. DataSourceDecorator
+DataSourceDecorator <|-- CompressionDecorator
+DataSourceDecorator <|-- EncryptionDecorator
+DataSourceDecorator o-- DataSource : wrapped
+
+note as N
+  Intent: add compression and encryption to a file source per call site, stacked in any order.
+  Consequence: a request passes through every wrapper; the order of wrapping changes the result.
+end note
+@enduml

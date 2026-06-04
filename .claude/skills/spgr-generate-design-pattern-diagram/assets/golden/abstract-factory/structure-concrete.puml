@@ -1,0 +1,39 @@
+@startuml abstract-factory-structure-concrete
+' Abstract Factory, Creational. Concrete structure: real classes bound to roles.
+' Example: a UI toolkit producing a matched widget family per platform.
+' Source: src/ui/factory/*.ts (cite the real files when you adapt this).
+!include ../../pattern-preamble.iuml
+
+interface WidgetFactory <<AbstractFactory>> {
+  +createButton() : Button
+  +createCheckbox() : Checkbox
+}
+class MacWidgetFactory <<ConcreteFactory>>
+class WinWidgetFactory <<ConcreteFactory>>
+interface Button <<AbstractProduct>>
+interface Checkbox <<AbstractProduct>>
+class MacButton <<ConcreteProduct>>
+class MacCheckbox <<ConcreteProduct>>
+class WinButton <<ConcreteProduct>>
+class WinCheckbox <<ConcreteProduct>>
+class AppShell <<Client>>
+
+WidgetFactory <|.. MacWidgetFactory
+WidgetFactory <|.. WinWidgetFactory
+Button <|.. MacButton
+Button <|.. WinButton
+Checkbox <|.. MacCheckbox
+Checkbox <|.. WinCheckbox
+MacWidgetFactory ..> MacButton : creates
+MacWidgetFactory ..> MacCheckbox : creates
+WinWidgetFactory ..> WinButton : creates
+WinWidgetFactory ..> WinCheckbox : creates
+AppShell --> WidgetFactory
+AppShell --> Button
+AppShell --> Checkbox
+
+note as N
+  Intent: render a platform-consistent widget family without the shell knowing the platform.
+  Consequence: a new platform is one factory and one product set; a new widget type touches every factory.
+end note
+@enduml

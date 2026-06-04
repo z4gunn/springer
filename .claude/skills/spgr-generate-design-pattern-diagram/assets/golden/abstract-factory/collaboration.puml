@@ -1,0 +1,18 @@
+@startuml abstract-factory-collaboration
+' Abstract Factory, Creational. Signature scenario: the client holds an
+' AbstractFactory and asks it for a matched product family.
+title Abstract Factory: AppShell builds a platform widget family
+
+participant "AppShell\n<<Client>>" as Client
+participant "MacWidgetFactory\n<<ConcreteFactory>>" as Factory
+participant "MacButton\n<<ConcreteProduct>>" as Button
+participant "MacCheckbox\n<<ConcreteProduct>>" as Checkbox
+
+Client -> Factory : createButton()
+Factory -> Button : new MacButton()
+Factory --> Client : button
+Client -> Factory : createCheckbox()
+Factory -> Checkbox : new MacCheckbox()
+Factory --> Client : checkbox
+note over Client : the returned widgets are guaranteed to match the Mac family
+@enduml

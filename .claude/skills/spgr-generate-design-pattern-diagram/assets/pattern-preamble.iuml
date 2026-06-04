@@ -1,0 +1,28 @@
+' Shared PlantUML preamble for Springer design-pattern structure diagrams.
+' Import at the top of every generated structure .puml so all 23 GoF patterns
+' render uniformly:  !include pattern-preamble.iuml
+'
+' Defines per-category stereotype spots and abstract/interface styling. A role
+' label such as <<ConcreteStrategy>> is given a category-colored spot so a reader
+' tells a Creational role from a Structural or Behavioral one on sight.
+
+skinparam classBorderColor #2E2E2E
+skinparam classBackgroundColor #FBFBFB
+skinparam classFontColor #1A1A1A
+skinparam classAttributeFontColor #444444
+skinparam stereotypeABackgroundColor #FBFBFB
+skinparam shadowing false
+skinparam noteBackgroundColor #FFF8E1
+skinparam noteBorderColor #C9A227
+
+' Role-binding macro. ROLE(RealClass, RoleName) prints the real class name with a
+' canonical GoF role stereotype. Use on the concrete structure view.
+!define ROLE(class, role) class <<role>>
+
+' Category-spot stereotype macros. Each prints a colored spot whose letter and
+' color code the GoF category: green C Creational, blue S Structural, orange B
+' Behavioral. Apply the macro that matches the pattern's catalog category so the
+' role label reads as a category-colored marker, not plain text.
+!define CREATIONAL_ROLE(role) << (C,#2E7D32) role >>
+!define STRUCTURAL_ROLE(role) << (S,#1565C0) role >>
+!define BEHAVIORAL_ROLE(role) << (B,#EF6C00) role >>

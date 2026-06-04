@@ -1,0 +1,25 @@
+@startuml decorator-collaboration
+' Decorator, Structural. Signature scenario: a call to the outer decorator adds
+' behavior, then delegates inward to the wrapped component.
+title Decorator: write() flows through the wrapper stack to the file
+
+participant "Client" as Client
+participant "EncryptionDecorator\n<<ConcreteDecorator>>" as Enc
+participant "CompressionDecorator\n<<ConcreteDecorator>>" as Comp
+participant "FileDataSource\n<<ConcreteComponent>>" as File
+
+Client -> Enc : write(data)
+activate Enc
+Enc -> Enc : encrypt(data)
+Enc -> Comp : write(encrypted)
+activate Comp
+Comp -> Comp : compress(encrypted)
+Comp -> File : write(compressed)
+activate File
+File --> Comp : ok
+deactivate File
+Comp --> Enc : ok
+deactivate Comp
+Enc --> Client : ok
+deactivate Enc
+@enduml

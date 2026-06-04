@@ -1,0 +1,38 @@
+@startuml observer-structure-concrete
+' Observer, Behavioral. Concrete structure: real classes bound to roles.
+' Example: an order's status changes notify a dashboard and an email sender.
+' Source: src/orders/order.ts, src/notify/*.ts (cite the real files when adapting).
+!include ../../pattern-preamble.iuml
+
+interface OrderEvents <<Subject>> {
+  +subscribe(l : OrderListener)
+  +unsubscribe(l : OrderListener)
+  +publish()
+}
+class Order <<ConcreteSubject>> {
+  -status : OrderStatus
+  +getStatus() : OrderStatus
+  +setStatus(s : OrderStatus)
+}
+interface OrderListener <<Observer>> {
+  +onOrderChanged(o : Order)
+}
+class DashboardWidget <<ConcreteObserver>> {
+  +onOrderChanged(o : Order)
+}
+class EmailNotifier <<ConcreteObserver>> {
+  +onOrderChanged(o : Order)
+}
+
+OrderEvents <|.. Order
+OrderListener <|.. DashboardWidget
+OrderListener <|.. EmailNotifier
+OrderEvents o-- "0..*" OrderListener : listeners
+DashboardWidget --> Order : reads status
+EmailNotifier --> Order : reads status
+
+note as N
+  Intent: push order status changes to a dashboard and an email sender without the Order knowing them.
+  Consequence: listener notification order is unspecified; a slow listener delays the publish loop.
+end note
+@enduml

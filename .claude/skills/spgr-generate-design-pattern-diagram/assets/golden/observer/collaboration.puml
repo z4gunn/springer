@@ -1,0 +1,25 @@
+@startuml observer-collaboration
+' Observer, Behavioral. Signature scenario: a state change triggers publish(),
+' which loops update() over every registered observer.
+title Observer: setStatus triggers notify across the listeners
+
+participant "Order\n<<ConcreteSubject>>" as Order
+participant "DashboardWidget\n<<ConcreteObserver>>" as Dash
+participant "EmailNotifier\n<<ConcreteObserver>>" as Email
+
+Order -> Order : setStatus(SHIPPED)
+activate Order
+loop over each registered listener
+  Order -> Dash : onOrderChanged(order)
+  activate Dash
+  Dash -> Order : getStatus()
+  Order --> Dash : SHIPPED
+  deactivate Dash
+  Order -> Email : onOrderChanged(order)
+  activate Email
+  Email -> Order : getStatus()
+  Order --> Email : SHIPPED
+  deactivate Email
+end
+deactivate Order
+@enduml

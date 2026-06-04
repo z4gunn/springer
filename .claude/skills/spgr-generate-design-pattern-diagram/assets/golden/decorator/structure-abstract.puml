@@ -1,0 +1,30 @@
+@startuml decorator-structure-abstract
+' Decorator, Structural. Abstract structure: canonical GoF roles only.
+' The Decorator both extends Component and holds a Component, so behavior stacks.
+!include ../../pattern-preamble.iuml
+
+interface Component STRUCTURAL_ROLE(Component) {
+  +operation()
+}
+class ConcreteComponent STRUCTURAL_ROLE(ConcreteComponent) {
+  +operation()
+}
+abstract class Decorator STRUCTURAL_ROLE(Decorator) {
+  #wrapped : Component
+  +operation()
+}
+class ConcreteDecorator STRUCTURAL_ROLE(ConcreteDecorator) {
+  +operation()
+  +addedBehavior()
+}
+
+Component <|.. ConcreteComponent
+Component <|.. Decorator
+Decorator <|-- ConcreteDecorator
+Decorator o-- Component : wrapped
+
+note as N
+  Intent: add responsibilities to one object at runtime without subclassing the class.
+  Consequence: many small wrapper objects; debugging a deep stack of decorators is harder.
+end note
+@enduml
