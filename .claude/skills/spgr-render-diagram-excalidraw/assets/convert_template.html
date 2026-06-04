@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #ffffff; overflow: hidden; }
+    #root { display: inline-block; }
+    #root svg { display: block; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="module">
+    // Pinned versions. Maintainers revalidate these after an upstream release.
+    // mermaid-to-excalidraw and excalidraw share one DOM context here so the
+    // conversion runs against real getBBox layout, not jsdom.
+    import { parseMermaidToExcalidraw } from "https://esm.sh/@excalidraw/mermaid-to-excalidraw@1.1.2?bundle";
+    import { convertToExcalidrawElements, exportToSvg } from "https://esm.sh/@excalidraw/excalidraw@0.18.0?bundle";
+
+    // Convert a Mermaid source string to Excalidraw skeleton elements, then to
+    // full Excalidraw elements. Returns { success, elements, files } or an error.
+    window.convertMermaid = async function(mermaidSource) {
+      try {
+        const { elements: skeleton, files } = await parseMermaidToExcalidraw(mermaidSource, {
+          fontSize: 16,
+        });
+        const elements = convertToExcalidrawElements(skeleton);
+        return { success: true, elements: elements, files: files || {} };
+      } catch (err) {
+        return { success: false, error: err && err.message ? err.message : String(err) };
+      }
+    };
+
+    // Render Excalidraw JSON to an in-page SVG so Playwright can screenshot it.
+    window.renderDiagram = async function(jsonData) {
+      try {
+        const data = typeof jsonData === "string" ? JSON.parse(jsonData) : jsonData;
+        const elements = data.elements || [];
+        const appState = data.appState || {};
+        const files = data.files || {};
+
+        appState.viewBackgroundColor = appState.viewBackgroundColor || "#ffffff";
+        appState.exportWithDarkMode = false;
+
+        const svg = await exportToSvg({
+          elements: elements,
+          appState: { ...appState, exportBackground: true },
+          files: files,
+        });
+
+        const root = document.getElementById("root");
+        root.innerHTML = "";
+        root.appendChild(svg);
+
+        window.__renderComplete = true;
+        window.__renderError = null;
+        return { success: true, width: svg.getAttribute("width"), height: svg.getAttribute("height") };
+      } catch (err) {
+        window.__renderComplete = true;
+        window.__renderError = err && err.message ? err.message : String(err);
+        return { success: false, error: err && err.message ? err.message : String(err) };
+      }
+    };
+
+    window.__moduleReady = true;
+  </script>
+</body>
+</html>

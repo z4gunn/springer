@@ -1,0 +1,9 @@
+flowchart TD
+    Start([User opens app]) --> Auth{Authenticated?}
+    Auth -->|No| Login[Show login screen]
+    Auth -->|Yes| Home[Load home feed]
+    Login --> Submit[Submit credentials]
+    Submit --> Verify{Valid?}
+    Verify -->|No| Login
+    Verify -->|Yes| Home
+    Home --> Done([Session active])
