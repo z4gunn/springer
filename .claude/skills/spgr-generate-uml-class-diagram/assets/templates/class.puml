@@ -1,0 +1,68 @@
+@startuml class-golden
+' Golden template: class diagram in PlantUML (default notation).
+' Shows the five relationship kinds, visibility markers, abstract and static,
+' generics, a stereotype spot, and labelled multiplicities and roles.
+' Replace the example types with the subsystem under design.
+
+skinparam classAttributeIconSize 0
+
+abstract class PaymentMethod {
+  # id : UUID
+  + {abstract} authorize(amount : Money) : AuthResult
+}
+
+interface Refundable {
+  + refund(amount : Money) : RefundResult
+}
+
+enum Currency {
+  USD
+  EUR
+  GBP
+}
+
+class Card << (M,#ADD1B2) Method >> {
+  - last4 : String
+  - brand : Brand
+  + authorize(amount : Money) : AuthResult
+  + refund(amount : Money) : RefundResult
+}
+
+class Order {
+  - {static} taxRate : Decimal
+  - placedAt : Instant
+  + total() : Money
+}
+
+class LineItem {
+  - quantity : Int
+  - unitPrice : Money
+}
+
+class Customer {
+  - email : String
+}
+
+class Repository<T> {
+  + findById(id : UUID) : T
+}
+
+' generalization: Card is a kind of PaymentMethod (hollow triangle at the whole)
+PaymentMethod <|-- Card
+
+' realization: Card implements the Refundable interface
+Refundable <|.. Card
+
+' composition: Order owns the lifecycle of its LineItems (filled diamond at the whole)
+Order "1" *-- "1..*" LineItem : contains >
+
+' aggregation: an Order references a Customer it does not own (hollow diamond at the whole)
+Order "0..*" o-- "1" Customer : placed by >
+
+' association: a Customer uses one or more PaymentMethods
+Customer "1" --> "1..*" PaymentMethod : pays with >
+
+' dependency: Order reads the Currency enum
+Order ..> Currency : uses
+
+@enduml

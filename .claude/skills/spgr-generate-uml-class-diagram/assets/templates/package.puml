@@ -1,0 +1,32 @@
+@startuml package-golden
+' Golden template: package diagram in PlantUML (default notation).
+' Shows nested packages, directional acyclic dependency arrows, and the
+' <<import>> and <<access>> stereotypes. PlantUML is required here because
+' Mermaid has fragile nested-namespace support and no package annotations.
+
+package "web" {
+  package "web.api" {
+  }
+  package "web.ui" {
+  }
+}
+
+package "domain" {
+}
+
+package "data" {
+  package "data.sql" {
+  }
+}
+
+package "platform" {
+}
+
+' dependencies point inward toward the stable core and form no cycle
+web.api ..> domain : <<import>>
+web.ui ..> domain : <<import>>
+domain ..> data : <<access>>
+data.sql ..> platform : <<import>>
+web.api ..> platform : <<access>>
+
+@enduml

@@ -1,0 +1,50 @@
+%% Golden template: class diagram in Mermaid (classDiagram).
+%% Use Mermaid ONLY for a standalone class view destined for Markdown that must
+%% render inline in GitHub or Obsidian with no toolchain. Stay on PlantUML for
+%% object diagrams, nested packages, package annotations, association classes,
+%% custom stereotype spots, and comma-separated generics.
+%% Generics use ~T~ (single type parameter only). For List~K,V~ use PlantUML.
+classDiagram
+    class PaymentMethod {
+        <<abstract>>
+        #UUID id
+        +authorize(Money amount) AuthResult*
+    }
+    class Refundable {
+        <<interface>>
+        +refund(Money amount) RefundResult
+    }
+    class Currency {
+        <<enumeration>>
+        USD
+        EUR
+        GBP
+    }
+    class Card {
+        -String last4
+        -Brand brand
+        +authorize(Money amount) AuthResult
+        +refund(Money amount) RefundResult
+    }
+    class Order {
+        -Decimal taxRate$
+        -Instant placedAt
+        +total() Money
+    }
+    class LineItem {
+        -int quantity
+        -Money unitPrice
+    }
+    class Customer {
+        -String email
+    }
+    class Repository~T~ {
+        +findById(UUID id) T
+    }
+
+    PaymentMethod <|-- Card : generalization
+    Refundable <|.. Card : realization
+    Order "1" *-- "1..*" LineItem : contains
+    Order "0..*" o-- "1" Customer : placed by
+    Customer "1" --> "1..*" PaymentMethod : pays with
+    Order ..> Currency : uses

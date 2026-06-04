@@ -1,0 +1,38 @@
+@startuml object-golden
+' Golden template: object diagram in PlantUML.
+' Object diagrams are PlantUML only. Mermaid has no object-diagram type, so a
+' runtime snapshot must use PlantUML's object keyword. An object diagram is a
+' true snapshot of one consistent moment: concrete slot values and links, with
+' no multiplicity and no operations. Pair it with its class diagram to validate.
+
+object "order42 : Order" as order42 {
+  placedAt = 2026-06-04T10:15Z
+  total = 59.98 USD
+}
+
+object "item1 : LineItem" as item1 {
+  quantity = 1
+  unitPrice = 19.99 USD
+}
+
+object "item2 : LineItem" as item2 {
+  quantity = 2
+  unitPrice = 19.99 USD
+}
+
+object "alex : Customer" as alex {
+  email = alex@example.com
+}
+
+object "visa : Card" as visa {
+  last4 = 4242
+  brand = VISA
+}
+
+' links carry no multiplicity in an object diagram, only the role
+order42 --> item1 : contains
+order42 --> item2 : contains
+order42 --> alex : placedBy
+alex --> visa : paysWith
+
+@enduml

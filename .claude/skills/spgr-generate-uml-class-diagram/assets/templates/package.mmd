@@ -1,0 +1,24 @@
+%% Golden template: lightweight package map in Mermaid (flowchart with subgraphs).
+%% Mermaid has no native UML package diagram. classDiagram namespaces are
+%% fragile and cannot carry <<import>>/<<access>> stereotypes or nested groups.
+%% This flowchart approximation is acceptable ONLY for a single-level Markdown
+%% map with no annotations. Escalate to package.puml for nested packages,
+%% <<import>>/<<access>> stereotypes, or any annotation. Keep arrows acyclic.
+flowchart TB
+    subgraph web
+        api[web.api]
+        ui[web.ui]
+    end
+    subgraph domain[domain]
+        dom[domain]
+    end
+    subgraph data
+        sql[data.sql]
+    end
+    platform[platform]
+
+    api --> dom
+    ui --> dom
+    dom --> sql
+    sql --> platform
+    api --> platform

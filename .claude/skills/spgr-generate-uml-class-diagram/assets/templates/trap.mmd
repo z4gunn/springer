@@ -1,0 +1,18 @@
+%% Deliberate Mermaid-trap sample for testing the trap linter.
+%% Every line below is a case the linter must catch and route to PlantUML:
+%%  1. comma-separated generic List~K,V~
+%%  2. nested namespace
+%%  3. package annotation
+%% This file is a test fixture, not a golden template. It is expected to ROUTE.
+classDiagram
+    namespace outer {
+        namespace inner {
+            class Cache {
+                +Map~String,Entry~ store
+            }
+        }
+    }
+    class Registry {
+        +List~K,V~ entries
+        <<package>> shared
+    }
