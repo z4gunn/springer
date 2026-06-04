@@ -1,0 +1,47 @@
+@startuml
+' renderer: plantuml state
+' entity: Subscription
+' source: subscription lifecycle, golden composite-with-history template
+' escalation-reason: PlantUML chosen because this model uses shallow history,
+' entry/exit/do behaviors, internal transitions, and orthogonal regions,
+' all of which Mermaid stateDiagram-v2 drops silently.
+' Canonical transition form: trigger[guard]/action.
+[*] --> Trial
+
+state Trial {
+  Trial : entry / startTrialClock
+  Trial : do / sendNurtureEmail
+  Trial : exit / stopTrialClock
+  Trial : reminder / logReminder
+}
+
+Trial --> Active : convert[paymentValid]/chargeFirstPeriod
+Trial --> Expired : trialClockElapsed
+
+state Active {
+  [*] --> Current
+
+  state Billing {
+    [*] --> Current
+    Current --> PastDue : chargeFailed/openDunning
+    PastDue --> Current : chargeSucceeded[withinGrace]/closeDunning
+    PastDue --> Suspended : graceElapsed/suspendAccess
+    Suspended --> Current : chargeSucceeded/restoreAccess
+  }
+  --
+  state Usage {
+    [*] --> Within
+    Within --> Over : meterExceeded/flagOverage
+    Over --> Within : periodReset/clearOverage
+  }
+
+  Active : entry / provisionAccess
+  Active : exit / deprovisionAccess
+}
+
+Active --> Paused : pause/freezeBilling
+Paused --> Active[H] : resume/unfreezeBilling
+Active --> Cancelled : cancel/scheduleEndOfPeriod
+Expired --> [*]
+Cancelled --> [*]
+@enduml

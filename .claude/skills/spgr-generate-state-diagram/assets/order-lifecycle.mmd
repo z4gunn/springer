@@ -1,0 +1,17 @@
+%% renderer: mermaid stateDiagram-v2
+%% entity: Order
+%% source: order lifecycle, golden linear template
+%% Canonical transition form: trigger[guard]/action.
+%% Mermaid is correct here: this model uses no history, no entry/exit/do,
+%% no internal transitions, and no orthogonal regions.
+stateDiagram-v2
+    [*] --> Cart
+    Cart --> Placed: submit[itemsPresent]/reserveStock
+    Placed --> Paid: payment[authorized]/captureFunds
+    Placed --> Cancelled: cancel/releaseStock
+    Paid --> Shipped: dispatch/notifyCarrier
+    Paid --> Refunded: cancel[withinWindow]/refundFunds
+    Shipped --> Delivered: confirmReceipt
+    Delivered --> [*]
+    Cancelled --> [*]
+    Refunded --> [*]
