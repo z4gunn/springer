@@ -25,7 +25,7 @@ Operate in the i18n vertical's three modes. As consultant, run the audit on requ
 | Artifact | Description |
 |----------|-------------|
 | `string-externalization-audit` | Audit report written via spgr-write-artifact. Carries the hard-coded-string findings list (each with file, line, the string, its category, priority, and an extraction-effort estimate), per-category counts, and a PASS or GATE verdict. |
-| CI lint rule | Source or config written via spgr-write-file that fails the build when a new hard-coded user-visible string is introduced. Verified by run-tests or CI before the audit is marked confirmed. |
+| CI lint rule | Source or config written via spgr-write-file that fails the build when a new hard-coded user-visible string is introduced. Verified by spgr-run-tests or CI before the audit is marked confirmed. |
 
 ## Procedure
 
@@ -37,7 +37,7 @@ Operate in the i18n vertical's three modes. As consultant, run the audit on requ
 6. Flag dynamic strings (concatenated or interpolated at runtime) for manual inspection. Static analysis cannot confirm these, so record them as needs-human-input in the confidence map rather than asserting them as confirmed.
 7. Set the verdict. Return GATE when any user-visible string remains hard-coded, which is a blocking condition that prevents localization from starting. Return PASS only when no user-visible string is hard-coded outside the i18n mechanism.
 8. Write the report via spgr-write-artifact and validate it inline with spgr-validate-artifact. On a validation failure, fix the artifact and re-validate before proceeding. Version the report with spgr-version-artifact and record the verdict rationale with spgr-log-decision.
-9. Stand up the CI lint rule via spgr-write-file so a new hard-coded user-visible string fails the build, preventing regression after the initial externalization. Verify the rule with run-tests or CI.
+9. Stand up the CI lint rule via spgr-write-file so a new hard-coded user-visible string fails the build, preventing regression after the initial externalization. Verify the rule with spgr-run-tests or CI.
 10. On a GATE verdict, route the finding set to the owning developer agent through a consultation via spgr-tag-vertical-agent rather than editing that agent's code or artifacts directly. Raise spgr-escalate when an input is missing or contradictory (for example no i18n-config or an empty ui-inventory), and use spgr-notify-human when a gate blocks a release.
 
 ## Notes

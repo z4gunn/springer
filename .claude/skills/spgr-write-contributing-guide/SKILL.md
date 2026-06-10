@@ -44,7 +44,7 @@ Calibrate every section to the contributor audience. An open-source library open
 
 ## Notes
 
-- Output type: source/config (CONTRIBUTING.md plus the PR template), not an envelope artifact. There is no content schema for this output. Verification is by spgr-run-tests or CI, and the recommendation is delivered through the consultation artifact via spgr-tag-vertical-agent (whose envelope spgr-validate-artifact checks, falling back to envelope-only validation for the consultation type, with a content schema registered in a later increment).
+- Output type: source/config (CONTRIBUTING.md plus the PR template), not an envelope artifact. There is no content schema for this output. Verification is by spgr-run-tests or CI, and the recommendation is delivered through the consultation artifact via spgr-tag-vertical-agent, which spgr-validate-artifact validates in full against the registered consultation content schema.
 - Do not duplicate the local development setup. Link to or embed the dev-setup source so the setup steps live in one place and stay current.
 - The PR template and the CONTRIBUTING.md PR requirements are one contract in two files. When one changes, change both in the same commit.
 - Keep contribution policy advisory to other agents. Where merge governance touches another agent's domain (for example the code-reviewer's approval rules), route the recommendation through the consultation rather than editing that agent's artifact.

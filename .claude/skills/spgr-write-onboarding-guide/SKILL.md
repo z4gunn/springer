@@ -14,7 +14,7 @@ Write the onboarding guide that compresses the knowledge transfer a new develope
 | Field | Description |
 |-------|-------------|
 | `architecture-docs` | Service topology and key design decisions. Read approved ADRs and the system diagram via spgr-read-artifact, and any prose docs via spgr-read-file. |
-| `local-dev-setup` | The local development setup produced by scaffold-local-dev-env. Link to it or embed the steps. Read with spgr-read-file. |
+| `local-dev-setup` | The local development setup produced by spgr-scaffold-local-dev-env. Link to it or embed the steps. Read with spgr-read-file. |
 | `code-organization` | Module structure, naming conventions, and the important files and directories. Derived by reading the source tree with spgr-read-file and Grep. |
 | `development-workflow` | Branching model, PR process, and review expectations. Read from project workflow docs and CONTRIBUTING-equivalent sources with spgr-read-file. |
 | `common-gotchas` | Non-obvious behaviors, configuration traps, counterintuitive test patterns, and historical quirks gathered from the codebase, decision logs, and the team. |
@@ -33,7 +33,7 @@ Write the onboarding guide that compresses the knowledge transfer a new develope
 
 3. Write the architecture mental model section. State how the system is organized and the top three things a new developer must understand first. Link out to the system diagram and ADRs rather than restating them, so the guide stays current as those artifacts version.
 
-4. Write the local environment setup section. Link to or embed the scaffold-local-dev-env output. Do not duplicate the setup steps in a way that will drift from the source. If the local-dev-setup input is absent, link to where it will live and flag the gap in the who-to-ask section.
+4. Write the local environment setup section. Link to or embed the spgr-scaffold-local-dev-env output. Do not duplicate the setup steps in a way that will drift from the source. If the local-dev-setup input is absent, link to where it will live and flag the gap in the who-to-ask section.
 
 5. Write the codebase tour. Name the key files, the important directories, and how to find things, derived from reading the source tree. Keep it to what is non-obvious about this layout, not a generic explanation of the framework's conventions.
 

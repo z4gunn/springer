@@ -1,6 +1,6 @@
 ---
 name: spgr-write-alert-runbook
-description: Produce an alert-runbook artifact per alert, the step-by-step investigation and remediation guide an on-call engineer follows when the alert fires, covering what the alert means, severity and response time, immediate triage steps, common causes with symptoms, per-cause remediation, the escalation path, and required post-incident follow-up. Use when the Observability Agent has confirmed alert definitions from configure-alerting and an SLO spec and must write the runbook at alert-design time before the alert goes live, or when a post-incident review surfaces a new cause or remediation step that the existing runbook must absorb.
+description: Produce an alert-runbook artifact per alert, the step-by-step investigation and remediation guide an on-call engineer follows when the alert fires, covering what the alert means, severity and response time, immediate triage steps, common causes with symptoms, per-cause remediation, the escalation path, and required post-incident follow-up. Use when the Observability Agent has confirmed alert definitions from spgr-configure-alerting and an SLO spec and must write the runbook at alert-design time before the alert goes live, or when a post-incident review surfaces a new cause or remediation step that the existing runbook must absorb.
 ---
 
 # write-alert-runbook
@@ -13,7 +13,7 @@ Write the runbook for one alert so the on-call engineer who is paged does not ha
 
 | Field | Description |
 |-------|-------------|
-| `alert-definitions` | The confirmed alert definitions from configure-alerting. One runbook is produced per alert. |
+| `alert-definitions` | The confirmed alert definitions from spgr-configure-alerting. One runbook is produced per alert. |
 | `slo-spec` | The SLO the alert protects, for context on what threshold the alert defends and what breach means to users. |
 | `system-architecture` | Service dependencies and known failure modes, used to enumerate the common causes and their symptoms. |
 | `historical-incident-data` | Past incidents for this alert, if available. Common causes and proven remediation steps inform the runbook content. |
@@ -34,7 +34,7 @@ Write the runbook for one alert so the on-call engineer who is paged does not ha
 6. Write the remediation steps for each cause as executable instructions. Each step is a command, a query, a config change, or a navigation path, not a vague directive. Order the causes by likelihood where historical data supports an ordering.
 7. Write the escalation path: who to page, in what order, and the condition that triggers escalation when the runbook steps do not resolve the issue. The condition must be observable, not "if it still seems broken".
 8. Write the post-incident follow-up: the actions expected after resolution, including the requirement that this runbook is reviewed and updated with any new cause or remediation step discovered during the incident. Runbooks are living documents.
-9. State that the runbook is linked from the alert annotation so the alert notification carries a direct URL to it. If the alert definition has no runbook-URL annotation slot, that is an alerting gap. Record it and route it to the configure-alerting owner rather than shipping an unlinked runbook.
+9. State that the runbook is linked from the alert annotation so the alert notification carries a direct URL to it. If the alert definition has no runbook-URL annotation slot, that is an alerting gap. Record it and route it to the spgr-configure-alerting owner rather than shipping an unlinked runbook.
 10. Set the runbook-usage tracking the alert should emit: consultation frequency per runbook, incidents resolved without consulting the runbook, and alerts that fired with no runbook access (which signals an unlinked runbook or a non-actionable alert). Record these as required observability outputs of this runbook.
 11. Record consequential choices with spgr-log-decision, in particular a chosen severity band, a cause-ordering call, and any escalation-path decision.
 12. The Observability vertical advises on the alert definition and SLO sections but does not edit them. Where the runbook reveals that an alert is not actionable, a threshold is wrong, or an SLO is mis-set, route the recommendation to the owning agent through spgr-tag-vertical-agent rather than editing the alert definition or SLO spec directly.
@@ -43,6 +43,6 @@ Write the runbook for one alert so the on-call engineer who is paged does not ha
 ## Notes
 
 - This skill produces an envelope artifact (alert-runbook). Write it through spgr-write-artifact and confirm it inline with spgr-validate-artifact. The alert-runbook content schema is not yet in the registry at `/Users/gunderer/Repos/springer/schemas/`, so envelope-only validation applies for now (header, confidence map, decision log, and version are checked). Its content schema is registered in a later build increment.
-- This skill writes the runbook only. It does not define alerts (configure-alerting) and it does not set SLOs (write-slo-spec). A runbook for an alert that does not exist, or that defends no SLO, is not confirmable and must be escalated to the owning agent.
+- This skill writes the runbook only. It does not define alerts (spgr-configure-alerting) and it does not set SLOs (spgr-write-slo-spec). A runbook for an alert that does not exist, or that defends no SLO, is not confirmable and must be escalated to the owning agent.
 - A runbook step is acceptable only if it is executable as written. Any step that requires the engineer to invent the procedure is incomplete and the runbook must not be marked confirmed until it is replaced with a concrete action.
 - A runbook is a living document. After every incident on this alert, the runbook is reviewed and updated. A new version is stamped with spgr-version-artifact when it changes after first write.

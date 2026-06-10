@@ -51,7 +51,7 @@ Operate as the Developer Experience vertical in auditor mode. The report is advi
 
 ## Notes
 
-- Output type is an audit or review report (envelope artifact) carrying findings by surface and a PASS or GATE verdict. spgr-validate-artifact applies envelope-only validation to the `dx-friction-audit` type for now (header, confidence map, decision log, version); its content schema is registered in a later increment.
+- Output type is an audit or review report (envelope artifact) carrying findings by surface and a PASS or GATE verdict. spgr-validate-artifact applies envelope-only validation to the `dx-friction-audit` type (header, confidence map, decision log, version) until a content schema is registered.
 - Gate thresholds are exact and not negotiable per run: fast-suite stage over 5 minutes, flaky-test rate over 1 percent without a code change. These are the only two blocking conditions. Every other finding is advisory.
 - A vertical recommendation reaches a horizontal agent through the registered consultation artifact (spgr-tag-vertical-agent), not by editing the other agent's output.
 - Take developer feedback as ground truth even when the named friction looks minor from outside. A surface that developers report but the metrics do not yet show is a needs-human-input finding, not a dismissal.

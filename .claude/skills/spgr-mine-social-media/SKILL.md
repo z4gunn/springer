@@ -37,7 +37,7 @@ Social media is the most temporally current and emotionally expressive discovery
 
 2. Select platforms. Default to all four. Match platform to market when the domain is clear: LinkedIn for B2B problems, Twitter/X and Bluesky for technical and startup communities, Facebook Groups for consumer and SMB markets. Record platform selection rationale with spgr-log-decision.
 
-3. Run a per-platform keyword search pass. Use search-web with a platform-specific site filter (for example `site:twitter.com`, `site:linkedin.com`, `site:bsky.app`) for each platform, querying the `hashtag_keyword_set` and each entry in `product_names`. Apply `date_filter`. Use a platform search API directly where one is available rather than the site-filtered fallback.
+3. Run a per-platform keyword search pass. Use spgr-search-web with a platform-specific site filter (for example `site:twitter.com`, `site:linkedin.com`, `site:bsky.app`) for each platform, querying the `hashtag_keyword_set` and each entry in `product_names`. Apply `date_filter`. Use a platform search API directly where one is available rather than the site-filtered fallback.
 
 4. Filter by engagement. Drop any post below `engagement_threshold` (likes plus replies). Capture each kept post as a source with URL, platform, date, likes, replies, and a short excerpt.
 

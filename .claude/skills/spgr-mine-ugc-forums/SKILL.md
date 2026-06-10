@@ -36,7 +36,7 @@ This skill runs in Phase 1, where no code is written. It is a discovery research
 
 1. Expand the keyword set before searching. Add synonyms, related terms, and competitor brand names to maximize coverage. Record the expanded set so the search pass is reproducible.
 
-2. Run a per-platform search pass with the search-web tool using `search_context: market`. Construct platform-specific queries with site operators: `site:reddit.com`, `site:news.ycombinator.com`, `site:stackoverflow.com`, `site:quora.com`, and the relevant niche-forum domains. Honor the `platforms` subset if one was given, otherwise search all five. Apply the date filter, defaulting to the last 24 months, since older posts may describe problems competitors have already solved.
+2. Run a per-platform search pass with spgr-search-web using `search_context: market`. Construct platform-specific queries with site operators: `site:reddit.com`, `site:news.ycombinator.com`, `site:stackoverflow.com`, `site:quora.com`, and the relevant niche-forum domains. Honor the `platforms` subset if one was given, otherwise search all five. Apply the date filter, defaulting to the last 24 months, since older posts may describe problems competitors have already solved.
 
 3. Search across all selected platforms, not one. Different communities surface different pain. Reddit shows consumer-level frustration, Hacker News surfaces technical and founder perspectives, Stack Overflow reveals implementation-level friction, Quora surfaces questions from people who never found a solution. For B2B or vertical products, weight niche forums, which often yield higher-quality signals than general platforms.
 

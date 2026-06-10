@@ -36,11 +36,11 @@ Turn a stack trace, error log, or failing test output into a structured diagnosi
 7. Escalate, do not guess, when the evidence cannot support at least medium confidence. Raise a precise request for the missing input with spgr-escalate: more verbose logging, a minimal reproduction case, or the output of a named diagnostic step. Do not fill the gap with an assumed cause.
 8. Rank the remediation options most-likely-to-fix first, each with its tradeoff. State for each whether it addresses the root cause or only the symptom.
 9. Name the regression test that the fix must include: the test that would have caught this error. The fix is incomplete without it, and the developer agent writes it test-first with spgr-write-acceptance-criteria and spgr-run-tests when applying the fix.
-10. Write the diagnosis with spgr-write-artifact and validate it inline with spgr-validate-artifact against its registered schema. Record the chosen root cause and the rejected alternatives with spgr-log-decision. On a new confirmed signature, add a pattern library entry with spgr-write-file.
+10. Write the diagnosis with spgr-write-artifact and validate it inline with spgr-validate-artifact. Record the chosen root cause and the rejected alternatives with spgr-log-decision. On a new confirmed signature, add a pattern library entry with spgr-write-file.
 
 ## Notes
 
-- The error-diagnosis is an envelope artifact written via spgr-write-artifact. Its registered schema is added to the schema registry at /Users/gunderer/Repos/springer/schemas/ in a later increment. Validate through spgr-validate-artifact rather than inlining a field list here.
+- Output type is an envelope artifact written via spgr-write-artifact. The error-diagnosis type has no registered content schema yet, so spgr-validate-artifact applies envelope-only validation (header, confidence map, decision log, version) until a content schema is registered.
 - This skill does not write or apply the fix. It hands a ranked, evidence-backed diagnosis to the developer agent, which applies the fix test-first under XP discipline and writes the named regression test before the implementation.
 - Confidence is a contract, not a courtesy. A medium or low confidence is a signal to the receiving agent that the fix may iterate, and a low confidence with a missing-input escalation is the correct output when the evidence is thin.
 - The error pattern library accelerates known failure modes only. A library match still requires the current evidence to fit before the recorded root cause is asserted.

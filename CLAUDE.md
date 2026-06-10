@@ -40,7 +40,7 @@ springer/
 
 A repo-level README.md is intentional and is not an auxiliary file in the no-README sense. The no-README rule in Universal Rules below applies inside a skill or agent directory, not at the repository root.
 
-Spec source (read-only): Phase 1 specs live in `~/Repos/ecg-intel/vault/40-projects/springer/`, as `skills/spgr-skill-*.md` and `agents/spgr-agent-*.md`. Each spec contains a "Phase 2 Build Notes" section, which is the build brief for that artifact. Specs are not edited from this repository.
+Spec source (read-only): Phase 1 specs live in `~/Repos/ecg-intel/vault/40-projects/archive/springer/`, as `skills/spgr-skill-*.md` and `agents/spgr-agent-*.md`. Each spec contains a "Phase 2 Build Notes" section, which is the build brief for that artifact. Specs are not edited from this repository.
 
 External skill dependency (read-only): The `spgr-render-diagram-excalidraw` skill builds on the globally installed `excalidraw-diagram` skill at `~/.claude/skills/excalidraw-diagram/`, reusing its color palette, element templates, and render methodology by absolute path. That skill must be present for render-diagram-excalidraw to run. It is not vendored into this repository.
 
@@ -123,4 +123,4 @@ This section states the commit and branch rules.
 - Commit directly to `main`. Push after a unit of work is complete. A branch and PR are opt-in.
 - Use conventional commit messages, scoped by what changed (e.g. `feat(agent): build spgr-agent-architect`, `feat(skill): build spgr-write-prd`, `chore(schemas): add prd schema`).
 - Never commit secrets or `.env`.
-- The full project roadmap lives in the ecg-intel vault at `vault/40-projects/springer/spgr-project.md` and `vault/30-research/software-engineering/methodology-comparison-agentic-coding.md`.
+- The full project roadmap lives in the ecg-intel vault at `vault/40-projects/archive/springer/spgr-project.md` and `vault/30-research/software-engineering/methodology-comparison-agentic-coding.md`.

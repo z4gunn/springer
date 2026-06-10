@@ -34,12 +34,12 @@ Raise the project version and update all version references in one operation so 
 3. Read each file in `version_reference_files` via spgr-read-file and confirm the located version string matches `current_version` before replacing it. A mismatch means the reference list is stale or the project drifted, so escalate via spgr-escalate rather than overwriting an unexpected value.
 4. Write the new version into every reference file via spgr-write-file. When `is_mobile`, increment the build-number integer in the same operation so the user-visible string and the build number move together.
 5. Stage only the version-reference files and create the dedicated commit `chore(release): bump version to X.Y.Z`. Do not include feature or source changes in this commit, so the history separates release churn from feature work.
-6. Verify the commit through run-tests or CI. Record the bump type, derived-versus-overridden source, and resulting version with spgr-log-decision.
+6. Verify the commit through spgr-run-tests or CI. Record the bump type, derived-versus-overridden source, and resulting version with spgr-log-decision.
 7. Escalate via spgr-escalate when the changelog has no unreleased entries, when entry categories conflict so no single bump type follows, when a reference file does not contain the expected current version, or when the computed version already exists as a tag.
 
 ## Notes
 
-- Output type is SOURCE or CONFIG. This skill edits version-reference files in the codebase and lands a dedicated commit. It does not emit an envelope artifact, so spgr-validate-artifact does not apply. Verification is by run-tests or CI on the resulting commit.
+- Output type is SOURCE or CONFIG. This skill edits version-reference files in the codebase and lands a dedicated commit. It does not emit an envelope artifact, so spgr-validate-artifact does not apply. Verification is by spgr-run-tests or CI on the resulting commit.
 - Semver mapping: breaking API change to `major`, new backward-compatible feature to `minor`, bug fix to `patch`. The type follows the changelog content, not a manual pick.
 - Mobile carries two version concepts. The user-visible semver string and the monotonically increasing build-number integer update in the same operation.
 - The version bump is always its own commit, never combined with feature changes.

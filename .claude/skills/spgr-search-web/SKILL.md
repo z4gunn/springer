@@ -30,7 +30,7 @@ Ground a downstream artifact in current, citable external intelligence rather th
 ## Procedure
 
 1. Read the query and `search_context`. For a `competitive` context, expand the query to also cover pricing, reviews, and changelog pages before searching. Apply `date_filter`, defaulting to the last 12 months when the context is `competitive`.
-2. Run the search with WebSearch. Fetch full-page content with WebFetch only when a result snippet is too thin to summarize or quote accurately. Use the largest persisted file read or write through spgr-read-file and spgr-write-file if intermediate content must be staged.
+2. Run the search with WebSearch. Fetch full-page content with WebFetch only when a result snippet is too thin to summarize or quote accurately. If intermediate content must be staged, read and write it through spgr-read-file and spgr-write-file.
 3. On a rate-limit or transient failure, back off exponentially and retry. Cache results by query hash for the session so a repeated query does not re-call the search API.
 4. Deduplicate sources by domain. Hash the domain of each result URL and keep the single highest-ranked result per domain. Strip tracker parameters (`utm_*`, `ref=`, and similar) from every URL before recording it.
 5. Build `findings_summary`, `sources`, and `key_quotes`. Flag any source older than 18 months as `[POTENTIALLY STALE]` in its `relevance_note`. For paywalled content, do not summarize the body. Record the URL, note the paywall, and add the item to `gaps` for human follow-up.

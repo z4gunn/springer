@@ -9,7 +9,7 @@ description: Produce an aria-spec artifact that assigns the ARIA role, required 
 
 Define the screen-reader contract for interactive and dynamic components before they are built. A control that reads as a button to a sighted user can be invisible or misidentified to a screen-reader user without the correct role, state, and property assignments. Produce one aria-spec artifact that developers implement against, so the accessibility semantics are part of the design rather than a later patch.
 
-This is an Accessibility vertical skill. The aria-spec is a recommendation to the frontend or mobile horizontal agent. Deliver it as a consultation through spgr-tag-vertical-agent rather than editing the component code or another agent's artifact. The vertical operates here as consultant (answering a tagged request for a component contract) and as gate input (the spec is the source check-wcag-compliance and the accessibility audit verify against).
+This is an Accessibility vertical skill. The aria-spec is a recommendation to the frontend or mobile horizontal agent. Deliver it as a consultation through spgr-tag-vertical-agent rather than editing the component code or another agent's artifact. The vertical operates here as consultant (answering a tagged request for a component contract) and as gate input (the spec is the source that spgr-check-wcag-compliance and the accessibility audit verify against).
 
 ## Inputs
 

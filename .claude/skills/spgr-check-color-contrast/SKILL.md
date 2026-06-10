@@ -37,7 +37,7 @@ The report records, per color pair: foreground hex, background hex, calculated c
 3. Compute the contrast ratio for each pair. Apply the threshold for the pair's role and text size:
    - Normal text: 4.5:1 for AA, 7:1 for AAA.
    - Large text (18pt or larger regular, 14pt or larger bold): 3:1 for AA, 4.5:1 for AAA.
-   - UI component boundaries and graphical objects (WCAG 2.2 criterion 1.4.11, Non-text Contrast): 3:1. This covers button borders, form input boundaries, and focus indicators.
+   - UI component boundaries and graphical objects (WCAG 2.1 criterion 1.4.11, Non-text Contrast): 3:1. This covers button borders, form input boundaries, and focus indicators.
 
 4. Cross-validate with at least two independent contrast tools before recording a Fail, so a borderline ratio is not mis-flagged. Record the level achieved per pair.
 

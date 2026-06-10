@@ -39,6 +39,6 @@ Write the project's role-based access control policy as the single contract betw
 
 ## Notes
 
-- The rbac-policy type is not yet in the schema registry. The artifact is written via spgr-write-artifact and its registered JSON Schema is added in a later build increment. Until then, validate structural completeness against this procedure rather than spgr-validate-artifact.
+- Output type is an envelope artifact written via spgr-write-artifact. The rbac-policy type has no registered content schema yet, so spgr-validate-artifact applies envelope-only validation (header, confidence map, decision log, version) until a content schema is registered. Still call it on every write, and check structural completeness against this procedure in addition.
 - Least privilege is the governing rule. Every grant must trace to a feature access requirement. A grant with no requirement is removed, not retained for convenience.
 - The policy is queryable by design. The effective permission set of any role must be answerable from the role definitions, the matrix, and the hierarchy without reading application code.

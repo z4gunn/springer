@@ -47,5 +47,5 @@ Per target language, write these as source files via `spgr-write-file`:
 ## Notes
 
 - Output type is SOURCE OR CONFIG (generated SDK packages plus contract tests), written via `spgr-write-file` and verified by `spgr-run-tests` or CI, not an envelope content schema. The generation-run record in step 8 is an envelope artifact whose content schema is registered in a later increment, so envelope-only validation applies for now.
-- Publishing to a package registry (npm, PyPI) is the DevOps Agent's step. This skill produces and verifies the package; hand off the publish through the consultation path, do not publish from here.
+- Publishing to a package registry (npm, PyPI) is the DevOps Agent's step. This skill produces and verifies the package. Hand off the publish through the consultation path, do not publish from here.
 - The contract test against staging is a hard gate. An SDK whose generated methods do not pass against the live staging API is not shippable output.

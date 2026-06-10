@@ -35,7 +35,7 @@ The artifact body is `{ target_market, problem_space, competitors: [{name, type,
 
 1. Validate the input. Confirm `target_market`, `problem_space`, `geography`, and `depth` are present and that `depth` is one of `surface`, `standard`, or `deep`. If any required field is missing or contradictory, stop and call spgr-escalate with the precise list of what is missing. Do not fill gaps with assumptions.
 
-2. Run the discovery pass. Use search-web to identify all relevant competitors across three categories: direct competitors (same problem, same audience), indirect alternatives (different solution, same problem), and the do-nothing option (status-quo tools such as spreadsheets or email). Fold in any `competitor_hints`. Apply the dedup rule: treat an acquired product and its parent company as separate entries when both are actively marketed.
+2. Run the discovery pass. Use spgr-search-web to identify all relevant competitors across three categories: direct competitors (same problem, same audience), indirect alternatives (different solution, same problem), and the do-nothing option (status-quo tools such as spreadsheets or email). Fold in any `competitor_hints`. Apply the dedup rule: treat an acquired product and its parent company as separate entries when both are actively marketed.
 
 3. Run the deep-dive pass per competitor. For each entry, capture name, founding year, funding stage if public, primary use case, key features, pricing, target audience, known weaknesses, and a one-line positioning statement. Source weaknesses from spgr-mine-support-data and review-platform data rather than relying on competitor marketing pages alone. When mobile competitors exist, mine app-store reviews as a weakness source.
 

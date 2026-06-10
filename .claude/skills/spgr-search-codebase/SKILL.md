@@ -37,7 +37,7 @@ Give a code-changing agent precise, line-numbered evidence of where a symbol is 
 
 3. Construct the search as a ripgrep command following the template `rg --json -n -C {context_lines} {flags} '{search_term}' {path}`. Set `{flags}` from the inputs: `-i` when not case sensitive, `--glob '{file_glob}'` when a glob is given, `--type {language}` when a language filter maps to a ripgrep type. Scope `{path}` to the repository root or to the glob.
 
-4. Rely on ripgrep default ignore behavior so files in `.gitignore`, `.dockerignore`, and `node_modules/` are not searched. Do not add flags that override these ignores. Binary files are skipped silently; capture the skipped count for `skipped_binaries`.
+4. Rely on ripgrep default ignore behavior so files in `.gitignore`, `.dockerignore`, and `node_modules/` are not searched. Do not add flags that override these ignores. Binary files are skipped silently, so capture the skipped count for `skipped_binaries`.
 
 5. For a symbol search (a function, class, or method name), run both a literal search and a regex search that covers common naming variants of the same symbol (camelCase, snake_case, PascalCase) so a rename or convention difference does not hide a real usage. Merge the results and dedupe by file and line.
 

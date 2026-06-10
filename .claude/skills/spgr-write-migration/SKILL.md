@@ -31,14 +31,14 @@ Produce a database schema migration that follows the expand/contract pattern. A 
 4. Detect whether any column or table the contract phase would remove is still referenced by application code. Grep the codebase for the identifier. If a live reference exists, do not emit the contract migration. Stop and raise spgr-escalate naming the referencing files.
 5. Write the up migration for the phase being produced. Write a working down migration that restores the exact prior state. Do not mark any schema change irreversible. Find the reversible equivalent, for example back up data before a transform so the down step can restore it.
 6. Name the file timestamp-first so ordering is unambiguous, then write it via spgr-write-file.
-7. Run validate-migration-safety on the migration before commit. If that skill flags a destructive operation, or the strategy or delta requires a DROP or a data transformation, raise spgr-notify-human and do not commit until a human approves. A safety pass alone does not authorize a destructive migration.
+7. Run spgr-validate-migration-safety on the migration before commit. If that skill flags a destructive operation, or the strategy or delta requires a DROP or a data transformation, raise spgr-notify-human and do not commit until a human approves. A safety pass alone does not authorize a destructive migration.
 8. Test the migration up and down against a staging snapshot via spgr-run-tests before it can target production. Confirm the down migration restores the snapshot state. If either direction fails, fix the script or raise spgr-escalate.
 9. Record the expand/contract phasing decision and the chosen strategy with spgr-log-decision so the contract phase has a traceable predecessor.
 
 ## Notes
 
-- The output is source code, verified by validate-migration-safety, spgr-run-tests against a staging snapshot, and CI, not by an envelope schema. There is no registered artifact schema for the migration file itself.
-- Every destructive operation is a human gate. DROP COLUMN, DROP TABLE, a data transformation, or any irreversible-by-default change routes through spgr-notify-human even when validate-migration-safety approves it.
+- The output is source code, verified by spgr-validate-migration-safety, spgr-run-tests against a staging snapshot, and CI, not by an envelope schema. There is no registered artifact schema for the migration file itself.
+- Every destructive operation is a human gate. DROP COLUMN, DROP TABLE, a data transformation, or any irreversible-by-default change routes through spgr-notify-human even when spgr-validate-migration-safety approves it.
 - One logical schema change per migration and per commit. A phase that adds and removes related structures together must be split into separate migrations.
 - Lint and format the migration clean before commit. Confirm the down migration exists and runs for every up migration.
-- The PR for a migration carries a checklist the code-reviewer agent enforces: expand/contract split confirmed, down migration present and tested, validate-migration-safety passed, and tested against a staging snapshot.
+- The PR for a migration carries a checklist the code-reviewer agent enforces: expand/contract split confirmed, down migration present and tested, spgr-validate-migration-safety passed, and tested against a staging snapshot.

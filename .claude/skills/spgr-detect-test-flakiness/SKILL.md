@@ -37,7 +37,7 @@ A flaky test is a test that lies. It sometimes reports broken code that works, a
 7. For each test at or above the 5% threshold, move it to the quarantine CI job with spgr-write-file and create the remediation ticket automatically. No manual step. The quarantine job runs on the same schedule but does not block merges or deployments. Quarantine is not deletion: the test keeps running so its failure data accumulates and confirms when remediation is complete.
 8. Set each quarantined test a remediation deadline at the end of the current sprint. Record that a test not fixed or deleted by that date is deleted, not extended.
 9. Un-flag any previously quarantined test that is now stable across the analyzed window and return it to the main suite.
-10. Write the flakiness report with spgr-write-artifact. Validate inline with spgr-validate-artifact against the registered schema. Record consequential calls, such as the chosen failure-rate threshold or a deletion recommendation, with spgr-log-decision.
+10. Write the flakiness report with spgr-write-artifact. Validate inline with spgr-validate-artifact. Record consequential calls, such as the chosen failure-rate threshold or a deletion recommendation, with spgr-log-decision.
 11. If a quarantined test reaches its deadline unfixed, escalate the delete-or-fix decision with spgr-escalate rather than silently extending quarantine.
 
 ## Root-cause catalog
@@ -53,6 +53,6 @@ A flaky test is a test that lies. It sometimes reports broken code that works, a
 - Run flakiness detection weekly on a rolling window so new flakes are caught as they appear and recovered tests are un-flagged.
 - The remediation deadline is a hard rule: fix or delete within the quarantine sprint. Quarantine indefinitely is test-debt accumulation. A test that is consistently flaky and cannot be fixed is almost always badly designed, so delete it and replace it with a more deterministic test of the same behavior.
 - Surface the flakiness backlog as a quality metric over time: total flaky count, remediations completed per sprint, and average time in quarantine before fix or deletion. Emit these trend metrics into the report summary.
-- The flakiness-report type is not yet in the registered envelope schema. Write it via spgr-write-artifact with its registered schema added in a later increment, and validate inline with spgr-validate-artifact once that schema lands.
+- Output type is an envelope artifact written via spgr-write-artifact. The flakiness-report type has no registered content schema yet, so spgr-validate-artifact applies envelope-only validation (header, confidence map, decision log, version) until a content schema is registered.
 - Quarantine CI-job config and test-file edits are source code, verified by spgr-run-tests and CI rather than by an envelope schema.
 - This skill detects and triages flakiness only. The actual test rewrite for each remediation belongs to the relevant test-authoring skill (for example spgr-write-unit-test or spgr-write-integration-test).

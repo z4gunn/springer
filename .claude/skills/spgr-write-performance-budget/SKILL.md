@@ -22,7 +22,7 @@ Set the numbers that define "fast enough" and the numbers that define a release-
 
 | Artifact | Description |
 |----------|-------------|
-| `performance-budget` | Thresholds per critical journey for: API response time (p50, p95, p99) per endpoint category; web page load (Time to First Byte, Largest Contentful Paint, First Input Delay); mobile frame rate (60 fps sustained, no jank on scroll or animation); database query time (p95 per category: read, write, complex query); background job completion time per job type. Includes a regression threshold (when a metric exceeds budget by X percent it is a blocking issue) and a CI benchmark-gate definition that runs the benchmark suite on every PR and fails on any over-budget metric. |
+| `performance-budget` | Thresholds per critical journey for API response time (p50, p95, p99) per endpoint category, web page load (Time to First Byte, Largest Contentful Paint, First Input Delay), mobile frame rate (60 fps sustained, no jank on scroll or animation), database query time (p95 per read, write, and complex-query category), and background job completion time per job type. Includes a regression threshold (when a metric exceeds budget by X percent it is a blocking issue) and a CI benchmark-gate definition that runs the benchmark suite on every PR and fails on any over-budget metric. |
 
 ## Procedure
 
@@ -42,6 +42,6 @@ Set the numbers that define "fast enough" and the numbers that define a release-
 
 ## Notes
 
-- This is an envelope artifact (a performance spec). Write it through spgr-write-artifact and validate inline with spgr-validate-artifact. The performance-budget type is not yet in the schema registry at `/Users/gunderer/Repos/springer/schemas/`, so envelope-only validation applies for now (header, confidence map, decision log, version); its content schema is registered in a later build increment.
+- This is an envelope artifact (a performance spec). Write it through spgr-write-artifact and validate inline with spgr-validate-artifact. The performance-budget type is not yet in the schema registry at `/Users/gunderer/Repos/springer/schemas/`, so envelope-only validation applies (header, confidence map, decision log, version) until a content schema is registered.
 - This skill produces the budget only. It does not write the load-test plan and it does not write the SLO spec. It supplies the p95 latency thresholds those artifacts consume, routed through a consultation, not a direct edit.
 - A threshold is confirmable only if it is testable against the target infrastructure. A number the system cannot meet at the expected scale is not a budget, it is a defect waiting to be filed, and it must be escalated to architecture instead of written.

@@ -35,7 +35,7 @@ Documentation coverage erodes on every release that ships code without the match
 5. Check README freshness, focused on the quickstart. Confirm the quickstart commands, version references, and configuration match the current release. Run the quickstart from a clean environment. A quickstart that does not work from clean is a blocking gap.
 6. Check changelog completeness. Compare the changelog against the release scope and the commit history. List every release change that is not reflected in the changelog.
 7. Set the verdict. Return GAPS, blocking, when any public API change is undocumented, when a major user-facing feature has no guide, or when the quickstart fails from clean. Return GAPS, non-blocking, for lower-severity gaps such as a docstring dip on internal exports. Return COMPLETE only when no blocking gap remains. Record the verdict and any judgment call, such as what counts as a major feature, with spgr-log-decision.
-8. Write the doc-coverage report with spgr-write-artifact and validate it inline with spgr-validate-artifact against its registered schema.
+8. Write the doc-coverage report with spgr-write-artifact and validate it inline with spgr-validate-artifact.
 9. On a blocking verdict, raise spgr-escalate to the release gate with the precise gap list, and tag the Documentation Agent via spgr-tag-vertical-agent so the gaps are assigned rather than discovered at ship time.
 
 ## Notes
@@ -44,5 +44,5 @@ Documentation coverage erodes on every release that ships code without the match
 - Docstring coverage is a metric over time, not a one-time pass. A project that starts at sixty percent does not drop below that without a recorded decision, so always compare against the docstring baseline and emit the trend into the report summary.
 - The README freshness check centers on the quickstart, because a quickstart that fails from a clean environment blocks every new developer regardless of the rest of the docs.
 - This skill audits and reports only. It does not write the missing docs. API reference generation, docstring generation, and guide authoring belong to the dedicated documentation skills.
-- The doc-coverage-report type is not yet in the registered envelope schema. Write it via spgr-write-artifact with its registered schema added in a later increment, and validate inline with spgr-validate-artifact once that schema lands.
+- Output type is an envelope artifact written via spgr-write-artifact. The doc-coverage-report type has no registered content schema yet, so spgr-validate-artifact applies envelope-only validation (header, confidence map, decision log, version) until a content schema is registered.
 - Run this audit from CI on every release candidate so coverage is measured automatically: API coverage from api spec analysis, docstring coverage from language tooling, and changelog completeness from commit analysis.

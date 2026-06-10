@@ -45,4 +45,4 @@ Write the store-facing listing content for both iOS App Store and Google Play as
 - Output type is an envelope spec artifact (`app-store-listing`). Its content schema is registered in a later increment, so spgr-validate-artifact applies envelope-only validation (header, confidence map, decision log, version) for now.
 - Hold every field to its store character limit. A field over the limit is a hard failure, not a warning, since the store truncates or rejects it.
 - Mark each field's confidence in the artifact: confirmed where the input supports it, proposed where a keyword or copy choice is a judgment call, needs-human-input where a market or legal claim needs human sign-off before submission.
-- Submission-readiness verification belongs to spgr-run-submission-checklist, not this skill. This skill produces the content; the checklist gates the submission.
+- Submission-readiness verification belongs to spgr-run-submission-checklist, not this skill. This skill produces the content. The checklist gates the submission.

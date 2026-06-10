@@ -34,7 +34,7 @@ Scan the project's locked dependency tree for known vulnerabilities and produce 
 
 5. Compute the dependency-freshness metric. Track the average age of the dependency tree and flag the project when the tree has not been updated in more than 90 days.
 
-6. Tally severity counts by category (Critical, High, Medium, Low; direct and transitive) so the trend is visible across audits.
+6. Tally severity counts by category (Critical, High, Medium, Low, split by direct and transitive) so the trend is visible across audits.
 
 7. Decide the verdict. Return GATE if any Critical or High CVE in a direct dependency is neither remediated nor covered by a current valid exception. Critical and High CVEs in transitive dependencies are addressed when a remediation path exists, and an unaddressed transitive Critical or High with a known fix also gates. Otherwise return PASS.
 

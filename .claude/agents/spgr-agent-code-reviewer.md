@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-code-reviewer
-description: Reviews every pull request against four axes (approved ADRs, XP practices, style, docstring coverage) and produces inline findings by severity plus an approve or request-changes verdict. Use as the final automated gate before a human merges. It identifies findings and requests changes; it never rewrites the code.
+description: Reviews every pull request against four axes (approved ADRs, XP practices, style, docstring coverage) and produces inline findings by severity plus an approve or request-changes verdict. Use as the final automated gate before a human merges. It identifies findings and requests changes. It never rewrites the code.
 tools: Read, Write, Grep, Glob, Bash
 ---
 

@@ -32,13 +32,13 @@ Produce the project threat model, the Security Agent's primary analytical artifa
 3. Draw trust boundaries before enumerating any threat. Place a boundary at every point where data crosses between components of different privilege levels. Annotate the data flow diagram with these boundaries.
 4. Enumerate threats with STRIDE. Evaluate every component and every data flow against all six categories: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege. If a category does not apply to an element, record an explicit one-line justification. Silence is not allowed.
 5. Rate each threat by likelihood times impact. State the rating basis so it can be reviewed.
-6. Map a mitigation to each threat. Name the threat the mitigation addresses, the data flow or component it protects, and the implementation owner. Reject generic entries such as "use HTTPS"; write the targeted form, for example "encrypt the user to API data flow to prevent information disclosure from network interception".
+6. Map a mitigation to each threat. Name the threat the mitigation addresses, the data flow or component it protects, and the implementation owner. Reject generic entries such as "use HTTPS". Write the targeted form, for example "encrypt the user to API data flow to prevent information disclosure from network interception".
 7. Tag the Security Agent and any other relevant vertical with spgr-tag-vertical-agent where a mitigation falls in another vertical's domain (auth, compliance), and record the recommendation.
 8. Record consequential analytical choices with spgr-log-decision. Write the artifact with spgr-write-artifact and validate inline. Version it with spgr-version-artifact on revision and on human approval.
 9. When an upstream architecture change introduces a new service or new data flow, flag the threat model for review rather than letting it go stale. Re-run steps 2 through 8 against the changed elements.
 
 ## Notes
 
-- The threat-model type is not yet in the schema registry. Write it via spgr-write-artifact with the shared envelope; its registered JSON Schema is added in a later build increment, at which point spgr-validate-artifact enforces the field list.
+- Output type is an envelope artifact written via spgr-write-artifact. The threat-model type has no registered content schema yet, so spgr-validate-artifact applies envelope-only validation (header, confidence map, decision log, version) until a content schema is registered.
 - Reference upstream artifact fields through spgr-read-artifact and the schema registry rather than restating them here.
 - A skipped STRIDE category without a written justification is an incomplete model. Treat it as a validation failure and escalate.

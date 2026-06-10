@@ -47,7 +47,7 @@ Write the artifact with spgr-write-artifact and validate it inline with spgr-val
 
 Run two passes. The first gathers raw data. The second applies the calculation framework with explicit arithmetic.
 
-1. Gather raw data. Use WebSearch and WebFetch for industry reports, population statistics, and ARPU benchmarks. Use spgr-mine-support-data for competitor pricing signals. Record every figure with its source URL and the retrieval date. Do not carry a number forward without a citation.
+1. Gather raw data. Use spgr-search-web for industry reports, population statistics, and ARPU benchmarks, and with `search_context: pricing` for competitor pricing signals. Record every figure with its source URL and the retrieval date. Do not carry a number forward without a citation.
 
 2. Build the bottom-up estimate from the ICP. This is the primary methodology. Count the number of ICP-matching entities, then apply the formulas:
    - TAM = total_population x addressable_fraction x ARPU_annual

@@ -41,6 +41,6 @@ This is source output. Write the `.xcprivacy` file with spgr-write-file and veri
 
 ## Notes
 
-- Output type: source file (`PrivacyInfo.xcprivacy`) plus a CI verification step, written with spgr-write-file and verified by CI. It is not an envelope artifact, so it does not carry a content schema. The consultation back to the Compliance Agent is the registered artifact, validated with spgr-validate-artifact, whose content schema is registered in a later increment (envelope-only validation applies for now).
+- Output type: source file (`PrivacyInfo.xcprivacy`) plus a CI verification step, written with spgr-write-file and verified by CI. It is not an envelope artifact, so it does not carry a content schema. The consultation back to the Compliance Agent is the registered artifact, validated in full by spgr-validate-artifact against the registered consultation content schema.
 - A collected data type with no source field in the data classification, a Required Reason API with no approved reason code, or an SDK with no Privacy Manifest is a blocking gap. Do not ship the manifest until each is resolved or escalated.
 - `NSPrivacyTracking` is never left unset. The default of an unanswered tracking question is a rejection risk, so declare `YES` or `NO` explicitly.

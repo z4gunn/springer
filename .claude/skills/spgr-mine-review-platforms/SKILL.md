@@ -35,7 +35,7 @@ Review platforms capture a different audience than UGC forums or social media. G
 
 1. Resolve the input. Require either `competitor_name` or `product_category`. If neither is present, stop and escalate through spgr-escalate with a precise list of what is missing. Do not guess a target. Apply the defaults for `platforms`, `date_filter`, and `review_count_target` when not supplied.
 
-2. Run a per-platform search and extraction pass over each platform in `platforms`. Use spgr-search-web with a site-scoped query per platform: `site:g2.com`, `site:capterra.com`, `site:trustpilot.com`, `site:producthunt.com`. Fetch individual review pages with spgr-read-file for the URLs the search returns. Honor `date_filter` and stop a platform pass at `review_count_target`.
+2. Run a per-platform search and extraction pass over each platform in `platforms`. Use spgr-search-web with a site-scoped query per platform: `site:g2.com`, `site:capterra.com`, `site:trustpilot.com`, `site:producthunt.com`. Fetch individual review pages with WebFetch for the URLs the search returns. Honor `date_filter` and stop a platform pass at `review_count_target`.
 
 3. Respect platform terms. Do not bulk-scrape review text in a way that violates a platform's terms of service. Where full page access is unavailable, work from public search result snippets and summarization rather than forcing a scrape. Record which platforms were summarized versus fully read in `sources`.
 
