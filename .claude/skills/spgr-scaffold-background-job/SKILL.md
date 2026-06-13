@@ -42,7 +42,7 @@ Generate the correct background job scaffold from the async job spec so a develo
 
 6. Generate the type-safe enqueue helper that constructs the payload against the typed schema and enqueues it, so an invalid payload fails at the enqueue call site. Wire the observability instrumentation to emit the spec-defined metrics for enqueue, start, success, failure, and duration. The metrics are pre-wired, never deferred.
 
-7. Run spgr-run-tests and confirm the success, retryable-failure, and non-retryable-failure tests now pass against the scaffold. Run lint and format and confirm both are clean before commit.
+7. Run spgr-run-tests and confirm the success, retryable-failure, and non-retryable-failure tests now pass against the scaffold. Run lint and format and confirm both are clean before commit. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`.
 
 8. Confirm the scaffold matches the spec: the payload schema, retry config, and metric set agree with the async job spec exactly. If the spec cannot be satisfied within the framework or stack, do not deviate silently. Raise spgr-escalate to request a spec change versioned through spgr-version-artifact, and consult the Async Infrastructure vertical with spgr-tag-vertical-agent. Record any consequential scaffolding choice with spgr-log-decision.
 

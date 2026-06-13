@@ -42,7 +42,7 @@ Create a seed script that loads a predictable dataset into development and test 
 
 7. Write the scenario-to-story map into the source so a developer can load the right context fast. List each scenario, the entities and counts it loads, and the user-story IDs it supports.
 
-8. Write the script with spgr-write-file. Validate the result by running it against a clean test database, then running it a second time, and confirming the two loads are identical. Run the project test suite that depends on the seed with spgr-run-tests. Lint and format the source clean before the change is committed. Record any consequential modeling choice (for example, how a boundary value was chosen) with spgr-log-decision.
+8. Write the script with spgr-write-file. Validate the result by running it against a clean test database, then running it a second time, and confirming the two loads are identical. Run the project test suite that depends on the seed with spgr-run-tests. Lint and format the source clean before the change is committed. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Record any consequential modeling choice (for example, how a boundary value was chosen) with spgr-log-decision.
 
 ## Notes
 

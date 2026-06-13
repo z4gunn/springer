@@ -39,7 +39,7 @@ Produce one UI component that is visually identical to the approved design spec,
 7. Apply YAGNI. Build only the states and props the spec and contract specify. Do not add states, variants, or props the spec does not list.
 8. Write one Storybook story per state so design QA can review every state in isolation.
 9. Run the component and visual regression suite via spgr-run-tests. Confirm every state renders as the spec describes and every regression case passes.
-10. Lint and format the component, stories, and contract clean before commit. Keep the component to one logical change per commit.
+10. Lint and format the component, stories, and contract clean before commit. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Keep the component to one logical change per commit.
 11. Write the files via spgr-write-file. Record any consequential implementation choice, such as a token chosen where the spec was ambiguous, via spgr-log-decision.
 
 ## Notes

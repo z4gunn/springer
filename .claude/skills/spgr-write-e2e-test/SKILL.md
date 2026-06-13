@@ -44,5 +44,5 @@ E2E tests answer the question unit and integration tests cannot: does the assemb
 - The E2E suite is source code. Its correctness is verified by spgr-run-tests and by the nightly CI run against staging, not by an envelope schema.
 - The test run report, the journey coverage map, and any flakiness report are not yet in the schema registry at /Users/gunderer/Repos/springer/schemas/. Write each through spgr-write-artifact once its registered schema is added in a later increment.
 - A bug filed from a nightly failure is a bug-report artifact, which is in the registry. Write it through spgr-write-artifact with inline spgr-validate-artifact.
-- E2E tests run nightly against staging, not on every commit. Keep each commit to one logical change and lint and format the suite clean before committing.
+- E2E tests run nightly against staging, not on every commit. Keep each commit to one logical change and lint and format the suite clean before committing. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`.
 - Later increments add visual regression checks (screenshot comparison) alongside the functional assertions, and parallel execution (Playwright sharding, Detox parallel workers) to hold the nightly run under fifteen minutes as the journey count grows.

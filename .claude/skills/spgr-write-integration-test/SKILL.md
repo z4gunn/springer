@@ -46,7 +46,7 @@ Write tests that exercise the seams between components rather than functions in 
 
 10. Generate a baseline endpoint test scaffold from the API spec and fill in the business logic assertions by hand. Add a contract diff check that compares the suite against the current API spec on every spec change and flags tests that no longer match. Add parallel execution with database sharding when the suite runtime grows past the target.
 
-11. Run the full suite, lint, and format with spgr-run-tests and confirm clean before write. Write each test file through spgr-write-file. Record any non-obvious test design choice with spgr-log-decision. When a case touches a vertical's domain, an authorization rule or a data-exposure boundary, consult that specialist with spgr-tag-vertical-agent before treating the section as done.
+11. Run the full suite, lint, and format with spgr-run-tests and confirm clean before write. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Write each test file through spgr-write-file. Record any non-obvious test design choice with spgr-log-decision. When a case touches a vertical's domain, an authorization rule or a data-exposure boundary, consult that specialist with spgr-tag-vertical-agent before treating the section as done.
 
 ## Notes
 

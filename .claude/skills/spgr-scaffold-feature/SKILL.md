@@ -39,7 +39,7 @@ Lay down the correctly structured starting point for one feature so the implemen
 
 6. Write every stub to disk with spgr-write-file, honoring the read-before-write contract.
 
-7. Run the project formatter and linter on the generated stubs and confirm a clean pass before handoff. Fix any stub that fails. Do not hand off a scaffold that is not lint and format clean.
+7. Run the project formatter and linter on the generated stubs and confirm a clean pass before handoff. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Fix any stub that fails. Do not hand off a scaffold that is not lint and format clean.
 
 8. Record the resolved naming, the stub set generated, and any convention decision that shaped the layout with spgr-log-decision so the reasoning is traceable.
 

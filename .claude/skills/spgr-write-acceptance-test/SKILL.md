@@ -36,7 +36,7 @@ Acceptance tests are the executable specification for a story and its primary de
 7. Write integration-level step definitions through spgr-write-file. Each step makes a real HTTP call to the test service and asserts against real test-database state. Do not mock at the system boundary, since a boundary mock removes the behavior the acceptance test exists to verify.
 8. Run the full suite through spgr-run-tests and confirm every scenario fails. Record this red state through spgr-log-decision as the gate that unblocks implementation. If a scenario passes before any implementation exists, the test is asserting nothing meaningful, so correct it and rerun.
 9. Hold the test-first sequence in this order: criteria confirmed, tests written and committed, CI confirms tests fail, then implementation begins. If asked to write tests against unconfirmed criteria, or if implementation has already begun without a recorded red state, raise spgr-escalate rather than proceeding.
-10. Commit the feature files and step definitions as one logical change, lint and format clean, before any implementation commit. Build only the scenarios the criteria specify and no speculative cases beyond the named edge cases.
+10. Commit the feature files and step definitions as one logical change, lint and format clean, before any implementation commit. For TypeScript or JavaScript step definitions, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Build only the scenarios the criteria specify and no speculative cases beyond the named edge cases.
 
 ## Notes
 

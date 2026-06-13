@@ -41,7 +41,7 @@ Add a new service or module to an existing project so it is indistinguishable fr
 
 8. Write the smoke test test-first, before any handoff is considered done. The smoke test must start the service, hit the health-check endpoint, and assert a valid response. A check that only confirms the file compiles is not a smoke test and fails the gate below.
 
-9. Validation gate. Run the smoke test with spgr-run-tests and confirm it starts the service and gets a valid health-check response. Run the project linter and formatter and confirm a clean pass on the new files. If any check fails, fix the service and re-run. Do not hand off a service that does not pass the smoke test on a clean run.
+9. Validation gate. Run the smoke test with spgr-run-tests and confirm it starts the service and gets a valid health-check response. Run the project linter and formatter and confirm a clean pass on the new files. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. If any check fails, fix the service and re-run. Do not hand off a service that does not pass the smoke test on a clean run.
 
 10. Record the cataloged conventions followed, the template used, and any spec gap that shaped the result with spgr-log-decision so the reasoning is traceable.
 

@@ -47,7 +47,7 @@ Catch cross-service API drift in each service's own CI pipeline without co-deplo
 
 9. Generate the contract coverage report by walking every consumer-provider pair in the system diagram and recording whether a contract test is defined for it. Surface the gaps. As the service count grows, render a contract dependency graph showing the consumer-provider relationships and the current verification status of each, so the blast radius of a provider change is visible.
 
-10. Run the consumer suite, the provider suite, lint, and format with spgr-run-tests and confirm clean before write. Write each test file and the pact file through spgr-write-file. Record any non-obvious contract design choice with spgr-log-decision. Commit one logical change per commit.
+10. Run the consumer suite, the provider suite, lint, and format with spgr-run-tests and confirm clean before write. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Write each test file and the pact file through spgr-write-file. Record any non-obvious contract design choice with spgr-log-decision. Commit one logical change per commit.
 
 ## Notes
 

@@ -25,7 +25,7 @@ Apply the project's committed formatter to all files a change touches, so the fo
 
 ## Procedure
 
-1. Read the touched files and the formatter config with spgr-read-file. Detect the formatter from the config and language: Prettier for JavaScript and TypeScript, Black or Ruff format for Python, gofmt or goimports for Go, rustfmt for Rust, swift-format for Swift, ktlint for Kotlin.
+1. Read the touched files and the formatter config with spgr-read-file. Detect the formatter from the config and language: Prettier for JavaScript and TypeScript, Black or Ruff format for Python, gofmt or goimports for Go, rustfmt for Rust, swift-format for Swift, ktlint for Kotlin. For TypeScript or JavaScript, the committed Prettier config is the gts `.prettierrc.json` whose values are recorded in `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md`. Confirm those values rather than an ad-hoc config.
 2. Confirm the formatter binary is the pinned version recorded in the config. A version mismatch produces diff churn unrelated to the change, so stop on mismatch rather than reformatting against the wrong version.
 3. Run the formatter against the full touched-file set, new and existing files alike. Existing code that the change touches gets corrected too.
 4. Write each changed file back with spgr-write-file, which enforces read-before-write and verifies the post-write checksum.

@@ -35,11 +35,11 @@ Lay down the initial project foundation before any feature code exists. The stru
 
 5. Install the base dependencies and pin every version in the lockfile. Write the lockfile to disk with spgr-write-file so it is committed at scaffold time.
 
-6. Configure the linter and the formatter from the stack defaults in the template. Run both with spgr-run-tests or the stack command and confirm a clean pass on the generated tree.
+6. Configure the linter and the formatter from the stack defaults in the template. For a JavaScript-runtime stack, initialize tooling with `npx gts init`, then apply the Springer tsconfig and ESLint overrides per `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md`. Plain JavaScript is not a valid scaffold target. Run the linter and formatter with spgr-run-tests or the stack command, and for TypeScript also run `tsc --noEmit`, and confirm a clean pass on the generated tree.
 
 7. Configure the test runner and write one example test that passes. Confirm it runs green with spgr-run-tests. This is the test-first seed the developer agent extends, so the suite must be runnable before any feature work begins.
 
-8. Write the CI pipeline stub. It must actually run lint, format check, and at minimum the one test on push. A stub that does nothing is not a CI pipeline and fails the validation step below.
+8. Write the CI pipeline stub. It must actually run lint, format check, and at minimum the one test on push. For a TypeScript stack it must also run the `tsc --noEmit` typecheck. A stub that does nothing is not a CI pipeline and fails the validation step below.
 
 9. Write `.env.example` listing every environment variable the application needs, with documentation and no values. A missing variable here causes local setup to fail for every later contributor, so derive the full list from the stack and the ADRs.
 

@@ -101,6 +101,13 @@ Run this checklist on every artifact before it is committed.
 - [ ] No em-dashes, semicolons, body-text bold, italics, or banned filler words
 - [ ] Scripts, if any, are tested by running them
 
+### Generated Code Standards
+
+The rules above govern the artifacts in this repository. This subsection governs the code those artifacts generate for a downstream project.
+
+Hard:
+- Any JavaScript-runtime stack a project selects MUST be TypeScript. Plain JavaScript is not permitted for new source. All generated TypeScript follows `.claude/references/typescript-standards.md`, the single source of truth for the tooling baseline (gts), compiler strictness, lint rules, and format rules. An agent that cannot satisfy a requirement in TypeScript within the approved architecture escalates rather than falling back to plain JavaScript. Other languages (e.g. Python, Go, Swift, Kotlin) keep their stack-default tooling and are unaffected by this rule.
+
 ## Build Order
 
 This section gives the order of work. Each item is a prerequisite for the next.

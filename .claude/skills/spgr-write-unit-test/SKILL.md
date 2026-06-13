@@ -36,7 +36,7 @@ Produce a unit test suite for a single unit of logic so a developer agent has a 
 7. Make every test assert at least one meaningful outcome. Reject assertion-free tests. Make every test independent and order-independent, with no shared mutable state between tests.
 8. Prefer one parameterized test over copy-paste repetition for boundary and error path coverage. Five boundary conditions are one parameterized test, not five duplicate tests.
 9. Run the suite via spgr-run-tests with coverage. Confirm the suite completes in seconds and that any single test under 100ms, a slower test signals a mock boundary error. Confirm 100% branch coverage on business logic. Do not target 100% on infrastructure adapters, those are covered at the integration level.
-10. Lint and format the test file clean before the change is committed. Keep the test addition to one logical change per commit.
+10. Lint and format the test file clean before the change is committed. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Keep the test addition to one logical change per commit.
 11. Write the test file via spgr-write-file. Record any consequential testing choice (a mock boundary decision, a deliberate coverage exclusion on an infrastructure adapter) via spgr-log-decision.
 
 ## Notes
