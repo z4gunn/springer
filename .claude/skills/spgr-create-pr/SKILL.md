@@ -48,7 +48,7 @@ Open one pull request and record it as a pull-request artifact the Code Reviewer
 
 ## Notes
 
-- Validate via spgr-validate-artifact against the registered `pull-request` schema in /Users/gunderer/Repos/springer/schemas/. Do not inline the field list.
+- Validate via spgr-validate-artifact against the registered `pull-request` schema in schemas/. Do not inline the field list.
 - The schema requires `test_first_followed`, `tests_passing`, and `lint_clean` in the checklist. These reflect XP discipline and gate the PR. `docs_updated` and `agents_notified` are recorded when applicable.
 - A draft PR is not reviewed by the Code Reviewer Agent until it is converted to ready. Set `is_draft` true while the work needs early feedback only.
 - Path-to-vertical map (extend per project structure): `**/auth/**` to Auth, dependency or secrets-sensitive change to Security, user-facing UI to Accessibility, schema or migration change to Architect, billing or tenancy paths to Billing or Multi-tenancy. Each match becomes one spgr-tag-vertical-agent consultation listed in `vertical_consultations`.

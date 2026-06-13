@@ -1,6 +1,6 @@
 # Object diagram
 
-How to build an object diagram: a concrete runtime snapshot used to validate a class model against one consistent case. Notation glyphs live in plantuml-syntax.md. Family quality rules and the render loop live in the shared standards at /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md.
+How to build an object diagram: a concrete runtime snapshot used to validate a class model against one consistent case. Notation glyphs live in plantuml-syntax.md. Family quality rules and the render loop live in the shared standards at .claude/references/diagram-standards.md.
 
 ## What an object diagram is
 

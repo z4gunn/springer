@@ -16,7 +16,7 @@ What survives a Mermaid-to-Excalidraw conversion and what degrades. Read this be
 
 | Property | How it degrades | Polish action |
 |----------|-----------------|---------------|
-| Color | Returns generic Mermaid colors, not the semantic palette. | Re-apply the fill and stroke pairs from /Users/gunderer/.claude/skills/excalidraw-diagram/references/color-palette.md by each node's semantic purpose. |
+| Color | Returns generic Mermaid colors, not the semantic palette. | Re-apply the fill and stroke pairs from ~/.claude/skills/excalidraw-diagram/references/color-palette.md by each node's semantic purpose. |
 | Layout | Returns Mermaid default auto-layout, often cramped, with wrapped labels (for example `Authenticate` and `d?` on two lines). | Re-space by hand, widen containers so labels fit on one line, balance whitespace. |
 | Containers | A box is drawn around every node, including ones that read better as free-floating text. | Apply container discipline. Target under 30 percent of text inside boxes. |
 | Hexagon `{{...}}` | Falls back to a rectangle. | Re-map to the intended shape or to free-floating text if the shape carried no meaning. |

@@ -1,6 +1,6 @@
 # Class diagram
 
-How to build the class view: classifiers, members, and the five relationship kinds. Notation glyphs live in mermaid-syntax.md and plantuml-syntax.md. Family quality rules and the render loop live in the shared standards at /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md.
+How to build the class view: classifiers, members, and the five relationship kinds. Notation glyphs live in mermaid-syntax.md and plantuml-syntax.md. Family quality rules and the render loop live in the shared standards at .claude/references/diagram-standards.md.
 
 ## Classifiers
 

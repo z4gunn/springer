@@ -38,7 +38,7 @@ Implement a single endpoint so that its behavior is faithful to the approved API
 
 5. Handle every error case the spec defines, returning only the spec-listed status codes and the spec's error envelope. Never expose internal error details to the caller. Log the internal error with context, return a sanitized message. Include the rate-limit headers on every response, including responses that do not approach the limit.
 
-6. Run spgr-run-tests and confirm the contract test, integration tests, and unit tests all pass and the response-time assertion holds. Run lint and format and confirm both are clean before commit. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`.
+6. Run spgr-run-tests and confirm the contract test, integration tests, and unit tests all pass and the response-time assertion holds. Run lint and format and confirm both are clean before commit. For TypeScript or JavaScript, conform to `.claude/references/typescript-standards.md` and pass `tsc --noEmit`.
 
 7. Confirm the implementation matches the spec exactly: no endpoint not in the spec, no status code not in the spec, no field not in the spec. If the spec cannot satisfy the requirement, do not deviate silently. Raise spgr-escalate to request a spec change with versioning through spgr-version-artifact, and consult the API Design vertical with spgr-tag-vertical-agent. Record any consequential implementation choice with spgr-log-decision.
 
@@ -46,5 +46,5 @@ Implement a single endpoint so that its behavior is faithful to the approved API
 
 - The output is source code verified by spgr-run-tests and CI, not an envelope artifact with a registered schema. The contract test and endpoint tests are the proof of conformance.
 - One logical change per commit. Lint and format must be clean before commit.
-- Read schema and field definitions through spgr-read-artifact and spgr-validate-artifact against the registry at /Users/gunderer/Repos/springer/schemas/ rather than inlining field lists here.
+- Read schema and field definitions through spgr-read-artifact and spgr-validate-artifact against the registry at schemas/ rather than inlining field lists here.
 - A deviation from the spec is a spec change, never a silent implementation difference. The spec stays the single source of truth for backend and every client surface.

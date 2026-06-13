@@ -46,7 +46,7 @@ Implement the outbound webhook delivery system so the product can notify externa
 
 7. Implement the delivery log and replay. Write one record per attempt with the fields in Outputs. Implement replay as a path that loads one logged event and re-runs the delivery job against one endpoint, reusing the same signing and retry code so a stale or duplicated implementation does not drift.
 
-8. Lint, format, and verify. Run the linter and formatter to clean before commit. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Run spgr-run-tests until the suite passes. Build only what the acceptance criteria require. Log the consequential choices (key strategy, backoff schedule, max attempts) via spgr-log-decision.
+8. Lint, format, and verify. Run the linter and formatter to clean before commit. For TypeScript or JavaScript, conform to `.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Run spgr-run-tests until the suite passes. Build only what the acceptance criteria require. Log the consequential choices (key strategy, backoff schedule, max attempts) via spgr-log-decision.
 
 9. Escalate on a vertical conflict. If signing or replay touches a security or compliance constraint the inputs do not settle, tag the specialist via spgr-tag-vertical-agent before finalizing rather than deciding it here.
 

@@ -41,6 +41,6 @@ WCAG conformance is a legal obligation in many jurisdictions and a basic require
 ## Notes
 
 - The axe-core test files are source code, verified by spgr-run-tests and CI rather than by an envelope schema. They must lint and format clean before commit, with one logical change per commit.
-- The accessibility-audit report is written via spgr-write-artifact, and its registered schema is added to the schema registry at `/Users/gunderer/Repos/springer/schemas/` in a later build increment. Until then, validate structure through spgr-write-artifact and spgr-validate-artifact rather than inlining field lists here.
+- The accessibility-audit report is written via spgr-write-artifact, and its registered schema is added to the schema registry at `schemas/` in a later build increment. Until then, validate structure through spgr-write-artifact and spgr-validate-artifact rather than inlining field lists here.
 - A BLOCK gate is a correct output, not a failure of this skill. The failure is a PASS issued without the manual keyboard and screen reader passes, since automated scanning alone does not cover the criteria those passes exist to check.
 - The report is release-scoped and immutable once stamped. Never edit a prior release's report to reflect a later fix.

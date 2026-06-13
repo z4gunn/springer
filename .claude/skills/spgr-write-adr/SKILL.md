@@ -41,7 +41,7 @@ Capture one significant architectural decision so the reasoning behind it surviv
 
 ## Notes
 
-- The adr artifact type is registered in the schema registry at `/Users/gunderer/Repos/springer/schemas/` as `adr-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
+- The adr artifact type is registered in the schema registry at `schemas/` as `adr-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
 - ADRs are immutable once accepted. A decision is changed by writing a new ADR that supersedes the old one, never by editing the accepted decision. The only edit allowed on an accepted ADR is a status change to Superseded with its `superseded_by` set.
 - An honest negative consequence is a required output, not optional. A consequences set with no downside fails review.
 - A decision log index that summarizes every ADR by number, title, and status, and the linter that flags missing sections and superseded ADRs left unupdated, are project-level tooling outside this single-artifact skill and are added in a later build increment.

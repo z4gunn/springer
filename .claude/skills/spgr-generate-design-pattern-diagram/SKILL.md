@@ -31,7 +31,7 @@ These are committed diagram-as-code (`.puml` or `.mmd`) plus their rendered `.sv
 
 ## Procedure
 
-1. Read the shared diagram standards at `/Users/gunderer/Repos/springer/.claude/references/diagram-standards.md` and the tool selection table at `/Users/gunderer/Repos/springer/.claude/references/tool-selection.md`. Follow the family quality rules and the render-and-validate loop. Do not restate them.
+1. Read the shared diagram standards at `.claude/references/diagram-standards.md` and the tool selection table at `.claude/references/tool-selection.md`. Follow the family quality rules and the render-and-validate loop. Do not restate them.
 
 2. Look up the named pattern in [references/pattern-catalog.md](references/pattern-catalog.md). Take its GoF category, its canonical role list, and its signature collaboration scenario. Use this vocabulary exactly. Do not invent role names. If the requested pattern is not one of the 23 GoF patterns, stop and raise spgr-escalate naming the unknown pattern, since this skill owns GoF patterns only.
 

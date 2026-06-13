@@ -50,6 +50,6 @@ Execute the automated security gate for a PR or scheduled sweep. Run static appl
 ## Notes
 
 - The scan-report is source-code-derived evidence, not a registered envelope artifact yet. Write it via spgr-write-artifact with its registered schema added in a later increment. The per-finding bug-reports validate against the registered bug-report schema through spgr-validate-artifact.
-- Reference field lists through the schema registry at /Users/gunderer/Repos/springer/schemas/ via spgr-validate-artifact rather than inlining them here.
+- Reference field lists through the schema registry at schemas/ via spgr-validate-artifact rather than inlining them here.
 - Accepted findings are not permanently acceptable. Track each in a security backlog and schedule it for remediation so the baseline never silently degrades.
 - This skill runs scanners and reports results. It does not modify application code to fix a finding. Remediation is a separate developer change that follows test-first discipline and is verified by spgr-run-tests and CI.

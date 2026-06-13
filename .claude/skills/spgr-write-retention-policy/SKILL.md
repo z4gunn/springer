@@ -39,6 +39,6 @@ Define per-tier data retention and deletion rules so the system keeps data long 
 
 ## Notes
 
-- The retention-policy type is not yet in the schema registry at `/Users/gunderer/Repos/springer/schemas/`. Write it through spgr-write-artifact under the shared envelope. Its registered JSON Schema is added in a later build increment, after which spgr-validate-artifact checks it by type.
+- The retention-policy type is not yet in the schema registry at `schemas/`. Write it through spgr-write-artifact under the shared envelope. Its registered JSON Schema is added in a later build increment, after which spgr-validate-artifact checks it by type.
 - This skill produces the policy only. It does not classify data and it does not write the audit-trail spec. If the classification registry is missing tiers or PII markers, stop and escalate to the classify-data owner.
 - A rule is implementable only if its trigger and mechanism map to real entities and fields. A rule that cannot be expressed against the data model is not confirmable and must be escalated to architecture.

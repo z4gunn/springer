@@ -44,6 +44,6 @@ Security testing produces raw output from several tools and manual reviews that 
 
 ## Notes
 
-- The security-findings artifact is written via spgr-write-artifact, and its registered schema is added to the schema registry at `/Users/gunderer/Repos/springer/schemas/` in a later build increment. Until then, validate structure through spgr-write-artifact rather than inlining field lists here.
+- The security-findings artifact is written via spgr-write-artifact, and its registered schema is added to the schema registry at `schemas/` in a later build increment. Until then, validate structure through spgr-write-artifact rather than inlining field lists here.
 - A BLOCK gate is a correct output, not a failure of this skill. The failure is a PASS issued without complete evidence or with an uncovered threat.
 - The findings report is release-scoped and immutable once stamped. Each release keeps its own report for audit, so never edit a prior release's report to reflect a later fix.

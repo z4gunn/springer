@@ -38,7 +38,7 @@ Implement the client-side state for one feature using the exact state management
 6. Apply YAGNI. Build only the slices, queries, and mutations the acceptance tests and the api-contract require. Do not add state the feature is not required to hold.
 7. Add the pattern's development-only debugging integration, for example Redux DevTools or its equivalent for the chosen pattern, gated to development builds so it does not ship to production.
 8. Document the state shape in code comments at the slice. When a shape decision involves a non-obvious choice, record it via spgr-log-decision and write the feature-level ADR for it via spgr-write-adr.
-9. Run the feature's acceptance and unit tests via spgr-run-tests. Confirm the previously failing tests now pass for the right reason. Reach zero lint errors via spgr-lint-code and format the changed files via spgr-format-code before commit. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Keep the change to one logical change per commit.
+9. Run the feature's acceptance and unit tests via spgr-run-tests. Confirm the previously failing tests now pass for the right reason. Reach zero lint errors via spgr-lint-code and format the changed files via spgr-format-code before commit. For TypeScript or JavaScript, conform to `.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Keep the change to one logical change per commit.
 10. Write each file via spgr-write-file, which enforces read-before-write and a post-write checksum.
 
 ## Notes

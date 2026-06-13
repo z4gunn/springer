@@ -52,7 +52,7 @@ Write every file with spgr-write-file.
 
 8. Write the template snapshot tests test-first, one per template. Each test renders the template with its expected variables, asserts the output is valid HTML, and compares against a committed snapshot so an unexpected change fails CI. Confirm the suite fails before the templates exist, then passes once they do, and run it with spgr-run-tests.
 
-9. Lint and format the scaffold clean before handing off. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Keep the work to one logical change per commit. Record any consequential choice (ESP client options, queue binding, guard mechanism) with spgr-log-decision.
+9. Lint and format the scaffold clean before handing off. For TypeScript or JavaScript, conform to `.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Keep the work to one logical change per commit. Record any consequential choice (ESP client options, queue binding, guard mechanism) with spgr-log-decision.
 
 ## Notes
 

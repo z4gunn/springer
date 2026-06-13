@@ -9,10 +9,10 @@ export const meta = {
   ],
 }
 
-const SPEC_DIR = '/Users/gunderer/Repos/ecg-intel/vault/40-projects/springer/skills'
-const OUT_DIR = '/Users/gunderer/Repos/springer/.claude/skills'
-const TEMPLATE = '/Users/gunderer/Repos/springer/templates/SKILL.template.md'
-const STANDARDS = '/Users/gunderer/Repos/ecg-intel/vault/40-projects/springer/build/BUILD-STANDARDS.md'
+const SPEC_DIR = process.env.SPGR_SPEC_DIR ?? 'specs/skills'
+const OUT_DIR = '.claude/skills'
+const TEMPLATE = 'templates/SKILL.template.md'
+const STANDARDS = process.env.SPGR_BUILD_STANDARDS ?? 'specs/BUILD-STANDARDS.md'
 
 const DISCOVERY = [
   'search-web', 'competitive-analysis', 'build-icp', 'build-persona', 'market-sizing',

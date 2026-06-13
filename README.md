@@ -173,7 +173,16 @@ Open this repository in Claude Code. The agents in `.claude/agents/` and the ski
 
 To run a project, delegate to the Orchestrator agent, which sequences the phases, or invoke a specific agent for a specific phase such as Discovery to start research or Architect to produce options. The agents drive the lifecycle and pause at the five human checkpoints: architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Artifacts accumulate in `runs/` and validate against the schemas in `schemas/` as they pass between agents.
 
-One skill family needs a one-time setup. The diagram skills render Mermaid and PlantUML sources, and `render-diagram-excalidraw` builds on the globally installed `excalidraw-diagram` skill at `~/.claude/skills/excalidraw-diagram/`. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, make the Mermaid CLI available through `npx`, and set up the excalidraw skill's Playwright environment. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
+One skill family needs a one-time setup, and it is optional. The diagram skills render Mermaid and PlantUML sources. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, and make the Mermaid CLI available through `npx`. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
+
+`spgr-render-diagram-excalidraw` is the one skill with an external dependency. It builds on the third-party `excalidraw-diagram` skill by Cole Medin, which is not bundled with Springer. Install it separately only if you want polished Excalidraw output:
+
+```bash
+git clone https://github.com/coleam00/excalidraw-diagram-skill.git ~/.claude/skills/excalidraw-diagram
+cd ~/.claude/skills/excalidraw-diagram/references && uv sync && uv run playwright install chromium
+```
+
+Every other agent and skill in Springer works without it, and the code-first Mermaid and PlantUML diagram skills cover diagramming on their own.
 
 Every line of JavaScript-runtime code the build, test, and scaffold skills generate is governed by one shared reference, `.claude/references/typescript-standards.md`. TypeScript is mandatory for any JavaScript-runtime stack, plain JavaScript is not permitted, and the reference adopts Google gts as the tooling baseline (tsconfig, ESLint, Prettier) and records the strict compiler bar, the type-safety rules, and the naming conventions the developer agents and the code reviewer enforce.
 

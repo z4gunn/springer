@@ -33,7 +33,7 @@ Produce the code-level static-structure view: classes, interfaces, and enums, th
 
 3. Read the inputs with spgr-read-file: the domain model or class definitions, the module layout for a package diagram, the scenario for an object diagram.
 
-4. Choose the notation. Default to PlantUML. Use Mermaid only for a standalone class view destined for Markdown. An object diagram routes to PlantUML unconditionally, because Mermaid has no object-diagram type. The decision table is in the shared reference at /Users/gunderer/Repos/springer/.claude/references/tool-selection.md.
+4. Choose the notation. Default to PlantUML. Use Mermaid only for a standalone class view destined for Markdown. An object diagram routes to PlantUML unconditionally, because Mermaid has no object-diagram type. The decision table is in the shared reference at .claude/references/tool-selection.md.
 
 5. For any candidate Mermaid view, run scripts/mermaid-trap-lint.sh on the source before generating further. It is a GATE, not a warning. On a non-zero exit (a comma-separated generic, a nested namespace, or a package annotation), regenerate the view as PlantUML using the matching golden template. Do not ship the Mermaid version of a trapped view.
 
@@ -48,7 +48,7 @@ Produce the code-level static-structure view: classes, interfaces, and enums, th
 ## Notes
 
 - The output is committed diagram-as-code plus a rendered SVG, verified by the render script in step 8, not an envelope artifact. This skill does not call spgr-write-artifact and adds no JSON schema.
-- Family quality rules, the notation policy, and the render-and-validate commands are shared across the diagram family. See /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md. The Mermaid-versus-PlantUML decision table and the Mermaid limitation list are at /Users/gunderer/Repos/springer/.claude/references/tool-selection.md. Do not restate them in the references here.
+- Family quality rules, the notation policy, and the render-and-validate commands are shared across the diagram family. See .claude/references/diagram-standards.md. The Mermaid-versus-PlantUML decision table and the Mermaid limitation list are at .claude/references/tool-selection.md. Do not restate them in the references here.
 - scripts/render-and-verify.sh renders both notations, controls the output path with PlantUML `-pipe`, and counts declared versus rendered relationships to catch a silent drop. Run it on every generated source before delivery.
 - scripts/mermaid-trap-lint.sh routes the three known Mermaid traps to PlantUML as a GATE. Run it on every candidate Mermaid source before generating further.
 - Golden templates are in assets/templates/: class and package in both notations, object in PlantUML only. Mermaid has no object type, so there is no object.mmd, and the Mermaid package map is a flat flowchart approximation, not a true UML package diagram.

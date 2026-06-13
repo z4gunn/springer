@@ -63,7 +63,7 @@ ok -->|else| attempt
 - `subgraph` groups nodes but does not partition by responsibility. It is not a swimlane. For responsibility by actor, escalate to PlantUML activity swimlanes.
 - No object-flow node distinct from control flow beyond the parallelogram convention above.
 
-See the full limitation list in /Users/gunderer/Repos/springer/.claude/references/tool-selection.md.
+See the full limitation list in .claude/references/tool-selection.md.
 
 ## Worked example
 A single-actor form submission with one branch. This is the simple-flowchart golden template.

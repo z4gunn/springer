@@ -9,7 +9,7 @@ description: Produce a UML activity diagram or a flowchart as committed diagram-
 
 Make a process explicit and reviewable before it is built or refactored. An activity diagram surfaces hidden branches, missing error paths, unsynchronized parallel work, and unclear ownership across actors, which are the defects that cost the most when found in code rather than on a diagram. This skill models control and process flow only. It does not restate the data model, the C4 structure, or the deployment topology, which belong to other diagram skills. The output is committed diagram-as-code (Mermaid or PlantUML source) plus a rendered SVG, kept in version control next to the code it documents, so it is regenerated from source rather than hand-edited and updated in the same commit as the workflow it depicts.
 
-Read the shared family rules at /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md and the notation decision at /Users/gunderer/Repos/springer/.claude/references/tool-selection.md before producing output. This skill adds only the activity-notation detail those files do not carry.
+Read the shared family rules at .claude/references/diagram-standards.md and the notation decision at .claude/references/tool-selection.md before producing output. This skill adds only the activity-notation detail those files do not carry.
 
 ## Inputs
 

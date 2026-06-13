@@ -54,7 +54,7 @@ Review one pull request and record the result as a code-review artifact the auth
 
 ## Notes
 
-- Validate via spgr-validate-artifact against the registered `code-review` schema in /Users/gunderer/Repos/springer/schemas/. Do not inline the field list.
+- Validate via spgr-validate-artifact against the registered `code-review` schema in schemas/. Do not inline the field list.
 - Severity maps the spec's categories onto the schema enum: blocking is P0 or P1, non-blocking is P2 or P3, and questions are findings whose verdict is COMMENT when no blocker exists. The schema requires per-finding file, line, severity, description, and remediation, and an axis from architecture, xp, style, docstring, correctness, or security.
 - Bugs, missing tests for new behavior, and ADR deviations are always blocking. Style nits the formatter enforces are never findings, and other style preferences are never blocking.
 - Do not refactor or edit the PR code in this skill. Request the change from the author through the findings. The merge decision is a human-in-the-loop gate handled by spgr-notify-human, not by this skill.

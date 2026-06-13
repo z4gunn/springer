@@ -50,7 +50,7 @@ Turn an observed failure into one bug-report artifact that any agent can act on 
 
 ## Notes
 
-- Validate via spgr-validate-artifact against the registered `bug-report` schema in /Users/gunderer/Repos/springer/schemas/. Do not inline the field list.
+- Validate via spgr-validate-artifact against the registered `bug-report` schema in schemas/. Do not inline the field list.
 - Severity table. P0: data loss, security breach, crash, or no access to core functionality, blocks the release, fix first. P1: a feature is broken on the happy path, blocks the release, fix this sprint. P2: works on the happy path but fails in a documented scenario, does not block the release but must be scheduled. P3: cosmetic, copy, or minor UX degradation, batch with other P3s.
 - The regression test is source code verified by spgr-run-tests and CI (red before fix, green after), not by an envelope schema. The bug-report artifact references it by path and bug ID.
 - Reference the affected story by ID. Five reports against one story is a signal for architectural review with the Architect Agent, not just more fixes.

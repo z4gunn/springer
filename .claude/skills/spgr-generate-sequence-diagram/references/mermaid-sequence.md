@@ -1,6 +1,6 @@
 # Mermaid sequence cheat-sheet
 
-Notation for `sequenceDiagram`, the default for this skill. Mermaid renders inline in GitHub and Obsidian with no toolchain. Escalate to PlantUML on the triggers in /Users/gunderer/Repos/springer/.claude/references/tool-selection.md.
+Notation for `sequenceDiagram`, the default for this skill. Mermaid renders inline in GitHub and Obsidian with no toolchain. Escalate to PlantUML on the triggers in .claude/references/tool-selection.md.
 
 ## Participants
 

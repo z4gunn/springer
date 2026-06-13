@@ -39,6 +39,6 @@ Each criterion entry carries: `ac_id`, `story_ref`, `scenario_type` (one of `hap
 
 ## Notes
 
-- The artifact type `acceptance-criteria` is in the schema registry at /Users/gunderer/Repos/springer/schemas/. Reference field rules through spgr-validate-artifact rather than inlining them.
+- The artifact type `acceptance-criteria` is in the schema registry at schemas/. Reference field rules through spgr-validate-artifact rather than inlining them.
 - A story with N criteria should yield at least N test cases at the QA handoff, given the 1:1 criterion-to-test relationship. Do not collapse distinct behaviors into one criterion to keep the count down. Split the story instead.
 - When a criterion touches a vertical domain (security, accessibility, performance), consult the specialist through spgr-tag-vertical-agent before finalizing that criterion.
