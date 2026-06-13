@@ -161,7 +161,7 @@ springer/
   .claude/
     agents/<name>.md         the 27 agents, auto-loaded in this repo
     skills/<name>/SKILL.md    the 194 skills, auto-loaded in this repo
-    references/<name>.md      shared cross-skill references (for example diagram-standards)
+    references/<name>.md      shared cross-skill references (for example diagram-standards, typescript-standards)
   schemas/               JSON Schemas for the typed artifacts that flow between agents
   templates/             golden starters for authoring a new skill or agent
   runs/                  the run store where a project's artifacts accumulate
@@ -174,6 +174,8 @@ Open this repository in Claude Code. The agents in `.claude/agents/` and the ski
 To run a project, delegate to the Orchestrator agent, which sequences the phases, or invoke a specific agent for a specific phase such as Discovery to start research or Architect to produce options. The agents drive the lifecycle and pause at the five human checkpoints: architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Artifacts accumulate in `runs/` and validate against the schemas in `schemas/` as they pass between agents.
 
 One skill family needs a one-time setup. The diagram skills render Mermaid and PlantUML sources, and `render-diagram-excalidraw` builds on the globally installed `excalidraw-diagram` skill at `~/.claude/skills/excalidraw-diagram/`. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, make the Mermaid CLI available through `npx`, and set up the excalidraw skill's Playwright environment. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
+
+Every line of JavaScript-runtime code the build, test, and scaffold skills generate is governed by one shared reference, `.claude/references/typescript-standards.md`. TypeScript is mandatory for any JavaScript-runtime stack, plain JavaScript is not permitted, and the reference adopts Google gts as the tooling baseline (tsconfig, ESLint, Prettier) and records the strict compiler bar, the type-safety rules, and the naming conventions the developer agents and the code reviewer enforce.
 
 ## Project status and roadmap
 
