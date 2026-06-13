@@ -1,6 +1,6 @@
 # PlantUML sequence cheat-sheet
 
-Notation for the PlantUML sequence diagram, the escalation target for this skill. PlantUML has no native GitHub or Obsidian render, so it needs Java or a server or a CI render step. Escalate from Mermaid only on the triggers in /Users/gunderer/Repos/springer/.claude/references/tool-selection.md: richer fragments, a true communication or object view, `autoactivate`, object creation, or finer styling Mermaid cannot express. State the trigger in the artifact when you escalate.
+Notation for the PlantUML sequence diagram, the escalation target for this skill. PlantUML has no native GitHub or Obsidian render, so it needs Java or a server or a CI render step. Escalate from Mermaid only on the triggers in .claude/references/tool-selection.md: richer fragments, a true communication or object view, `autoactivate`, object creation, or finer styling Mermaid cannot express. State the trigger in the artifact when you escalate.
 
 ## Participants
 

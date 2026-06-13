@@ -42,13 +42,13 @@ Generate the correct background job scaffold from the async job spec so a develo
 
 6. Generate the type-safe enqueue helper that constructs the payload against the typed schema and enqueues it, so an invalid payload fails at the enqueue call site. Wire the observability instrumentation to emit the spec-defined metrics for enqueue, start, success, failure, and duration. The metrics are pre-wired, never deferred.
 
-7. Run spgr-run-tests and confirm the success, retryable-failure, and non-retryable-failure tests now pass against the scaffold. Run lint and format and confirm both are clean before commit. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`.
+7. Run spgr-run-tests and confirm the success, retryable-failure, and non-retryable-failure tests now pass against the scaffold. Run lint and format and confirm both are clean before commit. For TypeScript or JavaScript, conform to `.claude/references/typescript-standards.md` and pass `tsc --noEmit`.
 
 8. Confirm the scaffold matches the spec: the payload schema, retry config, and metric set agree with the async job spec exactly. If the spec cannot be satisfied within the framework or stack, do not deviate silently. Raise spgr-escalate to request a spec change versioned through spgr-version-artifact, and consult the Async Infrastructure vertical with spgr-tag-vertical-agent. Record any consequential scaffolding choice with spgr-log-decision.
 
 ## Notes
 
 - The output is source code verified by spgr-run-tests and CI, not an envelope artifact with a registered schema. The unit test scaffold for success, retryable failure, and non-retryable failure is the proof that retry and dead-letter behavior is correct.
-- Read the spec and validate field and retry definitions through spgr-read-artifact and spgr-validate-artifact against the registry at /Users/gunderer/Repos/springer/schemas/ rather than inlining field lists here.
+- Read the spec and validate field and retry definitions through spgr-read-artifact and spgr-validate-artifact against the registry at schemas/ rather than inlining field lists here.
 - Build only what the spec defines (YAGNI). One logical change per commit. Lint and format must be clean before commit.
 - The enqueue helper enforces the payload schema at the call site, so a type error at enqueue replaces a runtime error in the worker.

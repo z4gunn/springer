@@ -42,7 +42,7 @@ Write the runbook for one alert so the on-call engineer who is paged does not ha
 
 ## Notes
 
-- This skill produces an envelope artifact (alert-runbook). Write it through spgr-write-artifact and confirm it inline with spgr-validate-artifact. The alert-runbook content schema is not yet in the registry at `/Users/gunderer/Repos/springer/schemas/`, so envelope-only validation applies for now (header, confidence map, decision log, and version are checked). Its content schema is registered in a later build increment.
+- This skill produces an envelope artifact (alert-runbook). Write it through spgr-write-artifact and confirm it inline with spgr-validate-artifact. The alert-runbook content schema is not yet in the registry at `schemas/`, so envelope-only validation applies for now (header, confidence map, decision log, and version are checked). Its content schema is registered in a later build increment.
 - This skill writes the runbook only. It does not define alerts (spgr-configure-alerting) and it does not set SLOs (spgr-write-slo-spec). A runbook for an alert that does not exist, or that defends no SLO, is not confirmable and must be escalated to the owning agent.
 - A runbook step is acceptable only if it is executable as written. Any step that requires the engineer to invent the procedure is incomplete and the runbook must not be marked confirmed until it is replaced with a concrete action.
 - A runbook is a living document. After every incident on this alert, the runbook is reviewed and updated. A new version is stamped with spgr-version-artifact when it changes after first write.

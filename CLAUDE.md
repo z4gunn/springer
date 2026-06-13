@@ -6,7 +6,7 @@ This file is the operative ruleset for AI agents working in this repository. It 
 
 Springer is an AI software development team, comprised of a library of Claude Code skills and agents, where each agent models a traditional dev-team role (e.g. product manager, architect, developer, QA, DevOps) and the vertical specialties that span those roles. The team executes the full software lifecycle on any greenfield SaaS or mobile application, from idea to production, and the human enters only at deliberate checkpoints.
 
-This repository holds the build: 27 agents and 194 skills, each translated from a Phase 1 spec into one working Claude Code artifact. The Phase 1 specs are the source of truth and live in the ecg-intel vault (see Spec Source below). When adding or changing an artifact, map from its spec rather than inventing. The motivation and methodology behind these rules are in README.md and are not restated here.
+This repository holds the build: 27 agents and 194 skills, each translated from a Phase 1 spec into one working Claude Code artifact. The Phase 1 specs are the source of truth and live in a private vault (see Spec Source below). When adding or changing an artifact, map from its spec rather than inventing. The motivation and methodology behind these rules are in README.md and are not restated here.
 
 ## Core Design Principles
 
@@ -30,7 +30,7 @@ springer/
   .claude/
     skills/<name>/SKILL.md   built skills, auto-loaded in this repo
     agents/<name>.md         built agents, auto-loaded in this repo
-    references/<name>.md     shared cross-skill references (e.g. diagram-standards), cited by absolute path
+    references/<name>.md     shared cross-skill references (e.g. diagram-standards), cited by repo-relative path
   templates/             golden starters, build from these and not from a blank file
     SKILL.template.md
     agent.template.md
@@ -40,9 +40,9 @@ springer/
 
 A repo-level README.md is intentional and is not an auxiliary file in the no-README sense. The no-README rule in Universal Rules below applies inside a skill or agent directory, not at the repository root.
 
-Spec source (read-only): Phase 1 specs live in `~/Repos/ecg-intel/vault/40-projects/archive/springer/`, as `skills/spgr-skill-*.md` and `agents/spgr-agent-*.md`. Each spec contains a "Phase 2 Build Notes" section, which is the build brief for that artifact. Specs are not edited from this repository.
+Spec source (read-only, private): Phase 1 specs live in a private vault, as `skills/spgr-skill-*.md` and `agents/spgr-agent-*.md`, each with a "Phase 2 Build Notes" section that is the build brief for that artifact. The specs are build provenance and are not required to run Springer or to use any built agent or skill. They are not edited from this repository. The one-time build scripts in `.claude/workflows/` read them through the `SPGR_SPEC_DIR` and `SPGR_BUILD_STANDARDS` environment variables, which have no default pointing at any private location.
 
-External skill dependency (read-only): The `spgr-render-diagram-excalidraw` skill builds on the globally installed `excalidraw-diagram` skill at `~/.claude/skills/excalidraw-diagram/`, reusing its color palette, element templates, and render methodology by absolute path. That skill must be present for render-diagram-excalidraw to run. It is not vendored into this repository.
+External skill dependency (optional): The `spgr-render-diagram-excalidraw` skill builds on the third-party `excalidraw-diagram` skill by Cole Medin (https://github.com/coleam00/excalidraw-diagram-skill), expected at `~/.claude/skills/excalidraw-diagram/`. It reuses that skill's color palette, element templates, and render methodology by path. The skill is not vendored here and must be installed separately for render-diagram-excalidraw to run. Every other Springer skill and agent works without it.
 
 ## Build Standards
 
@@ -130,4 +130,4 @@ This section states the commit and branch rules.
 - Commit directly to `main`. Push after a unit of work is complete. A branch and PR are opt-in.
 - Use conventional commit messages, scoped by what changed (e.g. `feat(agent): build spgr-agent-architect`, `feat(skill): build spgr-write-prd`, `chore(schemas): add prd schema`).
 - Never commit secrets or `.env`.
-- The full project roadmap lives in the ecg-intel vault at `vault/40-projects/archive/springer/spgr-project.md` and `vault/30-research/software-engineering/methodology-comparison-agentic-coding.md`.
+- The full project roadmap and the methodology research that motivates it live in a private vault and are not required to work in this repository.

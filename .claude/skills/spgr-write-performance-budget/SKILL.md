@@ -42,6 +42,6 @@ Set the numbers that define "fast enough" and the numbers that define a release-
 
 ## Notes
 
-- This is an envelope artifact (a performance spec). Write it through spgr-write-artifact and validate inline with spgr-validate-artifact. The performance-budget type is not yet in the schema registry at `/Users/gunderer/Repos/springer/schemas/`, so envelope-only validation applies (header, confidence map, decision log, version) until a content schema is registered.
+- This is an envelope artifact (a performance spec). Write it through spgr-write-artifact and validate inline with spgr-validate-artifact. The performance-budget type is not yet in the schema registry at `schemas/`, so envelope-only validation applies (header, confidence map, decision log, version) until a content schema is registered.
 - This skill produces the budget only. It does not write the load-test plan and it does not write the SLO spec. It supplies the p95 latency thresholds those artifacts consume, routed through a consultation, not a direct edit.
 - A threshold is confirmable only if it is testable against the target infrastructure. A number the system cannot meet at the expected scale is not a budget, it is a defect waiting to be filed, and it must be escalated to architecture instead of written.

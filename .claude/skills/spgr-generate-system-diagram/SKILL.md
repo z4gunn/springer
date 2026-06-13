@@ -37,6 +37,6 @@ Build the system-diagram artifact for an approved architecture so every agent an
 
 ## Notes
 
-- This skill produces the diagram only. Artifact envelope, header, confidence map, and decision log are handled by spgr-write-artifact and spgr-read-artifact. Schema fields live in the registry at /Users/gunderer/Repos/springer/schemas/ and are checked by spgr-validate-artifact, not restated here.
+- This skill produces the diagram only. Artifact envelope, header, confidence map, and decision log are handled by spgr-write-artifact and spgr-read-artifact. Schema fields live in the registry at schemas/ and are checked by spgr-validate-artifact, not restated here.
 - The output type system-diagram is a registered schema, so the write validates against an envelope schema with no further setup.
 - A diagram that contradicts the current architecture is worse than no diagram. Update it in the same commit as the change, or escalate if the change cannot be diagrammed within the approved architecture.

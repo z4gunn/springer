@@ -4,10 +4,10 @@ export const meta = {
   phases: [{ title: 'Vertical agents' }],
 }
 
-const SPEC_DIR = '/Users/gunderer/Repos/ecg-intel/vault/40-projects/springer/agents'
-const OUT_DIR = '/Users/gunderer/Repos/springer/.claude/agents'
-const TEMPLATE = '/Users/gunderer/Repos/springer/templates/agent.template.md'
-const STANDARDS = '/Users/gunderer/Repos/ecg-intel/vault/40-projects/springer/build/BUILD-STANDARDS.md'
+const SPEC_DIR = process.env.SPGR_SPEC_DIR ?? 'specs/agents'
+const OUT_DIR = '.claude/agents'
+const TEMPLATE = 'templates/agent.template.md'
+const STANDARDS = process.env.SPGR_BUILD_STANDARDS ?? 'specs/BUILD-STANDARDS.md'
 
 // model defaults to opus for the judgment-heavy verticals; documentation inherits.
 const AGENTS = [

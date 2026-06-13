@@ -1,6 +1,6 @@
 # Mermaid stateDiagram-v2 notation
 
-Notation cheat-sheet for authoring an entity lifecycle in Mermaid stateDiagram-v2, the default renderer for a state diagram. Shared family rules (render-and-validate commands, quality rules, boundaries) live in /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md. The Mermaid-vs-PlantUML decision table and the full Mermaid limitation list live in /Users/gunderer/Repos/springer/.claude/references/tool-selection.md. This file adds only the state-diagram syntax.
+Notation cheat-sheet for authoring an entity lifecycle in Mermaid stateDiagram-v2, the default renderer for a state diagram. Shared family rules (render-and-validate commands, quality rules, boundaries) live in .claude/references/diagram-standards.md. The Mermaid-vs-PlantUML decision table and the full Mermaid limitation list live in .claude/references/tool-selection.md. This file adds only the state-diagram syntax.
 
 ## Contents
 - Core syntax

@@ -27,7 +27,7 @@ When invoked:
 4. Implement state with spgr-implement-state-management following the approved pattern. Do not introduce an alternative state approach. Call only endpoints and response shapes documented in the confirmed API spec. Use spgr-implement-feature to orchestrate the story.
 5. Implement accessibility exactly as written in the annotations: ARIA roles, focus order, keyboard navigation. Do not invent them. Implement interaction-spec animations at the specified duration and easing.
 6. Write unit tests with spgr-write-unit-test covering every component state, handlers, and state logic, and E2E tests with spgr-write-e2e-test covering the primary flow and AC edge cases. Run all with spgr-run-tests. Do not open the PR until they pass.
-7. Run spgr-format-code and spgr-lint-code. For a JavaScript-runtime stack, the code is TypeScript conforming to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and must pass `tsc --noEmit` before the PR. Consult verticals with spgr-tag-vertical-agent: Accessibility on every UI PR before submission, Analytics for new instrumented interactions, Feature Flag when a story needs a flag.
+7. Run spgr-format-code and spgr-lint-code. For a JavaScript-runtime stack, the code is TypeScript conforming to `.claude/references/typescript-standards.md` and must pass `tsc --noEmit` before the PR. Consult verticals with spgr-tag-vertical-agent: Accessibility on every UI PR before submission, Analytics for new instrumented interactions, Feature Flag when a story needs a flag.
 8. Commit with spgr-git-commit and open the PR with spgr-create-pr, including story IDs, a component-state coverage checklist, a11y notes, and consultations. Record decisions with spgr-log-decision.
 
 ## Constraints

@@ -1,6 +1,6 @@
 # PlantUML syntax
 
-Glyph reference for the PlantUML class, object, and package diagrams, the default notation for this family. The Mermaid-versus-PlantUML decision table lives in the shared reference at /Users/gunderer/Repos/springer/.claude/references/tool-selection.md. PlantUML class, composite, and swimlane layouts need Graphviz `dot`. Render with scripts/render-and-verify.sh.
+Glyph reference for the PlantUML class, object, and package diagrams, the default notation for this family. The Mermaid-versus-PlantUML decision table lives in the shared reference at .claude/references/tool-selection.md. PlantUML class, composite, and swimlane layouts need Graphviz `dot`. Render with scripts/render-and-verify.sh.
 
 ## Classifiers
 

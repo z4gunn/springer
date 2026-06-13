@@ -9,10 +9,10 @@ export const meta = {
   ],
 }
 
-const SPEC_DIR = '/Users/gunderer/Repos/ecg-intel/vault/40-projects/springer/skills'
-const OUT_DIR = '/Users/gunderer/Repos/springer/.claude/skills'
-const TEMPLATE = '/Users/gunderer/Repos/springer/templates/SKILL.template.md'
-const STANDARDS = '/Users/gunderer/Repos/ecg-intel/vault/40-projects/springer/build/BUILD-STANDARDS.md'
+const SPEC_DIR = process.env.SPGR_SPEC_DIR ?? 'specs/skills'
+const OUT_DIR = '.claude/skills'
+const TEMPLATE = 'templates/SKILL.template.md'
+const STANDARDS = process.env.SPGR_BUILD_STANDARDS ?? 'specs/BUILD-STANDARDS.md'
 
 const TESTING = [
   'write-test-plan', 'write-acceptance-test', 'write-unit-test', 'write-integration-test',
@@ -72,7 +72,7 @@ HARD RULES:
 
 SPRINGER CONTRACT CONTEXT:
 - This skill is called by the QA, developer, or code-reviewer agents. The artifact-plumbing skills already exist and must be referenced by name where the spec implies them: spgr-read-file, spgr-write-file, spgr-read-artifact, spgr-write-artifact, spgr-validate-artifact, spgr-version-artifact, spgr-log-decision, spgr-escalate, spgr-notify-human, spgr-tag-vertical-agent. Other already-built skills you may reference by name include spgr-write-acceptance-criteria and spgr-run-tests.
-- The schema registry is at /Users/gunderer/Repos/springer/schemas/ with one JSON Schema per artifact type. Reference the registry through spgr-validate-artifact rather than inlining field lists.
+- The schema registry is at schemas/ with one JSON Schema per artifact type. Reference the registry through spgr-validate-artifact rather than inlining field lists.
 - TWO KINDS OF OUTPUT. (1) Some skills produce an ENVELOPE ARTIFACT with a registered schema: test-plan, bug-report, uat-report, code-review, pull-request (plus prd, nfr, user-story, acceptance-criteria, architecture-options, adr, architecture-decision, erd, tech-stack-decision, data-dictionary, system-diagram, infrastructure-diagram, escalation, hil-checkpoint, consultation). For these, write via spgr-write-artifact with inline spgr-validate-artifact. (2) Most development and testing skills produce SOURCE CODE (test files, components, migrations, scaffolds, config). For these, write files via spgr-write-file, and say in one Notes line that the output is source code verified by spgr-run-tests and CI rather than by an envelope schema. If a skill produces an artifact type not in the registered list above (for example a smoke-test result, a flakiness report, a doc-coverage report, or an OpenAPI spec), note that it is written via spgr-write-artifact with its registered schema added in a later increment.
 - XP discipline is central to this increment: test-first (failing test before implementation), YAGNI (build only what the acceptance criteria specify), one logical change per commit, lint and format clean before commit. Reflect the spec's specific rules, do not generically restate XP.
 

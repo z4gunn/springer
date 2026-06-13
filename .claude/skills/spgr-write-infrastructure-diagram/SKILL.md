@@ -38,6 +38,6 @@ Turn an approved architecture option and its cloud provider selection into an in
 
 ## Notes
 
-- The infrastructure-diagram artifact type is registered in the schema registry at `/Users/gunderer/Repos/springer/schemas/` as `infrastructure-diagram-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
+- The infrastructure-diagram artifact type is registered in the schema registry at `schemas/` as `infrastructure-diagram-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
 - The diagram must match the IaC. When the IaC changes, update the diagram in the same commit through spgr-version-artifact so the two never drift apart.
 - A network flow diagram showing ingress and egress rules supports compliance documentation and can be added as a second Mermaid view in the same artifact when a compliance framework requires it.

@@ -1,6 +1,6 @@
 # Polish checklist
 
-The four mandatory criteria a presentation copy must meet before it is delivered. Run every criterion. A converted diagram that skips the polish pass fails the acceptance bar even when the conversion was clean. The full design methodology behind these criteria lives in /Users/gunderer/.claude/skills/excalidraw-diagram/SKILL.md, the argue-not-display skill. This file is the four-point gate for the presentation copy.
+The four mandatory criteria a presentation copy must meet before it is delivered. Run every criterion. A converted diagram that skips the polish pass fails the acceptance bar even when the conversion was clean. The full design methodology behind these criteria lives in ~/.claude/skills/excalidraw-diagram/SKILL.md, the argue-not-display skill. This file is the four-point gate for the presentation copy.
 
 ## 1. Isomorphism
 
@@ -8,7 +8,7 @@ The visual structure mirrors the concept's behavior. If you removed all text, th
 
 ## 2. Evidence
 
-A technical diagram carries concrete artifacts, not just labeled boxes. Conversion strips all evidence, so add what the audience needs: real event or method names, a code snippet, a sample data payload, a UI mockup. Use the evidence-artifact colors from /Users/gunderer/.claude/skills/excalidraw-diagram/references/color-palette.md. Skip this only for a purely conceptual diagram where the concept is the abstraction.
+A technical diagram carries concrete artifacts, not just labeled boxes. Conversion strips all evidence, so add what the audience needs: real event or method names, a code snippet, a sample data payload, a UI mockup. Use the evidence-artifact colors from ~/.claude/skills/excalidraw-diagram/references/color-palette.md. Skip this only for a purely conceptual diagram where the concept is the abstraction.
 
 ## 3. Multi-zoom
 

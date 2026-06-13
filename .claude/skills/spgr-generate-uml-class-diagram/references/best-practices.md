@@ -1,6 +1,6 @@
 # Best practices
 
-Quality guardrails for the class-diagram family, beyond the syntax. Family-wide rules (one question per diagram, model only what serves the question, version control, regenerate not hand-edit, render before delivery) live in the shared standards at /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md. This file adds the static-structure-specific judgments.
+Quality guardrails for the class-diagram family, beyond the syntax. Family-wide rules (one question per diagram, model only what serves the question, version control, regenerate not hand-edit, render before delivery) live in the shared standards at .claude/references/diagram-standards.md. This file adds the static-structure-specific judgments.
 
 ## Ask the question first
 

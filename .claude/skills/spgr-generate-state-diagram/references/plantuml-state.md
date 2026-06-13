@@ -1,6 +1,6 @@
 # PlantUML state notation
 
-Notation cheat-sheet for authoring an entity lifecycle in PlantUML state, the escalation renderer when the model needs a feature Mermaid stateDiagram-v2 drops. Shared family rules (render-and-validate commands, quality rules, boundaries) live in /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md. The Mermaid-vs-PlantUML decision table and the Mermaid limitation list live in /Users/gunderer/Repos/springer/.claude/references/tool-selection.md. PlantUML composite state layout needs Graphviz, confirmed with `dot -V`. This file adds only the state-diagram syntax.
+Notation cheat-sheet for authoring an entity lifecycle in PlantUML state, the escalation renderer when the model needs a feature Mermaid stateDiagram-v2 drops. Shared family rules (render-and-validate commands, quality rules, boundaries) live in .claude/references/diagram-standards.md. The Mermaid-vs-PlantUML decision table and the Mermaid limitation list live in .claude/references/tool-selection.md. PlantUML composite state layout needs Graphviz, confirmed with `dot -V`. This file adds only the state-diagram syntax.
 
 ## Contents
 - When to use this renderer

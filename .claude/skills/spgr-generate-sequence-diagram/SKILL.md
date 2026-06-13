@@ -30,7 +30,7 @@ Capture the message protocol for one scenario as diagram-as-code: who calls whom
 
 1. Confirm the deliverable is interaction over time for one scenario. If it is process flow with responsibility lanes use spgr-generate-activity-diagram, a single entity lifecycle use spgr-generate-state-diagram, static structure use spgr-generate-uml-class-diagram, the data model use spgr-generate-erd, C4 structure use spgr-generate-system-diagram, and deployment topology use spgr-write-infrastructure-diagram. If the input names no concrete scenario, no participants, or contradicts itself on sync versus async, stop and raise spgr-escalate with the precise gap. Do not assume a protocol.
 
-2. Select the notation. Default to Mermaid `sequenceDiagram`. Escalate to PlantUML only on a trigger in /Users/gunderer/Repos/springer/.claude/references/tool-selection.md: richer fragments, a true communication or object view, `autoactivate`, object creation, or finer styling Mermaid cannot express. State the notation and the trigger in the source as a comment when you escalate.
+2. Select the notation. Default to Mermaid `sequenceDiagram`. Escalate to PlantUML only on a trigger in .claude/references/tool-selection.md: richer fragments, a true communication or object view, `autoactivate`, object creation, or finer styling Mermaid cannot express. State the notation and the trigger in the source as a comment when you escalate.
 
 3. Author the source from the matching golden template so output stays consistent across runs. For Mermaid, copy from assets/mermaid/ (`sync-request-response.mmd`, `async-fire-and-forget.mmd`, `alt-opt-loop.mmd`). For PlantUML, copy from assets/plantuml/ with the same three names. For the message arrows, activation, and fragment rules, read references/mermaid-sequence.md or references/plantuml-sequence.md.
 
@@ -47,7 +47,7 @@ Capture the message protocol for one scenario as diagram-as-code: who calls whom
 ## Notes
 
 - The output is committed diagram source plus a rendered SVG, verified by the render-and-validate script, not by an envelope schema. Do not call spgr-write-artifact for this skill.
-- Cross-cutting diagram quality rules (one question per diagram, source of truth, render before delivery, cite the source) live in /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md. The notation decision table and the Mermaid limitation list live in /Users/gunderer/Repos/springer/.claude/references/tool-selection.md. Do not restate them here.
+- Cross-cutting diagram quality rules (one question per diagram, source of truth, render before delivery, cite the source) live in .claude/references/diagram-standards.md. The notation decision table and the Mermaid limitation list live in .claude/references/tool-selection.md. Do not restate them here.
 - Keep use-case, interaction-overview, and timing diagrams out of scope. This skill owns interaction over time only.
 - For presentation-grade output, hand the committed source to spgr-render-diagram-excalidraw rather than re-authoring by hand.
 - scripts/render-sequence.sh is the validation gate. Run it before every delivery. scripts/lint-sequence.sh is the structural balance check it calls first, and can also run standalone on a draft. assets/mermaid/UNBALANCED-do-not-ship.mmd is a deliberately broken fixture for testing the lint, not a template.

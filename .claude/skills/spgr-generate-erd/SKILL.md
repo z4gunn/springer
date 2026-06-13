@@ -40,7 +40,7 @@ Build the single shared data model the whole team designs against. The erd artif
 
 ## Notes
 
-- The erd artifact type is registered in the schema registry at `/Users/gunderer/Repos/springer/schemas/` as `erd-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
+- The erd artifact type is registered in the schema registry at `schemas/` as `erd-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
 - The erd, the API spec, and the migrations must agree on every field name, type, and relationship. An inconsistency between them is a defect to escalate, not a variant to tolerate.
 - Soft delete by way of a nullable `deleted_at` is the default. Hard delete is an exception that requires an explicit input requirement and a logged decision.
 - A proposed structure or a proposed PII classification is a valid output state, not a failure. The failure is an invented entity or an unmarked PII field presented as confirmed.

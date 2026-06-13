@@ -41,7 +41,7 @@ Write the test-plan artifact that fixes what testing means for a release before 
 
 ## Notes
 
-- The test-plan artifact type is registered in the schema registry at `/Users/gunderer/Repos/springer/schemas/` as `test-plan-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
+- The test-plan artifact type is registered in the schema registry at `schemas/` as `test-plan-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
 - The test plan is a living document for the release. When a story is added mid-sprint, revise the plan with spgr-version-artifact so coverage and traceability stay current rather than drifting.
 - A test type without an owner agent or an NFR without a matching target is an incomplete plan, not a confirmed one. Mark the section proposed and confirm it before developers begin.
 - This skill produces the entry-and-exit contract that spgr-run-tests and CI enforce. Coverage targets declared here are the thresholds the CI gate fails the build against. Acceptance criteria referenced by entry criteria come from spgr-write-acceptance-criteria.

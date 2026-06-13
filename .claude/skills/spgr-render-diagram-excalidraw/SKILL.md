@@ -15,7 +15,7 @@ The code-first `generate-*` diagram siblings render inline in GitHub and Obsidia
 |-------|-------------|
 | `source` | A committed code-first diagram, Mermaid or PlantUML. Read it with spgr-read-file. The diagram-as-code stays authoritative. |
 | `purpose-and-audience` | What question the diagram answers and for whom. Drives depth, evidence, and the polish pass. |
-| `excalidraw-diagram conventions` | The global skill's methodology, palette, and templates, read by absolute path: /Users/gunderer/.claude/skills/excalidraw-diagram/SKILL.md, references/color-palette.md, references/element-templates.md. |
+| `excalidraw-diagram conventions` | The global skill's methodology, palette, and templates, read by absolute path: ~/.claude/skills/excalidraw-diagram/SKILL.md, references/color-palette.md, references/element-templates.md. |
 
 ## Outputs
 
@@ -35,7 +35,7 @@ The code-first `generate-*` diagram siblings render inline in GitHub and Obsidia
    `~/.claude/skills/excalidraw-diagram/references/.venv/bin/python scripts/mermaid_to_excalidraw.py <source.mmd>`
    On the convert-then-verify route, confirm the elements are individually editable using the checks in the decision tree before treating the output as a seed. If the script exits non-zero, read its stderr and act on it. A modules-did-not-load error means the runtime had no network access to esm.sh (see Notes).
 
-4. On a re-author route, render the source to SVG with the family render commands in /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md, then build the diagram natively from the global skill's methodology and element templates. The SVG seeds understanding, it does not produce the artifact.
+4. On a re-author route, render the source to SVG with the family render commands in .claude/references/diagram-standards.md, then build the diagram natively from the global skill's methodology and element templates. The SVG seeds understanding, it does not produce the artifact.
 
 5. Run the mandatory polish pass on the converted or re-authored elements. See [references/conversion-fidelity.md](references/conversion-fidelity.md) for what degrades and [references/polish-checklist.md](references/polish-checklist.md) for the four criteria. Re-apply the semantic palette, re-space the auto-layout, widen containers so labels fit on one line, re-map degraded shapes (hexagon, cylinder, subroutine fall back to rectangle), enforce container discipline under 30 percent of text inside boxes, and add the evidence the source lacks. Satisfy isomorphism, evidence, multi-zoom, and container discipline.
 
@@ -46,7 +46,7 @@ The code-first `generate-*` diagram siblings render inline in GitHub and Obsidia
 ## Notes
 
 - The spec line "Register the skill and any new script in README.md" is inherited from the external excalidraw-diagram skill and does not apply here, because Springer's CLAUDE.md forbids skill READMEs.
-- This skill is presentation and rendering only. It owns no model. generate-erd, generate-system-diagram, write-infrastructure-diagram, and the UML `generate-*` siblings own their notations, per /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md. This skill consumes their output and polishes it.
+- This skill is presentation and rendering only. It owns no model. generate-erd, generate-system-diagram, write-infrastructure-diagram, and the UML `generate-*` siblings own their notations, per .claude/references/diagram-standards.md. This skill consumes their output and polishes it.
 - The converter and its render template depend on esm.sh at runtime to fetch the pinned conversion libraries. The step needs network access. A missing network surfaces as a modules-did-not-load error from the script.
 - Library versions are pinned in [assets/convert_template.html](assets/convert_template.html): `@excalidraw/mermaid-to-excalidraw@1.1.2` and `@excalidraw/excalidraw@0.18.0`. The template is this skill's own, not the global skill's, whose unpinned import is currently broken by an esm.sh transitive 404. Upstream releases on a modest cadence, so revalidate the pins after an upstream upgrade.
 - The built-in Excalidraw GUI Mermaid-to-Excalidraw dialog is a manual spot-check only. It is not scriptable and is not the automated path this skill uses.

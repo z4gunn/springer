@@ -8,10 +8,10 @@ export const meta = {
   ],
 }
 
-const SPEC_DIR = '/Users/gunderer/Repos/ecg-intel/vault/40-projects/springer/skills'
-const OUT_DIR = '/Users/gunderer/Repos/springer/.claude/skills'
-const TEMPLATE = '/Users/gunderer/Repos/springer/templates/SKILL.template.md'
-const STANDARDS = '/Users/gunderer/Repos/ecg-intel/vault/40-projects/springer/build/BUILD-STANDARDS.md'
+const SPEC_DIR = process.env.SPGR_SPEC_DIR ?? 'specs/skills'
+const OUT_DIR = '.claude/skills'
+const TEMPLATE = 'templates/SKILL.template.md'
+const STANDARDS = process.env.SPGR_BUILD_STANDARDS ?? 'specs/BUILD-STANDARDS.md'
 
 const PM = [
   'write-prd', 'write-nfr', 'write-user-story', 'write-acceptance-criteria',
@@ -63,7 +63,7 @@ HARD RULES:
 
 SPRINGER CONTRACT CONTEXT:
 - This skill is called by agents. Artifact production goes through the plumbing skills already built: spgr-write-artifact, spgr-read-artifact, spgr-validate-artifact, spgr-version-artifact, spgr-log-decision, spgr-escalate, spgr-notify-human, spgr-tag-vertical-agent. Reference these by name in the Procedure where the spec implies them, rather than re-describing artifact mechanics.
-- The schema registry is at /Users/gunderer/Repos/springer/schemas/ with one JSON Schema per artifact type. Reference the registry through spgr-validate-artifact rather than inlining field lists. Registered types include: prd, nfr, user-story, acceptance-criteria, architecture-options, adr, architecture-decision, erd, tech-stack-decision, data-dictionary, system-diagram, infrastructure-diagram, escalation, hil-checkpoint, consultation. If this skill's output type is NOT in that list (for example a prioritized backlog, an MVP scope, a definition of done, an OpenAPI api-spec, or a vertical artifact like auth-model or threat-model), say in one Notes line that the artifact is written via spgr-write-artifact and its registered schema is added in a later build increment. The api-spec is OpenAPI 3.1 YAML validated by OpenAPI tooling, not by an envelope schema.
+- The schema registry is at schemas/ with one JSON Schema per artifact type. Reference the registry through spgr-validate-artifact rather than inlining field lists. Registered types include: prd, nfr, user-story, acceptance-criteria, architecture-options, adr, architecture-decision, erd, tech-stack-decision, data-dictionary, system-diagram, infrastructure-diagram, escalation, hil-checkpoint, consultation. If this skill's output type is NOT in that list (for example a prioritized backlog, an MVP scope, a definition of done, an OpenAPI api-spec, or a vertical artifact like auth-model or threat-model), say in one Notes line that the artifact is written via spgr-write-artifact and its registered schema is added in a later build increment. The api-spec is OpenAPI 3.1 YAML validated by OpenAPI tooling, not by an envelope schema.
 
 After writing, return the structured report. Set frontmatter_ok, voice_ok, under_500_lines, and maps_escalation to true only if you verified each by re-reading your file.`
 }

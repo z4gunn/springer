@@ -35,7 +35,7 @@ Write the CI pipeline configuration that gives every push the same automated qua
 
 3. Author the staged pipeline with fail-fast ordering:
    - Stage 1 Build: install dependencies, compile or transpile, produce the build artifact. Fail immediately and skip all later stages if the build fails.
-   - Stage 2 Lint and typecheck: run the linter and formatter check, fail on any lint error or unformatted file. For a TypeScript project, also run `tsc --noEmit` and fail on any type error, per `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md`. Run this stage in parallel with unit tests, the one allowed exception to fail-fast since both are fast and independent.
+   - Stage 2 Lint and typecheck: run the linter and formatter check, fail on any lint error or unformatted file. For a TypeScript project, also run `tsc --noEmit` and fail on any type error, per `.claude/references/typescript-standards.md`. Run this stage in parallel with unit tests, the one allowed exception to fail-fast since both are fast and independent.
    - Stage 3 Unit tests: run the fast unit suite, generate the coverage report, fail if coverage drops below the floor. Budget under 3 minutes.
    - Stage 4 Integration tests: run against the pinned test database. Budget under 7 minutes.
    - Stage 5 SAST and dependency audit: run Semgrep and the dependency scanner. Fail on Critical or High findings per the Security Agent thresholds.

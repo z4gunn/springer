@@ -1,6 +1,6 @@
 # Package diagram
 
-How to build a package diagram: module grouping and dependency direction, used to expose and govern layering. Notation glyphs live in plantuml-syntax.md. Family quality rules and the render loop live in the shared standards at /Users/gunderer/Repos/springer/.claude/references/diagram-standards.md.
+How to build a package diagram: module grouping and dependency direction, used to expose and govern layering. Notation glyphs live in plantuml-syntax.md. Family quality rules and the render loop live in the shared standards at .claude/references/diagram-standards.md.
 
 ## What a package diagram is
 

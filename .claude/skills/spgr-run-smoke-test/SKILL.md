@@ -46,6 +46,6 @@ Confirm a deployment is alive and the critical path works before live traffic re
 ## Notes
 
 - The smoke test suite is source code, verified by spgr-run-tests and CI rather than by an envelope schema.
-- The smoke-test-result artifact type is not yet in the schema registry at /Users/gunderer/Repos/springer/schemas/. Write it via spgr-write-artifact and add its registered schema, referenced through spgr-validate-artifact, in a later increment.
+- The smoke-test-result artifact type is not yet in the schema registry at schemas/. Write it via spgr-write-artifact and add its registered schema, referenced through spgr-validate-artifact, in a later increment.
 - The result verdict is the deployment go/no-go signal. NO-GO blocks the release and triggers automatic rollback. Do not mark a result confirmed on any failed check.
 - YAGNI. Build only the checks the critical paths require. Adding regression coverage here breaks the time budget and defeats the gate.

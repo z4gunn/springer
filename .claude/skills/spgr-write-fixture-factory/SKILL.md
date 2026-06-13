@@ -47,7 +47,7 @@ Replace hardcoded test fixtures with factories that generate valid entity instan
 
 10. Generate the factory reference table by introspecting all factory definitions, listing each entity, its default field values, and its available traits, so a new agent can read the test data landscape quickly.
 
-11. Run the full suite, lint, and format with spgr-run-tests and confirm clean and the validation test green before write. For TypeScript or JavaScript, conform to `/Users/gunderer/Repos/springer/.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Write each factory file, the validation test, and the reference table through spgr-write-file. Record any non-obvious factory design choice with spgr-log-decision. When a factory touches a vertical's domain (a PII field or an access-control state), consult that specialist with spgr-tag-vertical-agent before treating it as done.
+11. Run the full suite, lint, and format with spgr-run-tests and confirm clean and the validation test green before write. For TypeScript or JavaScript, conform to `.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Write each factory file, the validation test, and the reference table through spgr-write-file. Record any non-obvious factory design choice with spgr-log-decision. When a factory touches a vertical's domain (a PII field or an access-control state), consult that specialist with spgr-tag-vertical-agent before treating it as done.
 
 ## Notes
 

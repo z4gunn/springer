@@ -42,6 +42,6 @@ Turn a human's quality-attribute inputs into an nfr artifact whose every line is
 
 ## Notes
 
-- The nfr artifact type is registered in the schema registry at `/Users/gunderer/Repos/springer/schemas/` as `nfr-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
+- The nfr artifact type is registered in the schema registry at `schemas/` as `nfr-v1.json`. Reference field requirements through spgr-validate-artifact rather than inlining them here.
 - A proposed threshold is a valid output state, not a failure. Mark the section `proposed` and confirm it with the human. An invented number presented as confirmed is the failure.
 - Vertical flags gate the architecture phase. The nfr is not treated as ready for the Architect until the flagged verticals have reviewed their sections.

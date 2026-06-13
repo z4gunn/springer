@@ -1,6 +1,6 @@
 # Mermaid classDiagram syntax
 
-Glyph reference for Mermaid `classDiagram`, the standalone-Markdown class view only. Mermaid has no object-diagram and no true package-diagram type. The Mermaid limitation list and the Mermaid-versus-PlantUML decision table live in the shared reference at /Users/gunderer/Repos/springer/.claude/references/tool-selection.md. Run scripts/mermaid-trap-lint.sh before committing any Mermaid class view.
+Glyph reference for Mermaid `classDiagram`, the standalone-Markdown class view only. Mermaid has no object-diagram and no true package-diagram type. The Mermaid limitation list and the Mermaid-versus-PlantUML decision table live in the shared reference at .claude/references/tool-selection.md. Run scripts/mermaid-trap-lint.sh before committing any Mermaid class view.
 
 ## Relationship glyphs
 

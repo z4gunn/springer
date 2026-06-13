@@ -53,7 +53,7 @@ Turn the outcome of a user acceptance testing session into one uat-report artifa
 
 ## Notes
 
-- Validate via spgr-validate-artifact against the registered `uat-report` schema in /Users/gunderer/Repos/springer/schemas/. Do not inline the field list.
+- Validate via spgr-validate-artifact against the registered `uat-report` schema in schemas/. Do not inline the field list.
 - The sign-off is a hard human-in-the-loop gate. The deployment gate cannot read go without a named human entry in the sign-off block, delivered through spgr-notify-human.
 - The report is release-scoped. Link each release to its uat-report so a post-mortem can check whether a production issue was seen and deferred in UAT.
 - UAT rejection-rate tracking per story type and per implementing agent (a signal of spec misalignment, not just rework) is written via spgr-write-artifact under its registered schema, added in a later increment. Do not block this report on it.
