@@ -46,6 +46,8 @@ Spec source (read-only, private): Phase 1 specs live in a private vault, as `ski
 
 External skill dependency (optional): The `spgr-render-diagram-excalidraw` skill builds on the third-party `excalidraw-diagram` skill by Cole Medin (https://github.com/coleam00/excalidraw-diagram-skill), expected at `~/.claude/skills/excalidraw-diagram/`. It reuses that skill's color palette, element templates, and render methodology by path. The skill is not vendored here and must be installed separately for render-diagram-excalidraw to run. Every other Springer skill and agent works without it.
 
+External skill dependency (optional): The `spgr-generate-design-directions` and `spgr-create-design-system` skills can draw on the third-party `ui-ux-pro-max-skill` (https://github.com/nextlevelbuilder/ui-ux-pro-max-skill), a catalog of UI styles, color palettes, and font pairings, expected at `~/.claude/skills/ui-ux-pro-max/`. Verify the exact installed directory name on install. The two skills consume the catalog by path as an optional source of candidate styles, palettes, and pairings, then translate every selected value into named design tokens, so no raw hex or font name reaches an artifact. The catalog is not vendored here and must be installed separately. Both skills run fully without it.
+
 ## Build Standards
 
 This section defines how to build each skill and agent. Build from the templates in `templates/`. The rules are split by degree of freedom. A hard rule is a shape constraint that a validator can enforce. A guidance rule requires judgment.
