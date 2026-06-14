@@ -173,6 +173,24 @@ Open this repository in Claude Code. The agents in `.claude/agents/` and the ski
 
 To run a project, delegate to the Orchestrator agent, which sequences the phases, or invoke a specific agent for a specific phase such as Discovery to start research or Architect to produce options. The agents drive the lifecycle and pause at the five human checkpoints: architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Artifacts accumulate in `runs/` and validate against the schemas in `schemas/` as they pass between agents.
 
+### Quickstart: start a new project
+
+Springer builds each application inside its own copy of the runtime, which becomes that application's git repository. The file-writing tooling is bound to the project root, and the schema registry and shared references are cited by repo-relative path, so the runtime travels with the project rather than installing globally. To build a new app or SaaS app, instantiate a fresh copy:
+
+```bash
+npx degit z4gunn/springer my-saas-app   # fresh copy, no git history (needs the repo public)
+cd my-saas-app && git init && claude
+```
+
+Or, from a clone of this repository:
+
+```bash
+./scripts/new-project.sh ~/path/to/my-saas-app
+cd ~/path/to/my-saas-app && claude
+```
+
+The new directory is the application's own repository. It carries `.claude/skills/`, `.claude/agents/`, `.claude/references/`, `schemas/`, a project `CLAUDE.md` tailored to building an app (not to building Springer), and an empty `runs/`. Open it in Claude Code and delegate to the Orchestrator agent. Typed artifacts (PRD, ADRs, ERD, test plans) accumulate under `runs/<run-id>/`, and the application source code is written into the project tree. The build-time pieces (`.claude/workflows/`, `templates/`) are left out of the new project.
+
 One skill family needs a one-time setup, and it is optional. The diagram skills render Mermaid and PlantUML sources. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, and make the Mermaid CLI available through `npx`. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
 
 `spgr-render-diagram-excalidraw` is the one skill with an external dependency. It builds on the third-party `excalidraw-diagram` skill by Cole Medin, which is not bundled with Springer. Install it separately only if you want polished Excalidraw output:
