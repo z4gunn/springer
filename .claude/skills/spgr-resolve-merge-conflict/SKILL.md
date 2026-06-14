@@ -1,6 +1,6 @@
 ---
 name: spgr-resolve-merge-conflict
-description: Resolve git merge conflicts by understanding the intent of both sides and producing a correct merged result, then land it as a `chore: resolve merge conflict` commit and re-run the test suite. Use when a backend, frontend, mobile, or DevOps developer agent hits conflicts during a merge or rebase and must reconcile two changes that touched the same code, rather than accepting one side wholesale.
+description: Resolve git merge conflicts by understanding the intent of both sides and producing a correct merged result, then land it as a `chore(merge): resolve conflict` commit and re-run the test suite. Use when a backend, frontend, mobile, or DevOps developer agent hits conflicts during a merge or rebase and must reconcile two changes that touched the same code, rather than accepting one side wholesale.
 ---
 
 # resolve-merge-conflict
@@ -22,7 +22,7 @@ Resolve every conflicted hunk by writing the merged version that achieves what b
 | Artifact | Description |
 |----------|-------------|
 | Merged working tree | Conflict-free result that incorporates both sides' intended behavior |
-| Resolution commit | One commit per conflict file in the form `chore: resolve merge conflict in <filename> - <both sides described>` |
+| Resolution commit | One commit per conflict file. The subject follows Conventional Commits as `chore(merge): resolve conflict in <filename>`, and the commit body describes both sides' intents and the merged resolution |
 | Conflict-frequency note | A line recording the file and the branch pair, so repeated conflicts in one file surface structural coupling for the Architect Agent |
 
 ## Procedure
@@ -32,7 +32,7 @@ Resolve every conflicted hunk by writing the merged version that achieves what b
 3. Write the merged version that satisfies both intents. Do not run `git checkout --ours` or `--theirs` to take a side wholesale, and do not delete either side's behavior. Remove all conflict markers. Save with spgr-write-file.
 4. Stage each resolved file and verify no markers remain with `git diff --check`.
 5. Re-run the full suite with spgr-run-tests on the merged result. Conflict resolution creates new code paths the existing tests may not cover, so treat a green suite as the gate. If the suite fails or a new path is untested, fix the resolution or add coverage before committing.
-6. Commit per the message format above with spgr-git-commit. Log the resolution and its rationale with spgr-log-decision.
+6. Commit each resolved file per the Conventional Commits format above with spgr-git-commit, keeping the subject concise and putting the both-sides detail in the commit body. Log the resolution and its rationale with spgr-log-decision.
 7. Record the conflict in the frequency note: increment the count for this file and this `base_branch` / `conflicting_branch` pair. When a file crosses a recurring-conflict threshold, raise it with spgr-tag-vertical-agent to the Architect Agent as a structural-coupling signal.
 8. Escalate with spgr-escalate when both sides changed the same logic for different reasons and the correct merged behavior cannot be determined from context. Route to the Architect Agent or the authors of both changes, and do not commit a guessed resolution. Use spgr-notify-human if neither author nor the Architect can be resolved automatically.
 
@@ -41,3 +41,4 @@ Resolve every conflicted hunk by writing the merged version that achieves what b
 - Output type is SOURCE: the deliverable is merged source plus a git commit, verified by spgr-run-tests, not an envelope artifact. The conflict-frequency note is operational tracking, not a registered artifact.
 - Never resolve by taking one side wholesale or by discarding a change. Ambiguity is an escalation trigger, not a tie broken by the resolver.
 - The test re-run after resolution is mandatory. A merge is not complete until the suite passes on the merged tree.
+- The commit format follows the project git workflow. Merge and conflict-resolution commits use Conventional Commits, see `.claude/references/git-workflow.md`.
