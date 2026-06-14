@@ -7,7 +7,7 @@ description: Produce a design-directions artifact holding three or more genuinel
 
 ## Purpose
 
-Generate three or more meaningfully distinct creative directions so a human chooses the design direction deliberately, rather than having it decided implicitly by the first reasonable option that gets built. The contract that matters here is distinctness. Three directions that vary only in color palette are one direction with three colorways, not three directions. Each direction must vary on at least one structural axis (navigation model, density, interaction paradigm, or content hierarchy) and carry a rationale tied to the personas and flows, not aesthetic preference alone.
+Generate three or more meaningfully distinct creative directions so a human chooses the design direction deliberately, rather than having it decided implicitly by the first reasonable option that gets built. The contract that matters here is distinctness. Three directions that vary only in color palette are one direction with three colorways, not three directions. Each direction must vary on at least one structural axis (navigation model, density, interaction paradigm, or content hierarchy) and carry a rationale tied to the personas and flows, not aesthetic preference alone. When the optional ui-ux-pro-max catalog is installed, draw palette, style, and font-pairing candidates from it to seed visual language, and translate every selected value into a token downstream. This does not change the distinctness contract, because catalog selections are cosmetic and do not substitute for structural variation.
 
 ## Inputs
 
@@ -18,6 +18,7 @@ Generate three or more meaningfully distinct creative directions so a human choo
 | `brand-constraints` | Existing brand, color-palette restrictions, tone of voice. |
 | `platform-targets` | Web, iOS, Android, or the stated combination. |
 | `accessibility-requirements` | Target WCAG level and any platform accessibility constraints. |
+| `ui-ux-pro-max catalog` | Optional. The third-party catalog of UI styles, color palettes, and font pairings, read by absolute path `~/.claude/skills/ui-ux-pro-max/`. Candidate source material for each direction's visual language, translated to tokens, never copied as raw values. |
 
 ## Outputs
 
@@ -31,13 +32,13 @@ Generate three or more meaningfully distinct creative directions so a human choo
 
 2. Map the design space. Name the structural axes that can vary: navigation model, density, interaction paradigm, content hierarchy. Pick distinct positions on these axes so the directions cannot collapse into one. A direction that varies only in color or typography from another is not a separate direction.
 
-3. Draft at least three directions. For each, write the visual language, the interaction model, the information-architecture rationale, the emotional tone, and one or two key screen mockups that illustrate the direction concretely. Express all visual values as tokens, with no hardcoded hex codes, pixel sizes, or font names baked into the mockup descriptions.
+3. Draft at least three directions. For each, write the visual language, the interaction model, the information-architecture rationale, the emotional tone, and one or two key screen mockups that illustrate the direction concretely. Express all visual values as tokens, with no hardcoded hex codes, pixel sizes, or font names baked into the mockup descriptions. When the ui-ux-pro-max catalog is installed, visual-language candidates may be sourced from it by named selection (a style, palette, or pairing identifier), still expressed as tokens, never as raw hex or font names.
 
 4. Tie each direction to evidence. State why this direction serves the personas and the user flows. A direction without a defensible rationale anchored to a persona or a flow is rejected, not shipped.
 
 5. Add a per-direction usability prediction. Name which persona the direction is likely to test best with and why, drawing on the persona's stated goals, context, and constraints.
 
-6. Add an optional lightweight mood board per direction as supporting material when it clarifies the emotional tone. Keep it as a token-based reference, not a finished comp.
+6. Add an optional lightweight mood board per direction as supporting material when it clarifies the emotional tone. Keep it as a token-based reference, not a finished comp. The mood board may cite ui-ux-pro-max catalog entries as token-based references.
 
 7. Run a distinctness check across the full set. Confirm each pair of directions differs on at least one structural axis. If two directions differ only in surface styling, merge or replace one so the set holds three or more genuinely distinct directions.
 
@@ -53,3 +54,4 @@ Generate three or more meaningfully distinct creative directions so a human choo
 - All visual values are token-based. No hardcoded style values appear in any direction or mockup.
 - Mark each direction's status in the confidence map as proposed. The full set carries needs-human-input until a direction is selected at the HIL checkpoint.
 - Three or more directions is a hard floor. Stop and escalate rather than ship two.
+- The ui-ux-pro-max catalog is an optional external skill. It is source material translated to tokens, not a values shortcut, and its selections never count toward structural distinctness. This skill runs fully without it.
