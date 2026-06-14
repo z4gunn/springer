@@ -129,7 +129,7 @@ This section gives the order of work. Each item is a prerequisite for the next.
 
 This section states the commit and branch rules.
 
-- Commit directly to `main`. Push after a unit of work is complete. A branch and PR are opt-in.
+- Commit directly to `main`. Push after a unit of work is complete. A branch and PR are opt-in. This rule governs maintaining the Springer repository itself. Applications Springer builds follow the trunk-based pull-request workflow in `.claude/references/git-workflow.md`, where `main` is protected and every change lands through a reviewed PR.
 - Use conventional commit messages, scoped by what changed (e.g. `feat(agent): build spgr-agent-architect`, `feat(skill): build spgr-write-prd`, `chore(schemas): add prd schema`).
 - Never commit secrets or `.env`.
 - The full project roadmap and the methodology research that motivates it live in a private vault and are not required to work in this repository.

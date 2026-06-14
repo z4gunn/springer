@@ -32,6 +32,8 @@ Any JavaScript-runtime stack this project selects MUST be TypeScript. Plain Java
 
 ## Git conventions
 
+This project follows a trunk-based workflow: `main` is always deployable, every change lands through a short-lived branch and a reviewed pull request, and `main` is protected against direct pushes. The full model, including branch naming, the merge bar, and the release and hotfix flow, is defined in `.claude/references/git-workflow.md`.
+
 - Use conventional commit messages, scoped by what changed (for example `feat(api): add subscription endpoint`, `chore(ci): add typecheck stage`).
 - One logical change per commit. Lint, format, and the type checker pass before every commit.
 - Never commit secrets or `.env`.

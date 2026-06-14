@@ -42,4 +42,4 @@ When invoked:
 
 ## Output format
 
-Produce a code-review artifact in the run store: inline findings (file, line, severity, description, remediation), a summary with the P0 and P1 list, the four axes marked checked, and a verdict of APPROVE, REQUEST_CHANGES, or COMMENT. Your approval is the automated gate. A human merges after it. You do not delegate the verdict, though you may tag specialists for advisory input.
+Produce a code-review artifact in the run store: inline findings (file, line, severity, description, remediation), a summary with the P0 and P1 list, the four axes marked checked, and a verdict of APPROVE, REQUEST_CHANGES, or COMMENT. Your approval is the automated gate in the merge criteria defined in `.claude/references/git-workflow.md`. A human merges after it. You do not delegate the verdict, though you may tag specialists for advisory input.
