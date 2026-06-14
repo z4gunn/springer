@@ -47,4 +47,5 @@ Branch naming and base selection are the first decision in every development tas
 - Branch names use only lowercase letters, digits, and hyphens. No underscores, no uppercase, no other special characters.
 - The naming convention is also enforced server-side by a push-time hook or branch-protection rule that rejects non-conforming names. This skill makes the local name conform so the push is accepted on the first attempt.
 - One branch carries one logical change. A task that spans two stories needs two branches.
+- The branching model these types serve (trunk-based, `main` always deployable) and the trigger for cutting a `release/<version>` branch are defined in `.claude/references/git-workflow.md`.
 - Use spgr-escalate for every stop condition in the procedure. Do not fill a missing ID, slug, or version with a guess, and do not overwrite an existing branch or a dirty tree.

@@ -56,7 +56,7 @@ The pipeline source covers:
 
 - The output is source or config (pipeline YAML and deploy scripts), verified by a CI run of the staging path rather than by an envelope content schema. There is no registered content schema for cd-pipeline yet, so spgr-validate-artifact applies envelope-only validation (header, confidence map, decision log, version) until a content schema is registered.
 - No literal secrets in any pipeline or IaC. Source credentials from the secret store.
-- Staging auto-deploys. A merge to main is the confidence signal, and a change not ready to ship is not ready for main.
+- Staging auto-deploys. A merge to main is the confidence signal, and a change not ready to ship is not ready for main. The trunk-based deployable-main model this pipeline depends on is defined in `.claude/references/git-workflow.md`.
 - Production needs a deliberate signal and human sign-off via spgr-notify-human. It is appropriate care, not bureaucracy.
 - A deploy is valid only with a tested rollback. Verify the rollback before the production job is treated as complete.
 - Version every deployment under semantic versioning and record it in the immutable deployment log.
