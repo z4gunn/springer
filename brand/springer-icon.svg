@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Springer">
+  <g>
+    <rect x="72.00" y="274.00" width="72.00" height="148.00" fill="#B7AE9E" stroke="#7A715F" stroke-width="3" stroke-linejoin="round"/>
+    <line x1="72.00" y1="348.00" x2="144.00" y2="348.00" stroke="#7A715F" stroke-width="3"/>
+    <rect x="368.00" y="274.00" width="72.00" height="148.00" fill="#B7AE9E" stroke="#7A715F" stroke-width="3" stroke-linejoin="round"/>
+    <line x1="368.00" y1="348.00" x2="440.00" y2="348.00" stroke="#7A715F" stroke-width="3"/>
+    <path d="M 368.00 274.00 L 361.25 235.69 L 428.90 211.07 L 440.00 274.00 Z" fill="#C26A3C" stroke="#8A4A28" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 361.25 235.69 L 341.80 202.01 L 396.95 155.73 L 428.90 211.07 Z" fill="#C0B7A6" stroke="#7A715F" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 341.80 202.01 L 312.00 177.01 L 348.00 114.65 L 396.95 155.73 Z" fill="#CFC7B8" stroke="#7A715F" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 312.00 177.01 L 275.45 163.70 L 287.95 92.80 L 348.00 114.65 Z" fill="#C0B7A6" stroke="#7A715F" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 275.45 163.70 L 236.55 163.70 L 224.05 92.80 L 287.95 92.80 Z" fill="#B4AA94" stroke="#7A715F" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 236.55 163.70 L 200.00 177.01 L 164.00 114.65 L 224.05 92.80 Z" fill="#C0B7A6" stroke="#7A715F" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 200.00 177.01 L 170.20 202.01 L 115.05 155.73 L 164.00 114.65 Z" fill="#CFC7B8" stroke="#7A715F" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 170.20 202.01 L 150.75 235.69 L 83.10 211.07 L 115.05 155.73 Z" fill="#C0B7A6" stroke="#7A715F" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 150.75 235.69 L 144.00 274.00 L 72.00 274.00 L 83.10 211.07 Z" fill="#C26A3C" stroke="#8A4A28" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+  </svg>
