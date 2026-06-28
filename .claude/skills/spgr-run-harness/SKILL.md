@@ -48,16 +48,21 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 3. Do. Dispatch each routed unit to its domain agent as a subagent. In the
    sequential spine this is one unit per tick. Collect the artifacts each agent
    wrote. Agents never write run state.
-4. Check. Validate every produced artifact with spgr-validate-artifact. Compare
-   the actual outcome against the expected outcome. Reduce to one verdict: pass,
-   fail, gate, or blocked. The audit fan-out and the comparison detail are wired
-   in at the next increment.
+4. Check. Validate every produced artifact with spgr-validate-artifact. Fan out
+   the always-active vertical audits relevant to the produced artifact type as
+   read-only subagents in parallel, and wait for all to return. Compare the actual
+   outcome against the expected outcome from Plan. Reduce to one verdict: pass,
+   fail, gate, or blocked. An audit that returns GATE, or any open Critical or
+   High finding, forces a hard stop, never an advance.
 5. Act. Append one pdca-cycle artifact with the plan, the dispatched batch, the
    check verdicts, and the act transition. Refresh the projection with
    `scripts/rebuild-projection.py <run-dir>`. Version or archive any superseded
    artifact with spgr-version-artifact and spgr-archive-artifact. Then take the
-   transition: advance and loop, retry by routing a fix, escalate by routing per
-   the orchestrator rules, or pause.
+   transition: advance and loop, retry, escalate by routing per the orchestrator
+   rules, or pause. On a fail verdict, retry by filing a bug report with
+   spgr-write-bug-report and a regression test, then routing the fix to the
+   developer agent that owns the artifact. Bound retries: after two failed retries
+   on the same unit, stop retrying and escalate to the human rather than looping.
 6. Pause at a gate. Write the hil-checkpoint with pipeline_status paused, set the
    act transition to pause, record the pending batch in the cycle artifact, fire
    spgr-notify-human, and terminate cleanly. Resuming is step 1 on the next entry.
