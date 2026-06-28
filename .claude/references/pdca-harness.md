@@ -138,6 +138,9 @@ Two scripts keep the deterministic work out of the model.
 - `scripts/rebuild-projection.py <run-dir> [--validate]` rebuilds run-state.json
   by replaying the cycle log. Run it after every Act, and any time the projection
   is lost or suspected stale.
+- `scripts/pin-learnings.py <retrospective.json> ...` freezes the advisory
+  learnings set by content hash at run start. Pure function of the inputs. Makes
+  no judgment about which learnings apply.
 
 ## Increment status
 
@@ -147,6 +150,8 @@ to Do to Check (validate plus the read-only audit fan-out and the expected-versu
 terminate at a gate, rehydrate on entry. WIP-bounded parallel Do is live: the
 orchestrator returns a ready-batch and the harness dispatches independent
 file-disjoint units in one turn behind the fork-join barrier. The
-self-improvement loop is wired in at the final increment. The run-state wip_board
+self-improvement loop is live: learnings are pinned by hash at run start, cited
+as advisory proposed rationale in Plan, and written to a retrospective at
+completion, with rule changes gated on human promotion. The run-state wip_board
 is maintained by the harness after each barrier, and rebuild-projection carries
 it forward when replaying the log.
