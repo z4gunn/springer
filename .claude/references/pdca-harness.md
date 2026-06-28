@@ -141,9 +141,10 @@ Two scripts keep the deterministic work out of the model.
 
 ## Increment status
 
-The sequential spine is the current build: single-unit Plan to Do to Check
-(validate only) to Act, terminate at a gate, rehydrate on entry. The Check audit
-fan-out and the fix-and-retry branch, WIP-bounded parallel Do, and the
+The current build runs the sequential spine with the full Check: single-unit Plan
+to Do to Check (validate plus the read-only audit fan-out and the expected-versus
+-actual comparison) to Act, with the fix-and-retry branch on a fail verdict,
+terminate at a gate, rehydrate on entry. WIP-bounded parallel Do and the
 self-improvement loop are wired in later increments. The run-state wip_board is
 reconstructed structurally once parallel Do lands. Until then rebuild-projection
 carries the board forward from the prior projection.
