@@ -14,7 +14,7 @@ An architecture-first AI software development team, from idea to production.
 
 Springer is an AI software development team, built as a library of Claude Code agents and skills. Each agent models a role from a traditional product and engineering organization, from discovery and product management through architecture, design, development, QA, and DevOps, plus the cross-cutting specialties that span those roles. Together they carry a greenfield SaaS or mobile application across the full software lifecycle, from a raw problem statement to production, with a human entering only at deliberate checkpoints.
 
-This repository is the working build of that team: 27 agents and 196 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
+This repository is the working build of that team: 27 agents and 197 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
 
 ## Contents
 
@@ -114,13 +114,13 @@ Twenty-seven agents in three groups. Horizontal agents own a lifecycle phase. Un
 
 ## The skills
 
-A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Each one carries its own triggering information, so the right skill activates when an agent needs it. The 196 skills group as follows.
+A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Each one carries its own triggering information, so the right skill activates when an agent needs it. The 197 skills group as follows.
 
 ### Shared and product
 
 | Group | Count | Examples |
 |-------|-------|----------|
-| Core and shared | 8 | search-codebase, read-file, write-file, escalate, tag-vertical-agent, log-decision |
+| Core and shared | 9 | search-codebase, read-file, write-file, escalate, tag-vertical-agent, log-decision, run-harness |
 | Artifact plumbing | 6 | write-artifact, read-artifact, validate-artifact, diff-artifact, version-artifact |
 | Analysis and research | 5 | competitive-analysis, build-persona, build-icp, market-sizing, go-no-go |
 | User-feedback research | 6 | mine-ugc-forums, mine-app-store-reviews, mine-review-platforms, synthesize-painpoints |
@@ -173,7 +173,7 @@ springer/
   CLAUDE.md              the operative ruleset for AI agents, loaded every session
   .claude/
     agents/<name>.md         the 27 agents, auto-loaded in this repo
-    skills/<name>/SKILL.md    the 196 skills, auto-loaded in this repo
+    skills/<name>/SKILL.md    the 197 skills, auto-loaded in this repo
     references/<name>.md      shared cross-skill references (for example diagram-standards, typescript-standards)
   schemas/               JSON Schemas for the typed artifacts that flow between agents
   templates/             golden starters for authoring a new skill or agent
@@ -223,9 +223,9 @@ Every line of JavaScript-runtime code the build, test, and scaffold skills gener
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1. Spec | One spec file per agent and skill, the source of truth for the build | Complete |
-| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 196 skills |
+| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 197 skills |
 | 3. POC | Run the full lifecycle on a greenfield SaaS application and refine from real output | Next |
-| 4. Harness | Autonomous orchestration with feedback loops, self-improvement, and parallel execution | Planned |
+| 4. Harness | Autonomous orchestration with feedback loops, self-improvement, and parallel execution | In progress, PDCA driver (spgr-run-harness) on the feat/pdca-harness branch |
 
 ## Conventions and contributing
 
