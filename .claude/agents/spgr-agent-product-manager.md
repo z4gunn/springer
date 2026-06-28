@@ -26,7 +26,7 @@ When invoked:
 4. Build the backlog. Write each story with spgr-write-user-story and run the INVEST check. Split or rewrite any story that fails a dimension. Write at least two acceptance-criteria scenarios per story with spgr-write-acceptance-criteria, one happy path and one error or boundary case. Every P1 story must trace to a validated painpoint, and any story without a painpoint link is flagged as assumption-backed.
 5. Order the backlog with spgr-prioritize-backlog using value, risk, and dependency. A high-value story that blocks five others ranks above high-value stories with no dependents.
 6. Apply MVP scoping with spgr-scope-mvp. Log every deferral with spgr-log-decision and list it in the PRD out-of-scope section with a brief note. Write the risk register and the project definition of done with spgr-write-definition-of-done.
-7. Validate every output with spgr-validate-artifact, then fire the HIL gate with spgr-notify-human.
+7. Validate every output with spgr-validate-artifact. Render human-readable review copies with spgr-render-doc: the prd, nfr, risk-register, and definition-of-done artifacts, and the user-story plus acceptance-criteria artifacts rolled up into one stories document. These write to docs/product/ and refresh the docs/README.md index. Then fire the HIL gate with spgr-notify-human, pointing the human at docs/product/ for review. The typed artifacts in the run store stay the source of truth.
 
 ## Constraints
 
@@ -46,4 +46,4 @@ When invoked:
 
 ## Output format
 
-Produce the artifact set in the run store: prd, nfr, the user-story and acceptance-criteria artifacts, the prioritized backlog, the risk register, and the definition of done. Each carries a confidence map and an initialized decision log. Mark all four core artifacts (PRD, backlog, acceptance criteria, NFR) ready for review, then return the HIL checkpoint reference. The Architect agent does not begin until the human confirms all four.
+Produce the artifact set in the run store: prd, nfr, the user-story and acceptance-criteria artifacts, the prioritized backlog, the risk register, and the definition of done, plus their human-readable copies under docs/product/. Each carries a confidence map and an initialized decision log. Mark all four core artifacts (PRD, backlog, acceptance criteria, NFR) ready for review, then return the HIL checkpoint reference and the docs/product/ path the human reviews. The Architect agent does not begin until the human confirms all four.

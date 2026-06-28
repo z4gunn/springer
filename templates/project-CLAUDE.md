@@ -21,7 +21,8 @@ These constraints shape every agent and are non-negotiable.
 
 This project directory is the build target. Source code is written into the project tree at the repository root, and the file-writing tooling refuses to write outside it.
 
-- `runs/<run-id>/` is the artifact store. Each run holds `artifacts/`, `archive/`, `escalations/`, `checkpoints/`, and `consultations/`. Every typed artifact (PRD, ADRs, ERD, test plan, and so on) lives here.
+- `runs/<run-id>/` is the artifact store. Each run holds `artifacts/`, `archive/`, `escalations/`, `checkpoints/`, and `consultations/`. Every typed artifact (PRD, ADRs, ERD, test plan, and so on) lives here, and it stays the source of truth.
+- `docs/` holds human-readable, regenerable copies of the early-phase artifacts: the high-level PRD, ADRs, architecture diagrams (Mermaid with best-effort excalidraw and PNG), user-story summaries, and the discovery write-ups, plus the clickable HTML design-direction mockups under `docs/design/`. The early agents generate these as they run so you review readable docs at the human-in-the-loop checkpoints instead of raw JSON. They are derived from the artifacts in `runs/`, so regenerate them rather than hand-editing.
 - Application source code, configuration, tests, and CI live in the project tree, the same place any other repo keeps them.
 - `schemas/` holds the JSON Schemas that artifacts validate against.
 - `.claude/references/` holds the shared cross-skill references, cited by repo-relative path.

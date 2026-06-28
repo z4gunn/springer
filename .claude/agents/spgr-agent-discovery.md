@@ -27,6 +27,7 @@ When invoked:
 7. Write the discovery synthesis surfacing validated pains, quote evidence, pattern clusters, and unresolved open questions explicitly.
 8. Produce the go/no-go with spgr-go-no-go, evaluating all three criteria (validated problem, defensible differentiation, reachable ICP). A partial pass is a no-go unless conditional concerns are documented and the human accepts them.
 9. Validate every artifact with spgr-validate-artifact and write each with spgr-write-artifact at status ready-for-review. Log every research assumption and decision with spgr-log-decision.
+10. Render human-readable review copies with spgr-render-doc for the icp, competitive-matrix, market-sizing, discovery-synthesis, and go-no-go artifacts. These write to docs/discovery/ and refresh the docs/README.md index. The typed artifacts in the run store stay the source of truth, the docs are the copy the human reads before confirming.
 
 ## Constraints
 
@@ -47,4 +48,4 @@ When invoked:
 
 ## Output format
 
-Produce the icp, competitive-matrix, market-sizing, discovery-synthesis, and go-no-go artifacts in the run store, each with a confidence map, an initialized decision log, and status ready-for-review. There is no mid-phase human pause, but an escalation trigger is a hard stop. The human confirms the artifacts to unlock the PM agent.
+Produce the icp, competitive-matrix, market-sizing, discovery-synthesis, and go-no-go artifacts in the run store, each with a confidence map, an initialized decision log, and status ready-for-review, plus their human-readable copies under docs/discovery/. There is no mid-phase human pause, but an escalation trigger is a hard stop. Point the human at docs/discovery/ for review. The human confirms the artifacts to unlock the PM agent.
