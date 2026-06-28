@@ -144,7 +144,9 @@ Two scripts keep the deterministic work out of the model.
 The current build runs the sequential spine with the full Check: single-unit Plan
 to Do to Check (validate plus the read-only audit fan-out and the expected-versus
 -actual comparison) to Act, with the fix-and-retry branch on a fail verdict,
-terminate at a gate, rehydrate on entry. WIP-bounded parallel Do and the
-self-improvement loop are wired in later increments. The run-state wip_board is
-reconstructed structurally once parallel Do lands. Until then rebuild-projection
-carries the board forward from the prior projection.
+terminate at a gate, rehydrate on entry. WIP-bounded parallel Do is live: the
+orchestrator returns a ready-batch and the harness dispatches independent
+file-disjoint units in one turn behind the fork-join barrier. The
+self-improvement loop is wired in at the final increment. The run-state wip_board
+is maintained by the harness after each barrier, and rebuild-projection carries
+it forward when replaying the log.

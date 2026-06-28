@@ -45,9 +45,12 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    agent, its input artifact refs, and the expected outcome. Enforce the phase
    gate the orchestrator reports, do not route into a new phase while a prior
    -phase artifact is unconfirmed.
-3. Do. Dispatch each routed unit to its domain agent as a subagent. In the
-   sequential spine this is one unit per tick. Collect the artifacts each agent
-   wrote. Agents never write run state.
+3. Do. Dispatch each routed unit to its domain agent as a subagent. When the
+   batch holds several independent units, dispatch them in one turn so they run in
+   parallel, and do not proceed to Check until every dispatched agent has
+   returned. The turn boundary is the fork-join barrier, and because all run-state
+   writes happen here in the main session after the barrier, there is a single
+   writer. Collect the artifacts each agent wrote. Agents never write run state.
 4. Check. Validate every produced artifact with spgr-validate-artifact. Fan out
    the always-active vertical audits relevant to the produced artifact type as
    read-only subagents in parallel, and wait for all to return. Compare the actual
