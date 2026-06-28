@@ -134,6 +134,30 @@ def self_check():
     if not _validate_object(bad_enum, registry):
         failures.append("escalation with bad status enum was accepted")
 
+    # 4. Round-trip gating on the harness artifact types: a valid sample passes,
+    #    a representative invalid sample fails.
+    for label, obj in (("pdca-cycle", _sample_pdca_cycle()),
+                       ("run-state", _sample_run_state()),
+                       ("run-retrospective", _sample_retrospective())):
+        issues = _validate_object(obj, registry)
+        if issues:
+            failures.append(f"valid {label} sample rejected: {issues}")
+
+    bad_cycle = _sample_pdca_cycle()
+    bad_cycle["content"]["check"]["verdict"] = "not-a-verdict"
+    if not _validate_object(bad_cycle, registry):
+        failures.append("pdca-cycle with bad check verdict was accepted")
+
+    bad_state = _sample_run_state()
+    bad_state["content"]["wip_board"]["development"] = ["S1", "S2", "S3"]
+    if not _validate_object(bad_state, registry):
+        failures.append("run-state exceeding the WIP limit was accepted")
+
+    bad_retro = _sample_retrospective()
+    bad_retro["content"]["run_outcome"] = "nope"
+    if not _validate_object(bad_retro, registry):
+        failures.append("run-retrospective with bad run_outcome was accepted")
+
     if failures:
         print("SELF-CHECK FAILED:")
         for f in failures:
@@ -174,6 +198,106 @@ def _sample_escalation():
             "status": "open",
         },
     }
+
+
+def _harness_header(artifact_id, artifact_type, section):
+    return {
+        "artifact_id": artifact_id,
+        "artifact_type": artifact_type,
+        "schema_version": "v1",
+        "producing_agent": "spgr-agent-orchestrator",
+        "timestamp": "2026-06-02T12:00:00Z",
+        "parent_artifact_ref": None,
+        "version": "v0.1-draft",
+        "version_type": "draft",
+        "confidence_map": {section: "confirmed"},
+        "decision_log": [],
+    }
+
+
+def _sample_pdca_cycle():
+    obj = _harness_header("CYCLE-0001", "pdca-cycle", "cycle")
+    obj["content"] = {
+        "cycle_id": "CYCLE-0001",
+        "cycle_number": 1,
+        "run_id": "demo",
+        "phase": "requirements",
+        "plan": {
+            "routed_batch": [{
+                "agent": "spgr-agent-product-manager",
+                "input_artifact_refs": ["prd-001"],
+                "expected_outcome": "an nfr artifact derived from the PRD",
+                "workstream": None,
+            }],
+            "rationale": "PRD is confirmed, route NFR authoring next.",
+        },
+        "do": {"dispatched": [{
+            "agent": "spgr-agent-product-manager",
+            "produced_artifact_refs": ["nfr-001"],
+            "status": "completed",
+        }]},
+        "check": {
+            "verdict": "pass",
+            "validations": [{"artifact_ref": "nfr-001", "result": "valid", "issues": []}],
+            "audits": [],
+            "expectation_match": True,
+        },
+        "act": {
+            "transition": "advance",
+            "state_changes": ["requirements: NFR produced"],
+            "versioned_refs": [],
+            "escalation_ref": None,
+            "checkpoint_ref": None,
+            "pending_batch": None,
+        },
+        "next_phase": "architecture",
+    }
+    return obj
+
+
+def _sample_run_state():
+    obj = _harness_header("run-state-demo", "run-state", "run_state")
+    obj["content"] = {
+        "run_id": "demo",
+        "regenerable": True,
+        "generated_from_cycle": 1,
+        "active_phase": "requirements",
+        "workstreams": [{"workstream_id": "core", "phase": "requirements"}],
+        "wip_board": {
+            "backlog": ["STORY-2"],
+            "development": ["STORY-1"],
+            "review": [],
+            "validation": [],
+            "done": [],
+        },
+        "ready_queue": [{"agent": "spgr-agent-architect", "input_artifact_refs": ["prd-001"], "workstream": "core"}],
+        "open_gates": [],
+        "open_escalations": [],
+        "cycle_counter": 1,
+        "learnings_pinned": [],
+    }
+    return obj
+
+
+def _sample_retrospective():
+    obj = _harness_header("RETRO-demo-001", "run-retrospective", "retrospective")
+    obj["content"] = {
+        "retrospective_id": "RETRO-demo-001",
+        "run_id": "demo",
+        "run_outcome": "completed",
+        "cycles_total": 12,
+        "learnings": [{
+            "learning_id": "L1",
+            "category": "routing-heuristic",
+            "observation": "Stories touching auth often needed a compliance consult.",
+            "evidence_refs": ["CYCLE-0003", "CYCLE-0007"],
+            "recommendation": "Suggest a compliance consult for auth stories.",
+            "confidence": "proposed",
+            "requires_human_promotion": False,
+        }],
+        "metrics": {"total_cycles": 12, "gates_hit": 2, "escalations_raised": 1, "retries": 1, "audit_gates": 0},
+    }
+    return obj
 
 
 def main(argv):
