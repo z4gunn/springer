@@ -1,20 +1,33 @@
+<div align="center">
+
+<img src="brand/springer-icon.png" alt="Springer" width="150">
+
 # Springer
+
+An architecture-first AI software development team, from idea to production.
+
+[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-C26A3C?style=flat-square)](https://claude.com/claude-code) ![Agents](https://img.shields.io/badge/agents-27-7A715F?style=flat-square) ![Skills](https://img.shields.io/badge/skills-196-7A715F?style=flat-square) ![Build](https://img.shields.io/badge/build-complete-C26A3C?style=flat-square) [![License: MIT](https://img.shields.io/badge/license-MIT-7A715F?style=flat-square)](LICENSE)
+
+</div>
+
+---
 
 Springer is an AI software development team, built as a library of Claude Code agents and skills. Each agent models a role from a traditional product and engineering organization, from discovery and product management through architecture, design, development, QA, and DevOps, plus the cross-cutting specialties that span those roles. Together they carry a greenfield SaaS or mobile application across the full software lifecycle, from a raw problem statement to production, with a human entering only at deliberate checkpoints.
 
-This repository is the working build of that team: 27 agents and 194 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
+This repository is the working build of that team: 27 agents and 196 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
 
 ## Contents
-- What Springer is
-- Why it works this way
-- How the team operates
-- Methodology
-- The agents
-- The skills
-- Repository structure
-- Using Springer
-- Project status and roadmap
-- Conventions and contributing
+
+- [What Springer is](#what-springer-is)
+- [Why it works this way](#why-it-works-this-way)
+- [How the team operates](#how-the-team-operates)
+- [Methodology](#methodology)
+- [The agents](#the-agents)
+- [The skills](#the-skills)
+- [Repository structure](#repository-structure)
+- [Using Springer](#using-springer)
+- [Project status and roadmap](#project-status-and-roadmap)
+- [Conventions and contributing](#conventions-and-contributing)
 
 ## What Springer is
 
@@ -101,7 +114,7 @@ Twenty-seven agents in three groups. Horizontal agents own a lifecycle phase. Un
 
 ## The skills
 
-A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Each one carries its own triggering information, so the right skill activates when an agent needs it. The 194 skills group as follows.
+A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Each one carries its own triggering information, so the right skill activates when an agent needs it. The 196 skills group as follows.
 
 ### Shared and product
 
@@ -119,7 +132,7 @@ A skill is a single-responsibility capability that an agent invokes, such as wri
 |-------|-------|----------|
 | Architecture | 9 | generate-architecture-options, write-adr, generate-erd, write-api-spec, write-tech-stack-decision |
 | Diagramming (UML and patterns) | 6 | generate-uml-class-diagram, generate-sequence-diagram, generate-state-diagram, generate-activity-diagram, generate-design-pattern-diagram, render-diagram-excalidraw |
-| Design | 8 | generate-design-directions, write-ia, create-wireframes, create-design-system, create-screen-specs, create-prototype |
+| Design | 9 | generate-design-directions, write-ia, create-wireframes, create-design-system, create-screen-specs, create-prototype, render-design-mockups |
 
 ### Build and ship
 
@@ -144,7 +157,7 @@ A skill is a single-responsibility capability that an agent invokes, such as wri
 | Analytics | 5 | write-event-taxonomy, write-instrumentation-spec, define-funnel, write-ab-test-spec |
 | Resilience | 4 | write-resilience-spec, write-error-standards, write-error-ux-spec, audit-resilience-coverage |
 | Feature Flags | 4 | define-feature-flag, write-rollout-plan, write-entitlement-map, audit-flag-debt |
-| Documentation and SDK | 7 | generate-api-docs, generate-sdk, generate-readme, generate-docstrings, generate-changelog |
+| Documentation and SDK | 8 | generate-api-docs, generate-sdk, generate-readme, generate-docstrings, generate-changelog, render-doc |
 | Async infrastructure | 5 | write-async-job-spec, scaffold-background-job, scaffold-webhook-delivery, audit-async-coverage |
 | Developer experience | 6 | scaffold-local-dev-env, generate-env-template, validate-env-config, audit-dx-friction |
 | Billing (SaaS) | 5 | write-billing-spec, write-metering-events, write-dunning-policy, audit-billing-accuracy |
@@ -160,10 +173,11 @@ springer/
   CLAUDE.md              the operative ruleset for AI agents, loaded every session
   .claude/
     agents/<name>.md         the 27 agents, auto-loaded in this repo
-    skills/<name>/SKILL.md    the 194 skills, auto-loaded in this repo
+    skills/<name>/SKILL.md    the 196 skills, auto-loaded in this repo
     references/<name>.md      shared cross-skill references (for example diagram-standards, typescript-standards)
   schemas/               JSON Schemas for the typed artifacts that flow between agents
   templates/             golden starters for authoring a new skill or agent
+  brand/                 logo, social-preview, and favicon assets
   runs/                  the run store where a project's artifacts accumulate
 ```
 
@@ -209,10 +223,14 @@ Every line of JavaScript-runtime code the build, test, and scaffold skills gener
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1. Spec | One spec file per agent and skill, the source of truth for the build | Complete |
-| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 194 skills |
+| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 196 skills |
 | 3. POC | Run the full lifecycle on a greenfield SaaS application and refine from real output | Next |
 | 4. Harness | Autonomous orchestration with feedback loops, self-improvement, and parallel execution | Planned |
 
 ## Conventions and contributing
 
 The authoring rules for changing or adding an agent or skill live in `CLAUDE.md`, which Claude Code loads every session. It is the operative ruleset for AI agents working in this repository and the reference for any human contributor. In short: one artifact has one responsibility, a skill description carries all of its own triggering information, detail lives in a skill's `references/` rather than its body, every artifact is built from a template in `templates/`, and the writing voice avoids em-dashes and marketing language. New work commits directly to `main` with a conventional commit message scoped by what changed.
+
+## License
+
+Released under the MIT License. See [LICENSE](LICENSE) for the full text.
