@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/run-retrospective-v1.json",
+  "title": "SPGR Run Retrospective v1",
+  "description": "Per-run learnings written at run end. Learnings are advisory inputs to future Plan steps, cited as proposed rationale, never autonomous mutations. A learning that would change a rule carries requires_human_promotion true and is applied only through a human gate.",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "run-retrospective" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["retrospective_id", "run_id", "run_outcome", "learnings"],
+      "properties": {
+        "retrospective_id": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "string", "minLength": 1 },
+        "run_outcome": {
+          "type": "string",
+          "enum": ["completed", "abandoned", "in-progress"]
+        },
+        "cycles_total": { "type": "integer", "minimum": 0 },
+        "learnings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["learning_id", "category", "observation", "recommendation", "confidence", "requires_human_promotion"],
+            "properties": {
+              "learning_id": { "type": "string", "minLength": 1 },
+              "category": {
+                "type": "string",
+                "enum": ["routing-heuristic", "rule-change-proposal", "audit-pattern", "escalation-pattern"]
+              },
+              "observation": { "type": "string", "minLength": 1 },
+              "evidence_refs": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "cycle_id values that support this learning."
+              },
+              "recommendation": { "type": "string", "minLength": 1 },
+              "confidence": {
+                "type": "string",
+                "enum": ["confirmed", "proposed"]
+              },
+              "requires_human_promotion": {
+                "type": "boolean",
+                "description": "True when applying this learning would change a rule (WIP limit, gate set, routing policy). Such learnings are applied only through a human gate."
+              }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "description": "Optional run counters.",
+          "properties": {
+            "total_cycles": { "type": "integer", "minimum": 0 },
+            "gates_hit": { "type": "integer", "minimum": 0 },
+            "escalations_raised": { "type": "integer", "minimum": 0 },
+            "retries": { "type": "integer", "minimum": 0 },
+            "audit_gates": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}
