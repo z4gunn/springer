@@ -142,6 +142,11 @@ Two scripts keep the deterministic work out of the model.
   learnings set by content hash at run start. Pure function of the inputs. Makes
   no judgment about which learnings apply.
 
+The store-reading scripts scan the active run-store subdirectories (artifacts,
+escalations, checkpoints, consultations) and never archive, so a checkpoint or
+escalation counts whether it sits in artifacts or in its own subdir, and a
+superseded artifact cannot resurrect a gate or a block.
+
 ## Increment status
 
 The current build runs the sequential spine with the full Check: single-unit Plan
