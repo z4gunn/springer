@@ -6,7 +6,7 @@
 
 An architecture-first AI software development team, from idea to production.
 
-[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-C26A3C?style=flat-square)](https://claude.com/claude-code) ![Agents](https://img.shields.io/badge/agents-27-7A715F?style=flat-square) ![Skills](https://img.shields.io/badge/skills-196-7A715F?style=flat-square) ![Build](https://img.shields.io/badge/build-complete-C26A3C?style=flat-square) [![License: MIT](https://img.shields.io/badge/license-MIT-7A715F?style=flat-square)](LICENSE)
+[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-C26A3C?style=flat-square)](https://claude.com/claude-code) ![Agents](https://img.shields.io/badge/agents-27-7A715F?style=flat-square) ![Skills](https://img.shields.io/badge/skills-197-7A715F?style=flat-square) ![Build](https://img.shields.io/badge/build-complete-C26A3C?style=flat-square) [![License: MIT](https://img.shields.io/badge/license-MIT-7A715F?style=flat-square)](LICENSE)
 
 </div>
 
