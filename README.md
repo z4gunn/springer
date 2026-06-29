@@ -185,7 +185,34 @@ springer/
 
 Open this repository in Claude Code. The agents in `.claude/agents/` and the skills in `.claude/skills/` load automatically, so no install step is needed for the core team.
 
-To run a project, delegate to the Orchestrator agent, which sequences the phases, or invoke a specific agent for a specific phase such as Discovery to start research or Architect to produce options. The agents drive the lifecycle and pause at the five human checkpoints: architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Artifacts accumulate in `runs/` and validate against the schemas in `schemas/` as they pass between agents.
+To run a project, drive it end to end with the PDCA harness described below, which loops the orchestrator and the domain agents autonomously and pauses only at the human gates. You can also invoke a specific agent for a specific phase, such as Discovery to start research or Architect to produce options, when you want to run one step by hand. Either way the agents pause at the five human checkpoints: architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Artifacts accumulate in `runs/` and validate against the schemas in `schemas/` as they pass between agents.
+
+### Drive a run with the PDCA harness
+
+The harness automates the loop a person otherwise runs by hand. The orchestrator decides the next unit of work and then stops. The `spgr-run-harness` skill is the loop around it. It reads run state, asks the orchestrator what runs next, dispatches the work, checks the result, records the tick, and repeats, pausing only at the human gates. It models the cycle as Plan-Do-Check-Act. Plan is the orchestrator routing the next batch of work. Do is each domain agent producing its artifact. Check is schema validation plus the read-only vertical audits. Act records the transition and then advances, retries a failure, routes an escalation, or pauses at a gate.
+
+To start a run, open this repository in Claude Code and ask for the harness by name, giving it a run id and a one-paragraph problem statement:
+
+```
+Use spgr-run-harness to start run-id acme-1 on this problem: <one paragraph>
+```
+
+The harness drives phase to phase and stops at the first human gate, for example prd-approval or architecture-options-selection. It writes a checkpoint and reports what it needs. Answer the checkpoint, then ask the harness to resume:
+
+```
+The architecture gate is answered, resume spgr-run-harness for run-id acme-1
+```
+
+Start and resume are the same path. On every entry the harness rehydrates from disk, so a run survives being stopped and is safe to pick up later. Run the harness in the main Claude session, never as a subagent, because it dispatches the orchestrator and the domain agents as its own subagents.
+
+What a run leaves behind, all under `runs/<run-id>/`:
+
+- `artifacts/`, the typed artifacts each agent produces, such as the PRD, NFR, and architecture options.
+- One append-only `pdca-cycle` record per tick. This log is the source of truth for what happened and why.
+- `run-state.json`, a derived projection of where the run is now: phase, WIP board, open gates, and open escalations. It is a cache that the harness rebuilds from the cycle log, never edited by hand.
+- A `hil-checkpoint` artifact at each gate, and an `escalation` artifact whenever an agent refuses to proceed on a real risk rather than guessing.
+
+The loop rules, the rehydration algorithm, the parallel barrier, and the advisory-learnings model are in `.claude/references/pdca-harness.md`.
 
 ### Quickstart: start a new project
 
@@ -203,7 +230,7 @@ Or, from a clone of this repository:
 cd ~/path/to/my-saas-app && claude
 ```
 
-The new directory is the application's own repository. It carries `.claude/skills/`, `.claude/agents/`, `.claude/references/`, `schemas/`, a project `CLAUDE.md` tailored to building an app (not to building Springer), and an empty `runs/`. Open it in Claude Code and delegate to the Orchestrator agent. Typed artifacts (PRD, ADRs, ERD, test plans) accumulate under `runs/<run-id>/`, and the application source code is written into the project tree. The build-time pieces (`.claude/workflows/`, `templates/`) are left out of the new project.
+The new directory is the application's own repository. It carries `.claude/skills/`, `.claude/agents/`, `.claude/references/`, `schemas/`, a project `CLAUDE.md` tailored to building an app (not to building Springer), and an empty `runs/`. Open it in Claude Code and drive it with the PDCA harness, the same `spgr-run-harness` skill described above, since it ships with every project copy. Typed artifacts (PRD, ADRs, ERD, test plans) accumulate under `runs/<run-id>/`, and the application source code is written into the project tree. The build-time pieces (`.claude/workflows/`, `templates/`) are left out of the new project.
 
 One skill family needs a one-time setup, and it is optional. The diagram skills render Mermaid and PlantUML sources. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, and make the Mermaid CLI available through `npx`. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
 
