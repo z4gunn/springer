@@ -7,7 +7,7 @@ description: <What the skill produces, in one clause.> Use when <concrete trigge
 GOLDEN TEMPLATE. Copy to .claude/skills/spgr-<verb-noun>/SKILL.md and fill in. Delete every comment before shipping.
 RULES (see ../CLAUDE.md Build Standards): frontmatter is EXACTLY name + description. Body imperative and <500 lines.
 All "when to use" lives in description, never here. Push detail to references/. No README/CHANGELOG.
-SOURCE: vault/40-projects/archive/springer/skills/spgr-skill-<name>.md  → use its "Phase 2 Build Notes" as the build brief.
+SOURCE: the private spec vault, skills/spgr-skill-<name>.md  → use its "Phase 2 Build Notes" as the build brief.
 -->
 
 # <verb-noun>

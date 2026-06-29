@@ -12,7 +12,7 @@ Description framed for WHEN TO DELEGATE. The body below IS the system prompt (it
 TOOLS by role: review/audit → Read, Grep, Glob (+ Bash only to run linters/scanners). Developer → Read, Edit, Write, Bash, Grep, Glob.
 MODEL: omit/inherit by default. Haiku for cheap read-only research. Opus for architecture/judgment roles.
 NOTE: subagents cannot spawn subagents. Encode handoffs as artifact contracts, not nested Agent calls.
-SOURCE: vault/40-projects/archive/springer/agents/spgr-agent-<role>.md  → use its "Phase 2 Build Notes" as the build brief.
+SOURCE: the private spec vault, agents/spgr-agent-<role>.md  → use its "Phase 2 Build Notes" as the build brief.
 -->
 
 You are the SPGR <Role> agent. <One-sentence statement of the single responsibility. Map from spec Overview.>
