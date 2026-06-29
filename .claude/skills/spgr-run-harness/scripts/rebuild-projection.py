@@ -25,15 +25,29 @@ from pathlib import Path
 
 EMPTY_BOARD = {"backlog": [], "development": [], "review": [], "validation": [], "done": []}
 
+# The active run-store subdirectories. archive/ is excluded on purpose, so a
+# superseded checkpoint or escalation cannot resurrect a gate or a block.
+ACTIVE_SUBDIRS = ("artifacts", "escalations", "checkpoints", "consultations")
+
 
 def load_good(run_dir):
-    artifacts_dir = Path(run_dir) / "artifacts"
-    out = []
-    for path in sorted(artifacts_dir.glob("*.json")):
-        try:
-            out.append(json.loads(path.read_text()))
-        except (OSError, json.JSONDecodeError):
+    """Parse every artifact in the active stores, deduped by artifact_id so the
+    same id in two stores is counted once (artifacts/ wins)."""
+    out, seen = [], set()
+    for sub in ACTIVE_SUBDIRS:
+        d = Path(run_dir) / sub
+        if not d.is_dir():
             continue
+        for path in sorted(d.glob("*.json")):
+            try:
+                artifact = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            aid = artifact.get("artifact_id")
+            if aid in seen:
+                continue
+            seen.add(aid)
+            out.append(artifact)
     return out
 
 

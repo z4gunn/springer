@@ -19,17 +19,26 @@ import json
 import sys
 from pathlib import Path
 
+# The active run-store subdirectories. archive/ is excluded on purpose, so a
+# superseded checkpoint or escalation cannot resurrect a gate or a block.
+ACTIVE_SUBDIRS = ("artifacts", "escalations", "checkpoints", "consultations")
+
 
 def load_artifacts(run_dir):
-    """Return a list of (path, artifact-dict) for every parseable artifact."""
-    artifacts_dir = Path(run_dir) / "artifacts"
+    """Return (path, artifact-dict) for every parseable artifact in the active
+    stores. Scans every ACTIVE_SUBDIRS directory that exists, so an escalation
+    or checkpoint counts whether it sits in artifacts/ or in its own subdir."""
     out = []
-    for path in sorted(artifacts_dir.glob("*.json")):
-        try:
-            out.append((path, json.loads(path.read_text())))
-        except (OSError, json.JSONDecodeError):
-            # A malformed file is reported as a read error, never silently used.
-            out.append((path, None))
+    for sub in ACTIVE_SUBDIRS:
+        d = Path(run_dir) / sub
+        if not d.is_dir():
+            continue
+        for path in sorted(d.glob("*.json")):
+            try:
+                out.append((path, json.loads(path.read_text())))
+            except (OSError, json.JSONDecodeError):
+                # A malformed file is reported as a read error, never silently used.
+                out.append((path, None))
     return out
 
 
@@ -38,7 +47,17 @@ def derive(run_dir):
     artifacts = load_artifacts(run_dir)
 
     read_errors = [str(p) for p, a in artifacts if a is None]
-    good = [a for _, a in artifacts if a is not None]
+    # Dedup by artifact_id, keeping the first occurrence so artifacts/ wins if
+    # the same id ever appears in two stores.
+    good, seen = [], set()
+    for _, a in artifacts:
+        if a is None:
+            continue
+        aid = a.get("artifact_id")
+        if aid in seen:
+            continue
+        seen.add(aid)
+        good.append(a)
 
     cycles = [a for a in good if a.get("artifact_type") == "pdca-cycle"]
     cycles.sort(key=lambda a: a.get("content", {}).get("cycle_number", 0))
