@@ -251,8 +251,7 @@ Every line of JavaScript-runtime code the build, test, and scaffold skills gener
 |-------|-------------|--------|
 | 1. Spec | One spec file per agent and skill, the source of truth for the build | Complete |
 | 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 197 skills |
-| 3. POC | Run the full lifecycle on a greenfield SaaS application and refine from real output | Next |
-| 4. Harness | Autonomous orchestration with feedback loops, self-improvement, and parallel execution | In progress, PDCA driver (spgr-run-harness) on the feat/pdca-harness branch |
+| 3. Harness | Autonomous orchestration with feedback loops, self-improvement, and parallel execution | Available, the spgr-run-harness PDCA driver |
 
 ## Conventions and contributing
 
