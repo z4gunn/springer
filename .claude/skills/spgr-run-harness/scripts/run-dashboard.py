@@ -85,6 +85,20 @@ def now_utc():
     return datetime.datetime.now(datetime.timezone.utc)
 
 
+def find_project_root():
+    """The project root is the directory holding runs/. Prefer the cwd, since
+    the harness runs there, then walk up from this script, which lives under
+    .claude/skills/spgr-run-harness/scripts/ in any Springer instance."""
+    if os.path.isdir(os.path.join(os.getcwd(), "runs")):
+        return os.getcwd()
+    node = os.path.dirname(os.path.abspath(__file__))
+    while node != os.path.dirname(node):
+        if os.path.isdir(os.path.join(node, "runs")):
+            return node
+        node = os.path.dirname(node)
+    return os.getcwd()
+
+
 def resolve_run_dir(arg, repo_root):
     if arg:
         if os.path.isdir(arg):
@@ -386,8 +400,7 @@ def main():
     parser.add_argument("--once", action="store_true", help="print one frame and exit")
     args = parser.parse_args()
 
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    run_dir = resolve_run_dir(args.run, repo_root)
+    run_dir = resolve_run_dir(args.run, find_project_root())
 
     if args.once:
         width = shutil.get_terminal_size((100, 40)).columns
