@@ -153,6 +153,42 @@ def load_events(run_dir):
     return events
 
 
+def aggregate_project(project_root):
+    """Roll up every run's event feed, plus the unrouted feed, into project
+    lifetime totals. Only activity since the event hook was installed is
+    counted, earlier runs left no metrics."""
+    stats = {
+        "runs": set(),
+        "dispatches": 0,
+        "completions": 0,
+        "tokens": {},
+        "duration_ms": 0,
+        "by_run": {},
+    }
+    pattern = os.path.join(project_root, "runs", "*", "events.jsonl")
+    for path in sorted(glob.glob(pattern)):
+        label = os.path.basename(os.path.dirname(path))
+        if label != "_dashboard":
+            stats["runs"].add(label)
+        for ev in load_events(os.path.dirname(path)):
+            kind = ev.get("event")
+            if kind == "agent_dispatched":
+                stats["dispatches"] += 1
+            elif kind == "agent_completed":
+                stats["completions"] += 1
+                metrics = ev.get("metrics") or {}
+                for key, value in metrics.items():
+                    if key == "duration_ms":
+                        stats["duration_ms"] += value
+                    else:
+                        stats["tokens"][key] = stats["tokens"].get(key, 0) + value
+                if metrics.get("total_tokens"):
+                    stats["by_run"][label] = (
+                        stats["by_run"].get(label, 0) + metrics["total_tokens"]
+                    )
+    return stats
+
+
 def pair_events(events):
     """Match dispatch and completion events into agent activity rows.
     Pair on tool_use_id when present, else first unmatched dispatch with the
@@ -197,7 +233,7 @@ def section(title, width):
     return f"{CYAN}{BOLD} {title}{RESET}"
 
 
-def render(run_dir, width):
+def render(run_dir, project_root, width):
     lines = []
     state_doc = load_json(os.path.join(run_dir, "run-state.json"))
     content = (state_doc or {}).get("content", {})
@@ -375,6 +411,39 @@ def render(run_dir, width):
         lines.append(f"  {DIM}no token metrics recorded yet{RESET}")
     lines.append(hrule(width))
 
+    # Project lifetime rollup across every run's event feed.
+    stats = aggregate_project(project_root)
+    lines.append(section("PROJECT TO DATE", width))
+    if stats["completions"] or stats["dispatches"]:
+        summary = (
+            f"  runs {BOLD}{len(stats['runs'])}{RESET}"
+            f"   agent runs {BOLD}{stats['completions']}{RESET}"
+            f"   tokens {BOLD}{fmt_tokens(stats['tokens'].get('total_tokens', 0))}{RESET}"
+        )
+        if stats["duration_ms"]:
+            summary += f"   agent time {fmt_elapsed(stats['duration_ms'] / 1000)}"
+        lines.append(clip(summary, width))
+        split = [
+            f"{label} {fmt_tokens(stats['tokens'][key])}"
+            for key, label in (
+                ("input_tokens", "in"),
+                ("output_tokens", "out"),
+                ("cache_read_tokens", "cache-read"),
+            )
+            if key in stats["tokens"]
+        ]
+        top_runs = sorted(stats["by_run"].items(), key=lambda kv: -kv[1])[:4]
+        detail = "   ".join(split)
+        if top_runs:
+            detail += "   by run: " + ", ".join(
+                f"{r} {fmt_tokens(t)}" for r, t in top_runs
+            )
+        if detail:
+            lines.append(clip(f"  {DIM}{detail}{RESET}", width))
+    else:
+        lines.append(f"  {DIM}no recorded agent activity yet{RESET}")
+    lines.append(hrule(width))
+
     # Last cycle summary.
     if cycle:
         cc = cycle.get("content", {})
@@ -400,18 +469,19 @@ def main():
     parser.add_argument("--once", action="store_true", help="print one frame and exit")
     args = parser.parse_args()
 
-    run_dir = resolve_run_dir(args.run, find_project_root())
+    project_root = find_project_root()
+    run_dir = resolve_run_dir(args.run, project_root)
 
     if args.once:
         width = shutil.get_terminal_size((100, 40)).columns
-        print("\n".join(render(run_dir, width)))
+        print("\n".join(render(run_dir, project_root, width)))
         return
 
     sys.stdout.write("\x1b[?1049h\x1b[?25l")
     try:
         while True:
             size = shutil.get_terminal_size((100, 40))
-            frame = render(run_dir, size.columns)
+            frame = render(run_dir, project_root, size.columns)
             frame.append("")
             frame.append(f"{DIM} watching {run_dir}  ·  ctrl-c to exit{RESET}")
             sys.stdout.write("\x1b[H" + "\x1b[K\n".join(
