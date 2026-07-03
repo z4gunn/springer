@@ -2,18 +2,65 @@
 """Open the live run dashboard in a separate terminal window, best effort.
 
 Called by the run-harness skill when a run starts or resumes. The dashboard
-is opt-in: nothing launches unless the developer sets SPGR_DASHBOARD=1.
-Exits 0 in every case so a launch failure can never block a run. A no-op
-when a dashboard process is already watching the run, or when the platform
-has no known way to open a terminal window, in which case it prints the
-manual command instead.
+is opt-in and the switch is a persisted setting the developer flips in chat:
+asking to turn the dashboard on or off runs this script with `on` or `off`,
+which stores the choice in runs/_dashboard/config.json. The SPGR_DASHBOARD
+environment variable, when set, overrides the stored choice in either
+direction, so automation can force it on or keep a session headless.
 
-Usage: python3 launch-dashboard.py <run-dir>
+The launch path exits 0 in every case so a failure can never block a run.
+It is a no-op when the dashboard is off, when a dashboard process is
+already watching the run, or when the platform has no known way to open a
+terminal window, in which case it prints the manual command instead.
+
+Usage:
+  python3 launch-dashboard.py <run-dir>   launch for a run, honoring the switch
+  python3 launch-dashboard.py on|off      persist the switch
+  python3 launch-dashboard.py status      report the switch and its source
 """
 
+import json
 import os
 import subprocess
 import sys
+
+
+def find_project_root():
+    """The project root is the directory holding runs/. Prefer the cwd, since
+    the harness runs there, then walk up from this script."""
+    if os.path.isdir(os.path.join(os.getcwd(), "runs")):
+        return os.getcwd()
+    node = os.path.dirname(os.path.abspath(__file__))
+    while node != os.path.dirname(node):
+        if os.path.isdir(os.path.join(node, "runs")):
+            return node
+        node = os.path.dirname(node)
+    return os.getcwd()
+
+
+def config_path(root):
+    return os.path.join(root, "runs", "_dashboard", "config.json")
+
+
+def switch_state(root):
+    """Returns (enabled, source). The environment variable wins when set,
+    otherwise the persisted config, defaulting to off."""
+    env = os.environ.get("SPGR_DASHBOARD")
+    if env:
+        return env.lower() in ("1", "true", "yes"), "SPGR_DASHBOARD environment variable"
+    try:
+        with open(config_path(root)) as fh:
+            return bool(json.load(fh).get("dashboard_enabled")), "runs/_dashboard/config.json"
+    except (OSError, json.JSONDecodeError, ValueError):
+        return False, "default"
+
+
+def set_switch(root, enabled):
+    path = config_path(root)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as fh:
+        json.dump({"dashboard_enabled": enabled}, fh, indent=2)
+        fh.write("\n")
 
 
 def already_watching(run_dir):
@@ -28,21 +75,7 @@ def already_watching(run_dir):
     return any(run_id in line or run_dir in line for line in out.splitlines())
 
 
-def main():
-    if len(sys.argv) != 2:
-        print("usage: launch-dashboard.py <run-dir>")
-        return
-    run_dir = os.path.abspath(sys.argv[1])
-    if not os.path.isdir(run_dir):
-        print(f"launch-dashboard: no such run directory {run_dir}, skipping")
-        return
-    if os.environ.get("SPGR_DASHBOARD", "").lower() not in ("1", "true", "yes"):
-        print("launch-dashboard: dashboard is opt-in, set SPGR_DASHBOARD=1 to enable")
-        return
-    if already_watching(run_dir):
-        print(f"launch-dashboard: a dashboard is already watching {run_dir}")
-        return
-
+def launch(run_dir):
     dashboard = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run-dashboard.py")
     command = f'python3 "{dashboard}" "{run_dir}"'
 
@@ -76,6 +109,51 @@ def main():
                 continue
 
     print(f"launch-dashboard: could not open a terminal window. Run manually: {command}")
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("usage: launch-dashboard.py <run-dir> | on | off | status")
+        return
+    arg = sys.argv[1]
+
+    if arg in ("on", "off", "status"):
+        root = find_project_root()
+        if arg == "status":
+            enabled, source = switch_state(root)
+            print(
+                f"launch-dashboard: dashboard is {'on' if enabled else 'off'}"
+                f" (from {source})"
+            )
+            return
+        set_switch(root, arg == "on")
+        if arg == "on":
+            print(
+                "launch-dashboard: dashboard on. The harness opens it when a"
+                " run starts or resumes."
+            )
+        else:
+            print("launch-dashboard: dashboard off.")
+        return
+
+    run_dir = os.path.abspath(arg)
+    if not os.path.isdir(run_dir):
+        print(f"launch-dashboard: no such run directory {run_dir}, skipping")
+        return
+    root = os.path.dirname(os.path.dirname(run_dir))
+    if not os.path.isdir(os.path.join(root, "runs")):
+        root = find_project_root()
+    enabled, _ = switch_state(root)
+    if not enabled:
+        print(
+            "launch-dashboard: dashboard is off. Ask in chat to turn the run"
+            " dashboard on, or run launch-dashboard.py on"
+        )
+        return
+    if already_watching(run_dir):
+        print(f"launch-dashboard: a dashboard is already watching {run_dir}")
+        return
+    launch(run_dir)
 
 
 if __name__ == "__main__":
