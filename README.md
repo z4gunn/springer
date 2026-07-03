@@ -214,6 +214,28 @@ What a run leaves behind, all under `runs/<run-id>/`:
 
 The loop rules, the rehydration algorithm, the parallel barrier, and the advisory-learnings model are in `.claude/references/pdca-harness.md`.
 
+### Watch a run on the live dashboard
+
+An opt-in terminal dashboard shows a run while it executes: the active phase and cycle count, open gates and escalations with how long each has waited, the WIP board, the agents in flight with elapsed time, recent completions with duration and token counts, a token rollup for the watched run, and project-to-date totals across every run. It is read-only and needs nothing beyond Python 3.
+
+Two pieces feed it. A hook registered in `.claude/settings.json` records every subagent dispatch and completion, with token metrics when available, to `runs/<run-id>/events.jsonl`. The hook loads when a Claude Code session starts, so it takes effect the first session after checkout. The dashboard polls that feed plus the run store once per second and redraws.
+
+To have the harness open the dashboard automatically when a run starts or resumes, set the environment variable before launching Claude Code:
+
+```bash
+export SPGR_DASHBOARD=1
+```
+
+With the variable set, the harness opens the dashboard in a separate terminal window and skips the launch when one is already watching the run. Without it, the harness opens nothing, and you can start the dashboard by hand at any time:
+
+```bash
+python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py           # most recently active run
+python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py acme-1   # a specific run
+python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py --once   # one snapshot, no live loop
+```
+
+Token and timing figures cover activity recorded since the event hook was installed. Runs that predate it show run state and gates but no agent metrics.
+
 ### Quickstart: start a new project
 
 Springer builds each application inside its own copy of the runtime, which becomes that application's git repository. The file-writing tooling is bound to the project root, and the schema registry and shared references are cited by repo-relative path, so the runtime travels with the project rather than installing globally. To build a new app or SaaS app, instantiate a fresh copy:

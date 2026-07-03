@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Open the live run dashboard in a separate terminal window, best effort.
 
-Called by the run-harness skill when a run starts or resumes. Exits 0 in
-every case so a launch failure can never block a run. A no-op when a
-dashboard process is already watching the run, when SPGR_NO_DASHBOARD is
-set, or when the platform has no known way to open a terminal window, in
-which case it prints the manual command instead.
+Called by the run-harness skill when a run starts or resumes. The dashboard
+is opt-in: nothing launches unless the developer sets SPGR_DASHBOARD=1.
+Exits 0 in every case so a launch failure can never block a run. A no-op
+when a dashboard process is already watching the run, or when the platform
+has no known way to open a terminal window, in which case it prints the
+manual command instead.
 
 Usage: python3 launch-dashboard.py <run-dir>
 """
@@ -35,7 +36,8 @@ def main():
     if not os.path.isdir(run_dir):
         print(f"launch-dashboard: no such run directory {run_dir}, skipping")
         return
-    if os.environ.get("SPGR_NO_DASHBOARD"):
+    if os.environ.get("SPGR_DASHBOARD", "").lower() not in ("1", "true", "yes"):
+        print("launch-dashboard: dashboard is opt-in, set SPGR_DASHBOARD=1 to enable")
         return
     if already_watching(run_dir):
         print(f"launch-dashboard: a dashboard is already watching {run_dir}")
