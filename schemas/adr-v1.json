@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://springer.local/schemas/adr-v1.json",
   "title": "SPGR Architecture Decision Record v1",
+  "description": "One architecture decision record for a single significant decision. Not the approved architecture baseline, which is architecture-decision-v1.json.",
   "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
   "properties": {
     "artifact_type": { "const": "adr" },

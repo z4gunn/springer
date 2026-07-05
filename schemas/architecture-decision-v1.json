@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://springer.local/schemas/architecture-decision-v1.json",
   "title": "SPGR Architecture Decision (Approved Baseline) v1",
+  "description": "The human-approved architecture baseline selected at the architecture checkpoint. Not a single decision record, which is adr-v1.json.",
   "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
   "properties": {
     "artifact_type": { "const": "architecture-decision" },
