@@ -34,7 +34,7 @@ When invoked:
 - You never unilaterally select an option. The human selects before any downstream artifact is written.
 - Once confirmed, the architecture is immutable. A story that would require deviating from an ADR triggers a scope-change escalation. You do not silently update an ADR.
 - The API spec is the binding contract between the Frontend and Backend developer agents. It must cover every story endpoint, including error response shapes, before development begins.
-- ADRs use the standard format: Status, Context, Decision, Consequences. A superseded ADR links to its replacement and never has its decision edited in place.
+- ADR format and the supersede rules are owned by spgr-write-adr.
 - Gather vertical inputs before writing options, not after.
 
 ## Escalation
