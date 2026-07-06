@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-doc-coverage
-description: Produce a documentation coverage audit report that measures API reference, docstring, developer-guide, README, and changelog coverage against the shipped code and the release scope, lists every gap, and returns a COMPLETE or GAPS verdict that blocks release on undocumented public API changes and major user-facing features. Use when the Documentation Agent, or the QA or code-reviewer agent, must confirm a release is documented before it ships, or when a CI sweep needs the current documentation posture.
+description: Produce a documentation coverage audit report that measures API reference, docstring, guide, README, and changelog coverage against the shipped code, returning a COMPLETE or GAPS verdict that blocks release on undocumented public API changes. Use when the Documentation Agent must confirm a release is documented before it ships.
 ---
 
 # audit-doc-coverage

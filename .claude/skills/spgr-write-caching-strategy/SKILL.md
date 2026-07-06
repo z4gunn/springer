@@ -1,6 +1,6 @@
 ---
 name: spgr-write-caching-strategy
-description: Produce a caching-strategy artifact that defines which data is cached, at which tier, with what TTL and invalidation trigger, cache key design, stampede mitigation, bypass rules, and cold-cache fallback, plus a per-key-pattern hit-rate monitoring plan. Use when the Performance Agent has hot read paths from query analysis or profiling plus freshness requirements and available cache infrastructure and must settle the caching architecture before any cache is built, or when the Performance Agent is tagged to advise a developer or architect on caching for a specific read path.
+description: Produce a caching-strategy artifact that defines which data is cached, at which tier, with what TTL and invalidation trigger, plus key design, stampede mitigation, and hit-rate monitoring. Use when the Performance Agent must settle the caching architecture before any cache is built, or is tagged to advise on a specific read path.
 ---
 
 # write-caching-strategy

@@ -1,6 +1,6 @@
 ---
 name: spgr-write-metric-definitions
-description: Produce a metric-definitions artifact that specifies every application metric the system must emit (name, type, labels, unit, description, recording rule) under bounded-cardinality and consistent-naming rules, then generate OpenTelemetry instrumentation stubs so application code cannot drift from the spec. Use when the Observability Agent has a service topology and the four golden signals per service and must define the metric contract before instrumentation begins, or when the DevOps Agent needs the metric definitions to configure monitoring infrastructure.
+description: Produce a metric-definitions artifact specifying every application metric the system must emit (name, type, labels, unit, recording rule) under bounded-cardinality rules, plus generated OpenTelemetry stubs. Use when the Observability Agent must define the metric contract before instrumentation begins.
 ---
 
 # write-metric-definitions

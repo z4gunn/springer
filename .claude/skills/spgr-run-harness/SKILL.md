@@ -1,6 +1,6 @@
 ---
 name: spgr-run-harness
-description: Drive a Springer run autonomously through the Plan-Do-Check-Act loop, advancing artifact to artifact between the five human gates and recording each tick as an immutable cycle record. Use to start a run, to advance an in-progress run to completion or the next gate, or to resume a run after a human has answered a paused checkpoint. Run this in the main session, never as a subagent, because it dispatches the orchestrator and domain agents as subagents.
+description: Drive a Springer run autonomously through the Plan-Do-Check-Act loop, advancing artifact to artifact between the five human gates. Use to start a run, advance it, or resume it after a paused checkpoint. Run this in the main session, never as a subagent, because it dispatches the orchestrator and domain agents as subagents.
 ---
 
 # run-harness

@@ -1,6 +1,6 @@
 ---
 name: spgr-run-material-review
-description: Produce a material-review report that checks an Android app against Google Play policy and Material Design guidelines, recording policy-rejection-risk findings (Data Safety Form inaccuracies, undeclared or unjustified permissions, deceptive UI), Material Design conformance findings (navigation, color, typography, motion), and advisory recommendations, with a PASS or GATE verdict that blocks submission on any policy-rejection-risk finding. Use when the App Store Agent must clear an Android build for Google Play submission, or when the Mobile Developer or QA agent needs a Play policy and Material Design check against the data safety draft before a release proceeds.
+description: Produce a material-review report that checks an Android app against Google Play policy and Material Design guidelines, returning a PASS or GATE verdict that blocks submission on any policy-rejection-risk finding. Use when the App Store Agent must clear an Android build for Google Play submission.
 ---
 
 # run-material-review

@@ -1,6 +1,6 @@
 ---
 name: spgr-notify-human
-description: Pause the pipeline at a human-in-the-loop checkpoint, deliver a scannable decision notification with options and consequences, and record the human response on return. Use at the required gates (architecture options, design-direction selection, PR merge, security or compliance flag, scope change) where work must not proceed without human judgment.
+description: Pause the pipeline at a human-in-the-loop checkpoint, deliver a scannable decision notification with options and consequences, and record the human response on return. Use when the pipeline reaches a required gate (architecture options, design-direction selection, PR merge, security or compliance flag, scope change) that needs human judgment.
 ---
 
 # notify-human

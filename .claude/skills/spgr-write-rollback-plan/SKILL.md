@@ -1,6 +1,6 @@
 ---
 name: spgr-write-rollback-plan
-description: Produce a rollback-plan artifact for one release, defining the exact reverse sequence to restore the previous known-good state across application code, database migrations, feature flags, and external configuration, with per-step verification, irreversible changes flagged with a forward-fix mitigation, expected rollback duration, minimum operator count, staging-drill timestamps, and automated trigger conditions wired to observability signals. Use when the DevOps Agent prepares a release for the same human gate as the deployment runbook and must specify how to undo the change before it ships, or when a release includes a database migration, a feature-flag change, or an external config change whose reversal mechanics must be settled before the deployment window opens.
+description: Produce a rollback-plan artifact for one release, defining the exact reverse sequence to restore the previous known-good state across code, migrations, feature flags, and external config, with per-step verification and automated trigger conditions. Use when the DevOps Agent must specify how to undo a release before it ships.
 ---
 
 # write-rollback-plan

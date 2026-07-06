@@ -1,6 +1,6 @@
 ---
 name: spgr-define-feature-flag
-description: Produce a feature-flag spec artifact that fixes a flag's key, type (release, experiment, kill-switch, or entitlement), per-environment default state, target audience, lifecycle milestones with a retirement date or trigger, rollback procedure, and flag dependencies before the flag is created in the flag platform, plus the lifecycle-management rules that surface overdue flags in a weekly debt review and alert on a release flag at 100 percent rollout for 14 days. Use when the Feature Flag Agent must specify a flag before it is created so the flag's purpose, audience, and expected removal are explicit and the flag does not become permanent technical debt, or when a feature needs the correct flag type chosen against its rollout intent rather than defaulting to a release flag.
+description: Produce a feature-flag spec artifact fixing a flag's key, type, per-environment defaults, target audience, lifecycle milestones with a retirement date, and rollback procedure before the flag is created in the flag platform. Use when the Feature Flag Agent must specify a flag before creation so it does not become permanent technical debt.
 ---
 
 # define-feature-flag

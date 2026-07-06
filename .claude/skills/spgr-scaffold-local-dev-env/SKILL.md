@@ -1,6 +1,6 @@
 ---
 name: spgr-scaffold-local-dev-env
-description: Scaffold a verified local development environment as source files, producing a Docker Compose service stack, idempotent setup targets (`make install`, `make dev`, `make test`, `make reset`, `make verify`), a `.devcontainer/devcontainer.json`, and a seeded database, so a developer reaches a running application within 15 minutes of cloning. Use when the DevOps Agent stands up local dev for a project from a confirmed tech stack, env template, and seed data, or when onboarding friction shows that clone-to-running takes too long or fails from a clean machine.
+description: Scaffold a verified local development environment as source files, with a Docker Compose stack, idempotent make targets, a devcontainer, and a seeded database, so clone-to-running takes under 15 minutes. Use when the DevOps Agent stands up local dev from a confirmed tech stack, or when setup fails from a clean machine.
 ---
 
 # scaffold-local-dev-env

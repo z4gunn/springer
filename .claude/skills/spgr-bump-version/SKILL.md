@@ -1,6 +1,6 @@
 ---
 name: spgr-bump-version
-description: Increment the project version following semantic versioning and update every version reference across the codebase atomically (package manifests, mobile version string and build number, API headers, docs), then land it as a dedicated `chore(release): bump version to X.Y.Z` commit. Use when the DevOps Agent prepares a release and needs the version raised consistently with the bump type derived from the CHANGELOG.md unreleased section, or when a pre-release build (TestFlight or Firebase) needs a valid prerelease version.
+description: Increment the project version following semantic versioning, update every version reference across the codebase atomically, and land it as a dedicated chore(release) commit. Use when the DevOps Agent prepares a release and needs the version raised with the bump type derived from the CHANGELOG.md unreleased section.
 ---
 
 # bump-version

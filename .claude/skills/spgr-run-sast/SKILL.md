@@ -1,6 +1,6 @@
 ---
 name: spgr-run-sast
-description: Produce a SAST findings report that runs static analysis against the codebase or a PR diff, records every finding with severity, file path, line number, rule ID, and description, triages each as confirmed, false positive, or needs-investigation, encodes fixed anti-patterns as custom rules so they cannot recur, and returns a PASS or GATE verdict that blocks merge or release on any unresolved confirmed Critical or High finding. Use when the Security Agent runs a full-codebase SAST scan before a release, or when the DevOps Agent wires SAST into the CI pipeline and needs the current vulnerability posture before vulnerable source code reaches production.
+description: Produce a SAST findings report that runs static analysis against the codebase or a PR diff, triages each finding, and returns a PASS or GATE verdict that blocks merge or release on any unresolved confirmed Critical or High finding. Use when the Security Agent runs a full-codebase scan before a release or the DevOps Agent wires SAST into CI.
 ---
 
 # run-sast

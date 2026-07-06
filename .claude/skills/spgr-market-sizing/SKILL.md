@@ -1,6 +1,6 @@
 ---
 name: spgr-market-sizing
-description: Produce a market-sizing artifact that estimates TAM, SAM, and SOM with a bottom-up calculation, a top-down cross-check, every assumption stated with a confidence level, every data source cited with a retrieval date, and a viability signal that flags when the obtainable market does not justify the build cost. Use when the Discovery Agent has an ICP and a problem space and must ground the go/no-go decision in market economics, or when a business model or geography changes and the addressable market must be re-estimated.
+description: Produce a market-sizing artifact estimating TAM, SAM, and SOM with a bottom-up calculation, a top-down cross-check, and a viability signal on whether the obtainable market justifies the build cost. Use when the Discovery Agent must ground the go/no-go decision in market economics, or when geography or business model changes force a re-estimate.
 ---
 
 # market-sizing

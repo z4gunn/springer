@@ -1,6 +1,6 @@
 ---
 name: spgr-escalate
-description: Raise a structured escalation when input is missing or contradictory, constraints conflict, scope changes, or a policy issue is found, then route it to the correct handler. Use when an agent cannot proceed correctly on its input and must stop and surface a precise list of what is wrong rather than filling gaps with assumptions.
+description: Raise a structured escalation when input is missing or contradictory, constraints conflict, scope changes, or a policy issue is found, then route it to the correct handler. Use when an agent cannot proceed on its input and must surface a precise list of what is wrong rather than filling gaps with assumptions.
 ---
 
 # escalate

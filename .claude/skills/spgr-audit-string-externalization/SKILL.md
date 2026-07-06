@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-string-externalization
-description: Produce a string-externalization audit report that finds every hard-coded user-visible string not routed through the i18n system, listing each by file and line, categorized by string type, ranked by user-flow priority with an extraction-effort estimate, and returning a PASS or GATE verdict that blocks localization start while user-visible strings remain hard-coded. Use when the i18n Agent must confirm the codebase is fully externalized before translation begins, or when a CI sweep needs the current externalization posture so a new hard-coded string does not regress an already-externalized surface.
+description: Produce a string-externalization audit report that finds every hard-coded user-visible string not routed through the i18n system, ranked by user-flow priority, returning a PASS or GATE verdict that blocks localization start while such strings remain. Use when the i18n Agent must confirm the codebase is fully externalized before translation begins.
 ---
 
 # audit-string-externalization

@@ -1,6 +1,6 @@
 ---
 name: spgr-log-decision
-description: Append a structured decision entry to an artifact's decision log, capturing the decision, rationale, alternatives considered, and downstream impact. Use whenever an agent makes a consequential choice while producing or revising an artifact, so the reasoning is preserved and traceable without re-litigating settled decisions.
+description: Append a structured decision entry to an artifact's decision log, capturing the decision, rationale, alternatives considered, and downstream impact. Use whenever an agent makes a consequential choice while producing or revising an artifact, so the reasoning stays traceable without re-litigating settled decisions.
 ---
 
 # log-decision

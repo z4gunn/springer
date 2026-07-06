@@ -1,6 +1,6 @@
 ---
 name: spgr-define-funnel
-description: Produce a funnel-definition artifact that specifies each conversion funnel as an ordered event sequence with entry criteria, an explicit conversion window, completion criteria, and segmentation dimensions, then generate the platform-specific funnel report config (Amplitude, Mixpanel, etc.) from that spec. Use when the Analytics Agent must define the conversion funnels for a product's core journeys against a confirmed event taxonomy, or when the PM agent needs funnel definitions to set the success metric for a story.
+description: Produce a funnel-definition artifact specifying each conversion funnel as an ordered event sequence with entry criteria, a conversion window, completion criteria, and segmentation dimensions, then generate the platform-specific funnel report config. Use when the Analytics Agent must define conversion funnels against a confirmed event taxonomy.
 ---
 
 # define-funnel

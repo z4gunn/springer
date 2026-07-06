@@ -1,6 +1,6 @@
 ---
 name: spgr-write-metering-events
-description: Produce a metering-events spec artifact that defines, per metered dimension, what constitutes one billable unit, which service emits the event and at which code location, the event properties, the idempotency strategy that guarantees an action is counted exactly once, the aggregation window, the failure handling when an event cannot reach the billing platform, and a monthly reconciliation procedure that compares metering counts against billed amounts. Use when the Billing Agent has a confirmed billing spec with usage-based or hybrid dimensions and must fix how usage is measured and reported before any metering code is written, or when a new metered dimension is added and its counting, idempotency, and reconciliation rules must be specified.
+description: Produce a metering-events spec artifact defining, per metered dimension, the billable unit, the emitting code location, the exactly-once idempotency strategy, and the reconciliation procedure. Use when the Billing Agent has a confirmed billing spec with usage-based dimensions and must fix how usage is measured before metering code is written.
 ---
 
 # write-metering-events

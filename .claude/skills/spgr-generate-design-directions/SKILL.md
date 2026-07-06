@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-design-directions
-description: Produce a design-directions artifact holding three or more genuinely distinct creative directions for human selection, each with visual language, interaction model, information-architecture rationale, emotional tone, one or two key screen mockups, and a per-persona usability prediction. Use when the Design Agent has personas, core user flows, brand constraints, platform targets, and accessibility requirements and must open the design space before any detailed design work, or when a HIL checkpoint needs distinct directions for a human to pick one or scope a hybrid.
+description: Produce a design-directions artifact holding three or more genuinely distinct creative directions for human selection, each with visual language, interaction model, emotional tone, and key screen mockups. Use when the Design Agent has personas, flows, and brand constraints and must open the design space before detailed design.
 ---
 
 # generate-design-directions

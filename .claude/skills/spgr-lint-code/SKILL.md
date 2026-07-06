@@ -1,6 +1,6 @@
 ---
 name: spgr-lint-code
-description: Run the project linter on modified files, auto-fix safe violations in place, and produce a lint report listing the remaining violations that need manual resolution. Use when the Backend, Frontend, or Mobile Developer agent has changed files and must reach zero lint errors before commit, or when the Code Reviewer agent needs the lint posture of a PR branch.
+description: Run the project linter on modified files, auto-fix safe violations in place, and produce a lint report listing violations that need manual resolution. Use when a developer agent has changed files and must reach zero lint errors before commit, or when the Code Reviewer agent needs the lint posture of a PR branch.
 ---
 
 # lint-code

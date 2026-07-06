@@ -1,6 +1,6 @@
 ---
 name: spgr-mine-ugc-forums
-description: Produce a forum pain-point analysis artifact by mining Reddit, Hacker News, Stack Overflow, Quora, and niche forums for authentic user frustration expressed in natural language, grouped into pain-point clusters by theme with verbatim quotes, engagement-weighted frequency signals, a per-platform breakdown, cited source URLs, and the exact user vocabulary for copywriting. Use when the Discovery Agent needs unfiltered evidence of a problem from public forums during Phase 1 discovery, or when the PM agent needs forum-grounded pain signals and user language before writing requirements.
+description: Produce a forum pain-point analysis artifact by mining Reddit, Hacker News, Stack Overflow, Quora, and niche forums for user frustration, grouped into cited pain-point clusters with verbatim quotes and exact user vocabulary. Use when the Discovery Agent needs unfiltered problem evidence from public forums before requirements are written.
 ---
 
 # mine-ugc-forums

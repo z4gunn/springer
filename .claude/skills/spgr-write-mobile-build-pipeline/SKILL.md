@@ -1,6 +1,6 @@
 ---
 name: spgr-write-mobile-build-pipeline
-description: Write the CI/CD pipeline configuration for iOS and Android builds as source code, covering secrets-injected code signing, platform test runners, archive and bundle generation, multi-channel distribution to TestFlight, Firebase App Distribution, App Store, or Play Store, screenshot capture for visual regression, and optional device-farm UI test matrices. Use when the DevOps agent stands up or updates a mobile project's build and release pipeline, or when the Mobile Developer agent supplies build scheme and test target names and needs the signing and distribution mechanics encoded correctly.
+description: Write the CI/CD pipeline configuration for iOS and Android builds, covering code signing, platform test runners, archive generation, and distribution to TestFlight, Firebase, App Store, or Play Store. Use when the DevOps agent stands up or updates a mobile project's build and release pipeline.
 ---
 
 # write-mobile-build-pipeline

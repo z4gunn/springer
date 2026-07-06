@@ -1,6 +1,6 @@
 ---
 name: spgr-create-release-tag
-description: Create an annotated, optionally GPG-signed git tag in `vX.Y.Z` form at a release commit and push it to the remote, marking the exact source state a deployment is built from. Use when the DevOps Agent has a post-bump version, a release commit SHA, and a signed-off deployment runbook, and must tag the source before deployment begins, or when a downstream agent needs the permanent link between a deployed artifact and its source code.
+description: Create an annotated, optionally GPG-signed git tag in vX.Y.Z form at a release commit and push it, marking the exact source state a deployment is built from. Use when the DevOps Agent has a post-bump version and a signed-off deployment runbook and must tag the source before deployment begins.
 ---
 
 # create-release-tag

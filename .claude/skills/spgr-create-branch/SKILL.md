@@ -1,6 +1,6 @@
 ---
 name: spgr-create-branch
-description: Create a feature, fix, hotfix, release, or chore branch with a convention-compliant name, cut from an up-to-date copy of the correct base, then push it to the remote. Use when a backend, frontend, mobile, or DevOps developer agent starts a development task and needs a named branch before any commit, or when a hotfix must be cut from a release branch rather than from main.
+description: Create a feature, fix, hotfix, release, or chore branch with a convention-compliant name, cut from an up-to-date copy of the correct base, then push it to the remote. Use when a developer agent starts a development task and needs a named branch before any commit, or when a hotfix must be cut from a release branch.
 ---
 
 # create-branch

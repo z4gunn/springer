@@ -1,6 +1,6 @@
 ---
 name: spgr-write-e2e-test
-description: Write an end-to-end test suite that drives the full application stack through complete critical user journeys, using Playwright for web and Detox or Maestro for mobile, with page objects, story-ID tags, hermetic per-test isolation, and failure-time screenshot, console, and network capture. Use when the QA agent owns the critical-journey coverage for a story marked as a P0 flow, or when a developer agent provides updated selectors or screen identifiers and the affected E2E tests must be rewritten to match.
+description: Write an end-to-end test suite that drives the full application stack through complete critical user journeys, using Playwright for web and Detox or Maestro for mobile. Use when the QA agent owns critical-journey coverage for a P0 flow, or when updated selectors require the affected E2E tests rewritten.
 ---
 
 # write-e2e-test

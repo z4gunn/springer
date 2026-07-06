@@ -1,6 +1,6 @@
 ---
 name: spgr-create-pr
-description: Open a pull request and produce a pull-request envelope artifact with a structured description that gives the reviewer the what, the story link, how to test, risks and mitigations, and a completion checklist, plus auto-tagging of every vertical agent whose domain the diff touches. Use when the backend, frontend, mobile, or DevOps developer agent has finished a change on a branch with passing tests and a clean lint, and needs the change opened for review against the approved acceptance criteria.
+description: Open a pull request and produce a pull-request envelope artifact with a structured description covering the story link, how to test, risks, and a completion checklist, auto-tagging every vertical agent whose domain the diff touches. Use when a developer agent has a finished change with passing tests and needs it opened for review.
 ---
 
 # create-pr

@@ -1,6 +1,6 @@
 ---
 name: spgr-write-bug-report
-description: Produce a bug-report envelope artifact that documents one defect with deterministic reproduction steps, environment context, expected vs actual behavior, a severity classification, a root-cause hypothesis, and a committed regression test that fails before the fix and passes after. Use when a QA, developer, or code-reviewer agent observes a test failure or production defect and must file a reproducible, fix-ready report, or when an escaped bug needs the regression test that closes the gap in the suite.
+description: Produce a bug-report artifact that documents one defect with deterministic reproduction steps, severity, a root-cause hypothesis, and a committed regression test that fails before the fix and passes after. Use when a QA, developer, or code-reviewer agent observes a defect and must file a reproducible, fix-ready report.
 ---
 
 # write-bug-report

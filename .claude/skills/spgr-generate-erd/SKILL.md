@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-erd
-description: Produce an erd artifact that captures the full data model as entities with typed attributes and constraints, relationships with cardinality, junction tables for M:N, audit fields on every entity, and explicit PII markers, rendered as portable Mermaid. Use when the Architect Agent has data requirements from the PRD and user stories plus a compliance classification and needs the authoritative data model before any migration, data dictionary, or API spec work begins.
+description: Produce an erd artifact capturing the full data model as entities with typed attributes, relationships with cardinality, junction tables for M:N, audit fields, and PII markers, rendered as portable Mermaid. Use when the Architect Agent has data requirements and a compliance classification and needs the data model before migration or API spec work.
 ---
 
 # generate-erd
