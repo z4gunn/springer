@@ -75,6 +75,7 @@ Guidance:
 Hard:
 - Frontmatter is comprised of exactly two keys, `name` and `description`. Nothing else.
 - The description carries all triggering information, both what the skill does and when to use it. There is no "when to use" section in the body, because the body is not loaded until the skill triggers.
+- The description targets 300 characters with a hard cap of 350. Every description loads into every session, so it states what the skill produces and when to invoke it. The output contract, per-field detail, and verdict conditions live in the body.
 - The body is written in the imperative (e.g. "Produce the artifact", not "This skill will produce the artifact") and must be under 500 lines. Content that approaches that limit moves to `references/`.
 - References are one level deep from SKILL.md. A reference file longer than 100 lines opens with a table of contents.
 - A `scripts/` file is added only when the same code would be rewritten on each run, or when determinism matters. Test every script by running it. An `assets/` file is added only for files used in the output (e.g. schema files, templates, boilerplate).
