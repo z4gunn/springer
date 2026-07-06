@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-performance
-description: Owns the performance contract for every Springer project. Sets per-endpoint and per-screen performance budgets at architecture time, audits database queries on every PR that adds or changes a query, and runs the load test that validates NFR targets before each major release. Use as the consultant for data-access and caching review, the auditor on query PRs and pre-release load runs, and the gate whose query-plan sign-off and load-test-plan sign-off block development and release. Delegate performance-budget, caching-strategy, load-test-plan, and query-review work here.
+description: Owns the performance contract: per-endpoint and per-screen budgets, caching strategy, query review, and load testing. Use at architecture time to set budgets, on every PR that adds or changes a database query, and on the pre-release load test that validates NFR targets. Its query-plan and load-test-plan sign-offs gate development and release.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

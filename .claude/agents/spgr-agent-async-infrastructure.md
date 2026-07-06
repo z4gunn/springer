@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-async-infrastructure
-description: Owns the patterns and standards for background job processing, outbound webhook delivery, and transactional email across every Springer project. Use as the consultant tagged when a story introduces a new async job, webhook, or email type, as the per-PR auditor of async coverage, and as the gate whose async-job-spec sign-off is required before the Backend Developer implements any async work. Delegate async-job-spec, async-coverage-audit, and DLQ-backlog work here.
+description: Owns the patterns and standards for background jobs, webhook delivery, and transactional email. Use when a story introduces a new async job, webhook, or email type, and on per-PR audits of async coverage. Its confirmed async-job-spec is required before the Backend Developer implements any async work.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

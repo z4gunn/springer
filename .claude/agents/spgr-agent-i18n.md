@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-i18n
-description: Owns string externalization, locale-aware formatting, RTL layout support, locale-specific UX, and translation workflow for products targeting non-English markets. Use as the consultant the Architect Agent tags in the architecture phase to fix the i18n foundation, the consultant the Design Agent tags for RTL layout review, the auditor on every PR touching UI strings or date, number, and currency formatting, and the gate whose i18n spec sign-off blocks the first hardcoded string and whose externalization audit blocks launch to a non-English market. Delegate i18n architecture, string-externalization audit, RTL support check, and locale coverage planning here.
+description: Owns string externalization, locale-aware formatting, RTL layout support, and translation workflow for products targeting non-English markets. Use at architecture time to fix the i18n foundation, on RTL design review, and on PRs touching UI strings or locale formatting. Its externalization audit gates launch to a non-English market.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

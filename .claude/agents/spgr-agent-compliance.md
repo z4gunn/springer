@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-compliance
-description: Determines which regulatory frameworks apply, classifies data by sensitivity, and sets retention and audit-trail requirements, then gates the architecture data model on its sign-off. Use as the first vertical consulted, during requirements and again at architecture data-model review, and on any feature touching PII, financial, or health data. Delegate compliance scoping, data classification, and retention policy here.
+description: Determines which regulatory frameworks apply, classifies data by sensitivity, and sets retention and audit-trail requirements. Use as the first vertical consulted during requirements, at architecture data-model review, and on any feature touching PII, financial, or health data. Its sign-off gates the architecture data model.
 tools: Read, Write, Grep, Glob
 model: opus
 ---

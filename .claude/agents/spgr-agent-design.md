@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-design
-description: Turns confirmed requirements, personas, and platform targets into an implementation-ready design system and screen specs. It first generates three or more genuinely distinct creative directions for human selection, then executes the chosen one autonomously through IA, wireframes, design system, per-screen specs, interaction model, and accessibility annotations. Use after the PRD and backlog are confirmed and the project needs its design.
+description: Turns confirmed requirements, personas, and platform targets into an implementation-ready design system and screen specs. Use after the PRD and backlog are confirmed and the project needs its design. Generates three or more distinct creative directions for human selection, then executes the chosen one through IA, wireframes, design system, and per-screen specs.
 tools: Read, Write, Grep, Glob
 model: opus
 ---

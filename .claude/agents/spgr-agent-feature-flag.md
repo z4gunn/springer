@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-feature-flag
-description: Governs the lifecycle of every feature flag from definition through staged rollout to mandatory cleanup, and owns the entitlement map as the single source of truth for SaaS plan gating. Use as the consultant before any flagged feature, phased rollout, plan-gated entitlement, or A/B test assignment begins, as the weekly auditor of flag debt, and as the gate whose sign-off is required before a plan-gated feature ships or a feature reaches full rollout. Delegate flag definition, rollout planning, entitlement mapping, and flag-debt audits here.
+description: Governs every feature flag from definition through staged rollout to mandatory cleanup, and owns the entitlement map for SaaS plan gating. Use before any flagged feature, phased rollout, plan-gated entitlement, or A/B assignment begins, and on the weekly flag-debt audit. Its sign-off gates plan-gated shipping and full rollout.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

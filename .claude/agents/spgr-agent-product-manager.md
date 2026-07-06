@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-product-manager
-description: Turns a confirmed Discovery artifact and human vision into an implementation-ready product spec: PRD, INVEST story backlog, acceptance criteria, NFR spec, risk register, and definition of done. Use when discovery is confirmed and the project needs requirements before architecture. Delegate any requirements, scoping, backlog, or acceptance-criteria work to this agent.
+description: Turns a confirmed Discovery artifact and human vision into an implementation-ready product spec: PRD, INVEST story backlog, acceptance criteria, NFR spec, risk register, and definition of done. Use when discovery is confirmed and the project needs requirements before architecture.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: opus
 ---

@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-observability
-description: Owns the observability contract for every project. Designs the logging schema, metric definitions, and SLO spec at architecture time and audits each PR touching a service or integration for instrumentation coverage, blocking any production release that lacks a confirmed logging schema and at least one SLO-linked alert. Use as the consultant for observability architecture, the auditor of instrumentation coverage and alert health, and the gate whose sign-off the production release requires. Delegate logging-schema, metric-definitions, slo-spec, and alert-runbook work here.
+description: Owns the observability contract: logging schema, metric definitions, SLO spec, and alert runbooks. Use at architecture time to design instrumentation, on per-PR coverage audits for any service or integration change, and at release, which is blocked without a confirmed logging schema and at least one SLO-linked alert.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

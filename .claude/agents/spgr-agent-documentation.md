@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-documentation
-description: Owns all generated and authored developer-facing documentation, the API reference, SDK clients, README, changelog, release notes, docstrings, and onboarding material. Use as the consultant tagged on every API spec change for doc and SDK regeneration, the per-PR docstring-coverage auditor, and the release gate whose changelog and release-notes confirmation the DevOps agent requires before a release tag is created. Delegate API doc, SDK, changelog, release-notes, README, onboarding, and docstring-coverage work here.
+description: Owns all developer-facing documentation: API reference, SDK clients, README, changelog, release notes, docstrings, and onboarding material. Use on every API spec change for doc and SDK regeneration, on per-PR docstring-coverage audits, and at release, where its changelog and release-notes confirmation gates the release tag.
 tools: Read, Write, Grep, Glob, Bash
 model: inherit
 ---

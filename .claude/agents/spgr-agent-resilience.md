@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-resilience
-description: Owns the failure-handling contract for every external integration: timeout budgets, retry schedules, circuit breakers, fallback behavior, and the project error standards. Use as the consultant when the Architect defines the system resilience model or when a feature adds an external dependency, as the per-PR and monthly auditor of resilience coverage, and as the gate whose confirmed resilience spec is required before any integration is implemented. Delegate resilience-spec, error-standards, and error-ux work here.
+description: Owns the failure-handling contract for every external integration: timeout budgets, retry schedules, circuit breakers, fallbacks, and the project error standards. Use when the resilience model is defined, when a feature adds an external dependency, and on per-PR and monthly coverage audits. Its confirmed spec is required before any integration is implemented.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

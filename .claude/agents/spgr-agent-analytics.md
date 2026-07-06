@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-analytics
-description: Owns the product analytics contract for a project, defining the event taxonomy, instrumentation specs, funnels, and A/B test specs, then gating every user story on a confirmed instrumentation spec before it moves to Building. Use during requirements to design measurement with the PM agent, on every feature before implementation begins, on per-PR instrumentation audits, and on the post-release production verification pass. Delegate event taxonomy, instrumentation specs, funnel definitions, A/B test specs, and support-data mining here.
+description: Owns the product analytics contract: event taxonomy, instrumentation specs, funnels, and A/B test specs. Use during requirements to design measurement, before any feature is implemented, on per-PR instrumentation audits, and on the post-release verification pass. Its instrumentation-spec sign-off gates every story's move to Building.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

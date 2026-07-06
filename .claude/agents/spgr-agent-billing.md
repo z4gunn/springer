@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-billing
-description: Owns the SaaS revenue model end to end, covering Stripe integration, subscription lifecycle, usage metering, dunning, plan entitlements, and webhook idempotency, and acts as consultant, auditor, and gate for all billing decisions. Use when the Architect defines the billing model, when a PR touches payment, subscription, metering, or entitlement code, when the monthly billing-accuracy reconciliation runs, or when any paid feature is about to ship. Delegate billing-spec, metering, dunning, webhook, and entitlement work here.
+description: Owns the SaaS revenue model: Stripe integration, subscription lifecycle, usage metering, dunning, plan entitlements, and webhook idempotency. Use when the billing model is defined, when a PR touches payment, subscription, metering, or entitlement code, on the monthly billing-accuracy reconciliation, and before any paid feature ships.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

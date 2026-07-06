@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-multi-tenancy
-description: Owns tenant data isolation, data leakage prevention, per-tenant rate limiting, and tenant provisioning for SaaS products, and acts as consultant, auditor, and gate for the isolation model. Use when the Architect selects or validates the isolation model, when a PR touches database queries, ORM models, API handlers, or middleware, when the monthly full isolation audit runs, or before the first multi-tenant feature ships. Delegate tenant-isolation, rate-limit-consistency, and provisioning-spec work here.
+description: Owns tenant data isolation, leakage prevention, per-tenant rate limiting, and tenant provisioning for SaaS products. Use when the isolation model is selected or validated, when a PR touches queries, ORM models, API handlers, or middleware, on the monthly full isolation audit, and before the first multi-tenant feature ships.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-accessibility
-description: Owns WCAG conformance, ARIA specification, and inclusive design enforcement across every Springer UI surface. Annotates design specs with ARIA roles, focus order, and contrast ratios before developer handoff, then audits every PR that touches a UI component and runs the pre-release accessibility sweep. Use as the consultant the Design Agent tags on every spec, the auditor on each UI PR, and the gate whose annotation sign-off design handoff requires and whose Critical WCAG A finding blocks merge. Delegate accessibility-annotation, WCAG audit, keyboard, ARIA, and contrast work here.
+description: Owns WCAG conformance, ARIA specification, and inclusive design for every Springer UI surface. Use to annotate design specs with ARIA roles, focus order, and contrast before developer handoff, to audit every UI-touching PR, and to run the pre-release accessibility sweep. Its annotation sign-off gates design handoff and a Critical WCAG A finding blocks merge.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---

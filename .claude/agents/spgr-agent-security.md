@@ -1,6 +1,6 @@
 ---
 name: spgr-agent-security
-description: Owns threat modeling, vulnerability detection, and supply-chain integrity across the SDLC. Produces the STRIDE threat model at architecture time and audits PRs with SAST and dependency scans, blocking merge on Critical or High findings. Use as the consultant for threat modeling and the gate whose threat-model sign-off the architecture requires. Delegate threat-model and security-findings work here.
+description: Owns threat modeling, vulnerability detection, and supply-chain integrity across the SDLC. Use for the STRIDE threat model at architecture time and to audit PRs with SAST and dependency scans. Blocks merge on Critical or High findings and its threat-model sign-off gates the architecture.
 tools: Read, Write, Grep, Glob, Bash
 model: opus
 ---
