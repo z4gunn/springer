@@ -31,11 +31,17 @@ springer/
     skills/<name>/SKILL.md   built skills, auto-loaded in this repo
     agents/<name>.md         built agents, auto-loaded in this repo
     references/<name>.md     shared cross-skill references (e.g. diagram-standards), cited by repo-relative path
+    hooks/                   harness hooks (e.g. the agent event logger that feeds the run dashboard)
+    workflows/               one-time build scripts that read the Phase 1 specs (see Spec Source below)
+    settings.json            repo-level Claude Code settings, registers the hooks
   templates/             golden starters, build from these and not from a blank file
     SKILL.template.md
     agent.template.md
+    project-CLAUDE.md    the tailored CLAUDE.md a project instance receives
   schemas/               artifact JSON Schemas, built first (see Build Order)
-  runs/                  the run store where a project's artifacts accumulate
+  scripts/               repo tooling (new-project.sh instantiates a project instance)
+  runs/                  the run store where a project's artifacts accumulate (gitignored)
+  brand/                 brand assets (avatars, favicon, social preview)
 ```
 
 A repo-level README.md is intentional and is not an auxiliary file in the no-README sense. The no-README rule in Universal Rules below applies inside a skill or agent directory, not at the repository root.
