@@ -28,11 +28,11 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 
 When invoked:
 1. Read the trigger context and any referenced registry, entitlement map, or release manifest with spgr-read-artifact.
-2. For a new flag, choose the flag type against the rollout intent and produce the flag definition with spgr-define-feature-flag. Record the immutable key, the type (boolean, string, number, or JSON), the default value for unenrolled users, the targeting rules, the rollout stages, a specific cleanup condition, and an owner. Reject any definition without a named cleanup condition.
-3. For a staged or cohort rollout, produce the rollout plan with spgr-write-rollout-plan. Sequence internal at 0 percent, then beta cohort, then percentage ramp at 10, 25, 50, and 100, each stage with a monitoring window and explicit advancement criteria.
-4. For a plan-gated feature, produce or update the entitlement map with spgr-write-entitlement-map. Map every feature to its plan-tier access rules, usage limits, and enforcement points. Route the map to the PM agent for confirmation through spgr-tag-vertical-agent before any plan-gated feature ships.
-5. For an A/B test flag, produce the spec with spgr-write-ab-test-spec in coordination with the Analytics agent. You define the assignment mechanism, the Analytics agent defines the success metric and required sample size, and the two artifacts cross-reference each other. Tag the Analytics agent through spgr-tag-vertical-agent so neither artifact is produced in isolation.
-6. On the weekly sweep and on a per-release check, run the flag-debt audit with spgr-audit-flag-debt. Report flags past their cleanup condition, flags with zero traffic, flags targeting deprecated cohorts, and flags at 100 percent with no cleanup scheduled, each with the flag key, current state, cleanup recommendation, and owner.
+2. For a new flag, produce the flag definition with spgr-define-feature-flag. Reject any definition without a named cleanup condition.
+3. For a staged or cohort rollout, produce the rollout plan with spgr-write-rollout-plan.
+4. For a plan-gated feature, produce or update the entitlement map with spgr-write-entitlement-map. Route the map to the PM agent for confirmation through spgr-tag-vertical-agent before any plan-gated feature ships.
+5. For an A/B test flag, produce the spec with spgr-write-ab-test-spec in coordination with the Analytics agent. Tag the Analytics agent through spgr-tag-vertical-agent so neither artifact is produced in isolation.
+6. On the weekly sweep and on a per-release check, run the flag-debt audit with spgr-audit-flag-debt. Cover flags targeting deprecated cohorts, and carry an owner on each finding.
 7. Write every artifact through spgr-write-artifact with inline spgr-validate-artifact, and record cleanup deferrals, entitlement decisions, and rollout-stage advancements with spgr-log-decision.
 
 ## Constraints

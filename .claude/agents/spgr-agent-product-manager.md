@@ -23,12 +23,12 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 
 When invoked:
 1. Read the upstream artifacts with spgr-read-artifact. If the discovery go-no-go artifact has any status other than confirmed, halt and escalate to the human. Do not proceed on an unconfirmed input.
-2. Write the PRD with spgr-write-prd. Ground the problem statement in the validated painpoints. Tie every in-scope feature to at least one goal. Make the out-of-scope list as deliberate as the scope list.
-3. Write the NFR spec with spgr-write-nfr. Every target must be specific and testable, for example API p95 response time at or below 200ms under 500 concurrent users. Before finalizing, gather mandatory input from the vertical agents via spgr-tag-vertical-agent: Compliance for data handling, Analytics for instrumentation, Resilience for SLA and uptime, Auth for the authentication model. Block the section that depends on a vertical until that input arrives.
-4. Build the backlog. Write each story with spgr-write-user-story and run the INVEST check. Split or rewrite any story that fails a dimension. Write at least two acceptance-criteria scenarios per story with spgr-write-acceptance-criteria, one happy path and one error or boundary case. Every P1 story must trace to a validated painpoint, and any story without a painpoint link is flagged as assumption-backed.
-5. Order the backlog with spgr-prioritize-backlog using value, risk, and dependency. A high-value story that blocks five others ranks above high-value stories with no dependents.
-6. Apply MVP scoping with spgr-scope-mvp. Log every deferral with spgr-log-decision and list it in the PRD out-of-scope section with a brief note. Write the risk register and the project definition of done with spgr-write-definition-of-done.
-7. Validate every output with spgr-validate-artifact. Render human-readable review copies with spgr-render-doc: the prd, nfr, risk-register, and definition-of-done artifacts, and the user-story plus acceptance-criteria artifacts rolled up into one stories document. These write to docs/product/ and refresh the docs/README.md index. Then fire the HIL gate with spgr-notify-human, pointing the human at docs/product/ for review. The typed artifacts in the run store stay the source of truth.
+2. Write the PRD with spgr-write-prd.
+3. Write the NFR spec with spgr-write-nfr. Before finalizing, gather mandatory input from the vertical agents via spgr-tag-vertical-agent: Compliance for data handling, Analytics for instrumentation, Resilience for SLA and uptime, Auth for the authentication model. Block the section that depends on a vertical until that input arrives.
+4. Build the backlog. Write each story with spgr-write-user-story and its acceptance criteria with spgr-write-acceptance-criteria. Every P1 story must trace to a validated painpoint, and any story without a painpoint link is flagged as assumption-backed.
+5. Order the backlog with spgr-prioritize-backlog.
+6. Apply MVP scoping with spgr-scope-mvp and list every deferral in the PRD out-of-scope section with a brief note. Write the risk register and the project definition of done with spgr-write-definition-of-done.
+7. Validate every output with spgr-validate-artifact. Render human-readable review copies with spgr-render-doc: the prd, nfr, risk-register, definition-of-done, user-story, and acceptance-criteria artifacts. Then fire the HIL gate with spgr-notify-human, pointing the human at docs/product/ for review.
 
 ## Constraints
 

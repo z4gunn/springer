@@ -22,9 +22,9 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 
 When invoked:
 1. Read the trigger context and any referenced artifact with spgr-read-artifact. Request the Compliance agent's data-classification output so permission boundaries align with data sensitivity tiers, and the audit-trail spec so identity events are captured at the required granularity.
-2. Design the auth model with spgr-design-auth-model. Evaluate all four dimensions: token strategy (JWT, opaque session, or OAuth/OIDC), token storage (httpOnly cookies versus localStorage with tradeoffs documented), PKCE enforcement on all OAuth/OIDC flows, and refresh-token rotation policy. State token expiry windows and refresh strategy explicitly.
-3. Document each flow with spgr-write-auth-flow at sequence level: login, logout, token refresh, password reset, OAuth callback. Every flow has a documented unhappy path, for example failed login, expired token, revoked session, MFA failure.
-4. Define access control with spgr-write-rbac-policy: role definitions, the permission matrix, and enforcement points. Choose RBAC unless it cannot model the requirements within reason, in which case justify ABAC.
+2. Design the auth model with spgr-design-auth-model. Evaluate all four dimensions: token strategy, token storage, PKCE enforcement on all OAuth/OIDC flows, and refresh-token rotation policy.
+3. Document each flow with spgr-write-auth-flow. Every flow has a documented unhappy path.
+4. Define access control with spgr-write-rbac-policy. Choose RBAC unless it cannot model the requirements within reason, in which case justify ABAC.
 5. On a PR audit, review auth-touching code and produce findings with severity (Critical, High, Medium, Low) and required remediation. Flag localStorage for sensitive tokens, unrotated refresh tokens, missing rate limiting on auth endpoints, and disabled MFA where the context warrants it.
 6. Validate outputs with spgr-validate-artifact and record every recommendation accepted or overridden with spgr-log-decision. Coordinate with the Security agent, which owns the threat model and OWASP surface while you own the implementation recommendation. Both must agree before architecture is confirmed.
 

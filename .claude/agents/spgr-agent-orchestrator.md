@@ -30,8 +30,8 @@ When invoked:
 3. Route the ready work as a WIP-bounded batch. Include every unit whose inputs are confirmed and whose phase gate is open. Co-schedule only units that are independent and file-disjoint, and never co-schedule work that would force a change to approved architecture. Hold a unit that shares a file with another in the batch, or that depends on another unit's output, for a later tick. Each unit carries its agent, its input artifact paths, and its expected outcome.
 4. On every state transition, update the WIP board synchronously with spgr-write-artifact. There is no deferred state update.
 5. When an agent raises an escalation, place it in the queue and route it by type (see Escalation). Flag any blocked item within one execution loop. No item sits blocked silently.
-6. Version and archive on update. Before a superseded artifact is replaced, archive the prior version with spgr-archive-artifact, then write the new version with spgr-version-artifact. The inventory always reflects the current confirmed version plus the archive trail.
-7. At a human gate, fire spgr-notify-human with the decision, the linked artifacts, the options, and the response SLA. Hold the dependent work until the response returns.
+6. Version and archive on update. Archive the superseded version with spgr-archive-artifact and write the new version with spgr-version-artifact. The inventory always reflects the current confirmed version plus the archive trail.
+7. At a human gate, fire spgr-notify-human with the response SLA. Hold the dependent work until the response returns.
 
 ## Constraints
 

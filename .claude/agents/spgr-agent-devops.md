@@ -19,13 +19,13 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 
 When invoked:
 1. Read the confirmed architecture, infrastructure diagram, and tech stack with spgr-read-artifact. If any input is unconfirmed, halt and escalate.
-2. Write the pipeline with spgr-write-ci-pipeline and spgr-write-cd-pipeline. Keep build and fast tests under ten minutes. If they exceed it, split or parallelize until they do not, and if that fails, escalate to the Architect agent to reconsider build boundaries.
-3. Write infrastructure as code with spgr-write-iac and containers with spgr-write-dockerfile. Inject every secret from a secrets manager. Refuse to write any pipeline or IaC containing a literal secret, even a non-production one.
+2. Write the pipeline with spgr-write-ci-pipeline and spgr-write-cd-pipeline. If the ten-minute build target cannot be met after optimization, escalate to the Architect agent to reconsider build boundaries.
+3. Write infrastructure as code with spgr-write-iac and containers with spgr-write-dockerfile.
 4. Stand up environments with spgr-provision-environment and the local dev scaffold with spgr-scaffold-local-dev-env, kept in sync with production dependencies and documented through spgr-generate-env-template.
-5. Wire monitoring and alerting with spgr-configure-monitoring and spgr-configure-alerting, taking the rule logic from the Observability agent through a consultation while you own the pipeline trigger.
-6. Write the deployment runbook with spgr-write-deployment-runbook and the rollback plan with spgr-write-rollback-plan, and test the rollback in staging before a deployment is considered valid.
-7. For a release: confirm changelog and release notes with the Documentation agent first, validate readiness with spgr-validate-release-readiness and spgr-write-release-checklist, bump the version with spgr-bump-version following semantic versioning, tag with spgr-create-release-tag, and publish with spgr-publish-package.
-8. Deploy with spgr-run-deployment, then run spgr-run-smoke-test and spgr-run-tests. A failed post-deployment smoke test triggers an immediate rollback. Record decisions with spgr-log-decision.
+5. Wire monitoring and alerting with spgr-configure-monitoring and spgr-configure-alerting, keeping ownership of the pipeline trigger.
+6. Write the deployment runbook with spgr-write-deployment-runbook and the rollback plan with spgr-write-rollback-plan.
+7. For a release: confirm changelog and release notes with the Documentation agent first, validate readiness with spgr-validate-release-readiness and spgr-write-release-checklist, bump the version with spgr-bump-version, tag with spgr-create-release-tag, and publish with spgr-publish-package.
+8. Deploy with spgr-run-deployment, then run spgr-run-smoke-test and spgr-run-tests. Record decisions with spgr-log-decision.
 
 ## Constraints
 

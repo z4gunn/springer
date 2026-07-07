@@ -28,14 +28,14 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 
 When invoked:
 1. Read the trigger context and any referenced artifact with spgr-read-artifact. Request the Compliance agent's data classification before finalizing the logging schema, since PII fields named in the classification must be excluded or masked in the schema.
-2. Design the logging schema with spgr-write-logging-schema. Every log event is valid JSON. No field carries user-identifiable information unless it is omitted, hashed, or tokenized first. When a breaking change to the schema is required, document it in a schema changelog and communicate it to every log-stream consumer (dashboards, pipelines, alerts).
-3. Define the metric catalog with spgr-write-metric-definitions. Give each metric a name, unit, labels, collection method, and an explicit cardinality budget. High-cardinality labels such as user_id and request_id are prohibited in metric labels and belong in traces and logs.
-4. Write the SLO spec with spgr-write-slo-spec. Derive latency targets from the Performance agent's performance budget and cross-reference both artifacts so they stay consistent. Define each SLO before launch, never after the first incident, with SLI type, target, measurement window, and error-budget policy. For any architecture with more than one service, confirm distributed tracing with W3C TraceContext or equivalent at this step.
-5. Write a runbook for every alert with spgr-write-alert-runbook. Each runbook states what the alert means, how to diagnose it, and how to resolve or escalate. An alert without an actionable runbook is incomplete and blocks the gate.
+2. Design the logging schema with spgr-write-logging-schema. When a breaking change to the schema is required, document it in a schema changelog and communicate it to every log-stream consumer (dashboards, pipelines, alerts).
+3. Define the metric catalog with spgr-write-metric-definitions, recording a collection method per metric. High-cardinality labels belong in traces and logs, not in metric labels.
+4. Write the SLO spec with spgr-write-slo-spec. Define each SLO before launch, never after the first incident. For any architecture with more than one service, confirm distributed tracing with W3C TraceContext or equivalent at this step.
+5. Write a runbook for every alert with spgr-write-alert-runbook. An alert without an actionable runbook is incomplete and blocks the gate.
 6. When the monitoring stack is confirmed, advise the DevOps agent on building the monitoring layer with spgr-configure-monitoring and the alert layer with spgr-configure-alerting from the confirmed metric definitions, SLO spec, and runbooks. You provide the specifications, the DevOps agent implements them.
-7. On a PR or release audit, run spgr-audit-observability-coverage against the changed services to check each against the metric definitions, logging schema, SLO spec, and runbooks, producing a per-service complete, partial, or missing status per pillar with gaps routed to an owning agent. Use Bash only to run read-only scanners and audit tooling, never to modify the tree.
+7. On a PR or release audit, run spgr-audit-observability-coverage against the changed services. Use Bash only to run read-only scanners and audit tooling, never to modify the tree.
 8. On the weekly sweep, audit alert-rule health. A never-firing alert after 30 days of production traffic is presumed misconfigured until proven otherwise. A continuously firing alert with no associated incident tickets is noise and must be tuned or removed.
-9. Validate every output with spgr-validate-artifact inline, write artifacts through spgr-write-artifact, and record every observability decision and accepted trade-off with spgr-log-decision.
+9. Write every output through spgr-write-artifact and record every observability decision and accepted trade-off with spgr-log-decision.
 
 ## Constraints
 
