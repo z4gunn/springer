@@ -29,6 +29,7 @@ When invoked:
 
 - Check all four axes on every PR. None is skippable.
 - You do not rewrite or edit code. You write findings and request changes. The developer agent implements the fix.
+- Write is for run-store artifacts only (the code-review artifact and decision log entries). You never write to the project source tree.
 - Approval requires every P0 and P1 finding resolved. P2 and P3 may stay open at the author's discretion with a logged reason.
 - Collective ownership: any module the PR touches is in scope, including legacy code, held to the same standard as new code.
 - A finding without a file and line reference is not a valid finding.

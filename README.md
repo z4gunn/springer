@@ -214,6 +214,30 @@ What a run leaves behind, all under `runs/<run-id>/`:
 
 The loop rules, the rehydration algorithm, the parallel barrier, and the advisory-learnings model are in `.claude/references/pdca-harness.md`.
 
+### Watch a run on the live dashboard
+
+An opt-in terminal dashboard shows a run while it executes: the active phase and cycle count, open gates and escalations with how long each has waited, the WIP board, the agents in flight with elapsed time, recent completions with duration and token counts, a token rollup for the watched run, and project-to-date totals across every run. It is read-only and needs nothing beyond Python 3.
+
+Two pieces feed it. A hook registered in `.claude/settings.json` records every subagent dispatch and completion, with token metrics when available, to `runs/<run-id>/events.jsonl`. The hook loads when a Claude Code session starts, so it takes effect the first session after checkout. The dashboard polls that feed plus the run store once per second and redraws.
+
+The dashboard is off by default. Turn it on by asking in chat:
+
+```
+Turn the run dashboard on
+```
+
+The agent runs `launch-dashboard.py on`, which persists the choice in `runs/_dashboard/config.json`. Ask to turn the run dashboard off to reverse it, or ask for the dashboard status to see the current setting. While the dashboard is on, the harness opens it in a separate terminal window whenever a run starts or resumes, and skips the launch when one is already watching the run. The `SPGR_DASHBOARD` environment variable, when set, overrides the stored choice in either direction, so `SPGR_DASHBOARD=0` keeps a CI session headless and `SPGR_DASHBOARD=1` forces the dashboard on without touching the config.
+
+You can also start the dashboard by hand at any time, on or off:
+
+```bash
+python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py           # most recently active run
+python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py acme-1   # a specific run
+python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py --once   # one snapshot, no live loop
+```
+
+Token and timing figures cover activity recorded since the event hook was installed. Runs that predate it show run state and gates but no agent metrics.
+
 ### Quickstart: start a new project
 
 Springer builds each application inside its own copy of the runtime, which becomes that application's git repository. The file-writing tooling is bound to the project root, and the schema registry and shared references are cited by repo-relative path, so the runtime travels with the project rather than installing globally. To build a new app or SaaS app, instantiate a fresh copy:

@@ -54,6 +54,8 @@ mkdir -p "$TARGET/.claude"
 cp -R "$SRC/.claude/skills"     "$TARGET/.claude/skills"
 cp -R "$SRC/.claude/agents"     "$TARGET/.claude/agents"
 cp -R "$SRC/.claude/references" "$TARGET/.claude/references"
+cp -R "$SRC/.claude/hooks"      "$TARGET/.claude/hooks"
+cp "$SRC/.claude/settings.json" "$TARGET/.claude/settings.json"
 cp -R "$SRC/schemas"            "$TARGET/schemas"
 
 # 2. Install the downstream ruleset as the project's CLAUDE.md.

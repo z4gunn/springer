@@ -42,7 +42,14 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    is waiting on a human. Start and resume are the same path. On a new run only,
    pin the advisory learnings set once with `scripts/pin-learnings.py` over the
    available prior run-retrospective artifacts, and record it in
-   run-state.learnings_pinned so the run is reproducible.
+   run-state.learnings_pinned so the run is reproducible. Whenever the run will
+   continue past this step, run `scripts/launch-dashboard.py <run-dir>`. The
+   dashboard is opt-in: the launcher opens it in a separate terminal window
+   only when the developer has turned it on, is a no-op when a dashboard is
+   already watching the run, and always exits 0, so it never blocks the run.
+   When the human asks to turn the run dashboard on or off, run
+   `scripts/launch-dashboard.py on` or `off`, which persists the choice in
+   runs/_dashboard/config.json.
 2. Plan. Pass the readiness snapshot and every open escalation to the
    spgr-agent-orchestrator subagent. Receive a routed batch: each unit names the
    agent, its input artifact refs, and the expected outcome. Enforce the phase
