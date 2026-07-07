@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-observability-coverage
-description: Produce an observability-coverage audit report that checks every service against the metric definitions, logging schema, SLO spec, and alert runbooks, with a per-service status of complete, partial, or missing on each pillar, specific gaps routed to an owning agent, and a PASS or GATE verdict that blocks production release on any critical-path service lacking an SLO or alerting. Use when the Observability Agent must confirm a release or architecture review is fully instrumented, or when a CI sweep needs the current observability posture across the service topology.
+description: Produce an observability-coverage audit report that checks every service against the metric definitions, logging schema, SLO spec, and alert runbooks, with a PASS or GATE verdict that blocks production release on any critical-path service lacking an SLO or alerting. Use when the Observability Agent must confirm a release is instrumented.
 ---
 
 # audit-observability-coverage

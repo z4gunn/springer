@@ -1,6 +1,6 @@
 ---
 name: spgr-validate-artifact
-description: Validate an artifact against its registered JSON Schema and report a structured pass or fail with itemized issues. Use before consuming an artifact received from another agent, and inline before any artifact write completes, to confirm required fields, types, schema version, and confidence signals are present.
+description: Validate an artifact against its registered JSON Schema and report a structured pass or fail with itemized issues. Use before consuming an artifact received from another agent, and inline before any artifact write completes, to confirm required fields, types, schema version, and confidence signals.
 ---
 
 # validate-artifact

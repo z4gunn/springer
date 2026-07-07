@@ -7,6 +7,8 @@ description: <What the skill produces, in one clause.> Use when <concrete trigge
 GOLDEN TEMPLATE. Copy to .claude/skills/spgr-<verb-noun>/SKILL.md and fill in. Delete every comment before shipping.
 RULES (see ../CLAUDE.md Build Standards): frontmatter is EXACTLY name + description. Body imperative and <500 lines.
 All "when to use" lives in description, never here. Push detail to references/. No README/CHANGELOG.
+DESCRIPTION LENGTH: target 300 chars, hard cap 350. Every description loads into every session, so it carries
+what + when only. The output contract, per-field detail, and verdict conditions live in the body, loaded on trigger.
 SOURCE: the private spec vault, skills/spgr-skill-<name>.md  → use its "Phase 2 Build Notes" as the build brief.
 -->
 

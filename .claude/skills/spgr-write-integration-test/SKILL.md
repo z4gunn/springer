@@ -1,6 +1,6 @@
 ---
 name: spgr-write-integration-test
-description: Produce an integration test suite that verifies component and service interactions at real system boundaries, covering API endpoints against a running service, repository reads and writes against a real test database, service-to-service contracts at the real interface, and error boundaries, with per-test isolation and environment-injected configuration. Use when the QA or Backend Developer agent has an API spec, service boundary definitions, and data contracts and must catch contract drift, schema migration errors, and boundary marshaling bugs that unit tests cannot, or when the API Design agent reviews that the tests match the published spec.
+description: Produce an integration test suite verifying component and service interactions at real system boundaries, covering API endpoints, a real test database, service-to-service contracts, and error boundaries. Use when the QA or Backend Developer agent must catch contract drift and boundary bugs that unit tests cannot.
 ---
 
 # write-integration-test

@@ -1,6 +1,6 @@
 ---
 name: spgr-write-iac
-description: Write infrastructure as code that defines every cloud resource (networking, compute, data, secrets, IAM, observability) for dev, staging, and prod as reusable modules with environment-variable overrides, remote state, and CI validation, so any environment provisions, updates, and destroys reproducibly with no manual console changes. Use when the DevOps Agent must stand up or change cloud infrastructure from an approved infrastructure diagram, or when the Architect or Security Agent needs IaC produced against the confirmed topology and least-privilege IAM before a deploy proceeds.
+description: Write infrastructure as code defining every cloud resource for dev, staging, and prod as reusable modules with remote state and CI validation, so any environment provisions reproducibly with no manual console changes. Use when the DevOps Agent must stand up or change cloud infrastructure from an approved infrastructure diagram.
 ---
 
 # write-iac

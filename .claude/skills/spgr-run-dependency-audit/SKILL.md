@@ -1,6 +1,6 @@
 ---
 name: spgr-run-dependency-audit
-description: Produce a dependency-audit report that scans direct and transitive dependencies for known CVEs, records each with its CVSS score, severity, and remediation path, tracks time-limited accepted exceptions, adds a dependency-freshness metric, and returns a PASS or GATE verdict that blocks release on any unremediated Critical or High CVE in a direct dependency. Use when the Security Agent runs a pre-release dependency scan, or when the DevOps Agent wires automated dependency scanning into the CI pipeline and needs the current vulnerability posture before a vulnerable package reaches production.
+description: Produce a dependency-audit report that scans direct and transitive dependencies for known CVEs, returning a PASS or GATE verdict that blocks release on any unremediated Critical or High CVE in a direct dependency. Use when the Security Agent runs a pre-release dependency scan or the DevOps Agent wires dependency scanning into CI.
 ---
 
 # run-dependency-audit

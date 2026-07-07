@@ -1,6 +1,6 @@
 ---
 name: spgr-check-color-contrast
-description: Produce a color-contrast audit report that measures every text-on-background and UI-component-boundary color pair against WCAG contrast thresholds, recording the calculated ratio and level achieved per pair, listing failures with the components and states affected, and recommending corrected color values that reach AA while preserving brand intent, with a PASS or GATE verdict that blocks a token lock or release on any AA failure. Use when the Accessibility Agent must confirm a design token set or component palette meets contrast requirements before tokens are locked, or when the Frontend Developer or QA agent needs contrast evidence to justify a color token change, or when a design-token CI sweep needs the current contrast posture.
+description: Produce a color-contrast report that measures every text and UI-component color pair against WCAG thresholds, recommending corrected values that reach AA, with a PASS or GATE verdict that blocks a token lock or release on any AA failure. Use when the Accessibility Agent must confirm a design token set or component palette before tokens are locked.
 ---
 
 # check-color-contrast

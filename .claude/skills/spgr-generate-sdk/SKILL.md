@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-sdk
-description: Generate a typed client SDK from the validated OpenAPI spec for one or more target languages, with typed request and response models, an authentication module, pagination helpers, typed error classes, a quickstart README, and SDK contract tests that call the live staging API. Use when the Documentation Agent must produce or regenerate client SDKs after the API spec is confirmed or a new API version ships, or when the DevOps Agent needs the SDK packages built and verified before publishing them to a package registry.
+description: Generate a typed client SDK from the validated OpenAPI spec for one or more target languages, with typed models, auth, pagination, error classes, a quickstart, and contract tests against staging. Use when the Documentation Agent regenerates SDKs after an API spec change, or when the DevOps Agent needs SDK packages built before publishing.
 ---
 
 # generate-sdk

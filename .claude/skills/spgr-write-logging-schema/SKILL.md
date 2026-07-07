@@ -1,6 +1,6 @@
 ---
 name: spgr-write-logging-schema
-description: Produce a logging-schema artifact that defines the structured log fields, types, semantic conventions, level meanings, prohibited-field list, and sampling rules that every service must follow, plus a CI validation test that emits sample log entries and checks them against the schema. Use when the Observability Agent sets the shared log contract before services begin emitting logs, or when a new service, compliance constraint, or observability platform forces the schema to be re-issued.
+description: Produce a logging-schema artifact defining the structured log fields, types, level meanings, prohibited fields, and sampling rules every service must follow, plus a CI validation test. Use when the Observability Agent sets the shared log contract before services emit logs, or when a new service or platform forces a re-issue.
 ---
 
 # write-logging-schema

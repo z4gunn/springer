@@ -1,6 +1,6 @@
 ---
 name: spgr-detect-schema-drift
-description: Produce a schema-drift report that compares each environment's live database schema against the intended schema derived from running the full migration history on a clean database, listing divergent tables, columns, indexes, and constraints with a per-divergence diff and remediation step, and returns a go or no-go deployment verdict that gates on any drift not explained by an in-progress migration. Use when the Architect Agent must confirm a production deployment is safe, when a deployment pre-gate needs the current drift posture, or when a backend agent runs a check after any manual database change to confirm the live schema still matches the migrations.
+description: Produce a schema-drift report comparing each environment's live database schema against the schema derived from the full migration history, returning a go or no-go deployment verdict that gates on unexplained drift. Use when the Architect Agent must confirm a deployment is safe, or when a backend agent checks after a manual database change.
 ---
 
 # detect-schema-drift

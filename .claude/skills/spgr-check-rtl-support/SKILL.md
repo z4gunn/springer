@@ -1,6 +1,6 @@
 ---
 name: spgr-check-rtl-support
-description: Produce an RTL-support audit report that verifies an application's layout, icon usage, text alignment, and interaction patterns mirror correctly for right-to-left languages (Arabic, Hebrew, Urdu, Persian), recording per-category findings for layout mirroring, directional-versus-conceptual icon handling, hard-coded physical alignment, gesture and cursor direction, and physical-property usage that should be converted to CSS logical properties, with a PASS or GATE verdict that blocks release on any core function broken under RTL. Use when the i18n Agent must confirm a release or component library renders correctly under an RTL locale before it ships, or when a CI sweep needs the current RTL posture so a layout or interaction regression does not reach RTL users.
+description: Produce an RTL-support audit report that verifies layout mirroring, icon direction, text alignment, and interaction patterns for right-to-left languages, with a PASS or GATE verdict that blocks release on any core function broken under RTL. Use when the i18n Agent must confirm a release or component library renders correctly under an RTL locale.
 ---
 
 # check-rtl-support

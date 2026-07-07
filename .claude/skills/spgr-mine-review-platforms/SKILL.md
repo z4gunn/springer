@@ -1,6 +1,6 @@
 ---
 name: spgr-mine-review-platforms
-description: Produce a review-platform analysis artifact from G2, Capterra, Trustpilot, and Product Hunt reviews of a competitor or category, surfacing top pros and cons, switching reasons, buyer-persona signals, feature comparisons, and a per-platform breakdown of review count and average rating, every claim carrying a source. Use when the Discovery agent needs buyer-level evidence on why customers choose, stay with, or leave a competing product before scoping a market, or when the PM agent needs switching reasons and feature-comparison language to feed the competitive matrix.
+description: Produce a review-platform analysis artifact from G2, Capterra, Trustpilot, and Product Hunt reviews, surfacing pros and cons, switching reasons, buyer-persona signals, and per-platform ratings, every claim cited. Use when the Discovery agent needs buyer-level evidence on why customers choose, stay with, or leave a competing product.
 ---
 
 # mine-review-platforms

@@ -1,6 +1,6 @@
 ---
 name: spgr-write-deployment-runbook
-description: Produce a deployment-runbook artifact for one release, covering the pre-deployment checklist, the ordered deployment sequence, a verification gate after every step, smoke-test instructions, measurable rollback trigger conditions, an on-call escalation path, and an execution-log format for live audit. Use when the DevOps Agent prepares a release and the runbook is the required gate before the release checklist can be marked ready, or when the rollback plan needs the documented state transitions it must undo.
+description: Produce a deployment-runbook artifact for one release, covering the pre-deployment checklist, the ordered deployment sequence with per-step verification, smoke tests, rollback triggers, and escalation. Use when the DevOps Agent prepares a release, since the runbook gates the release checklist being marked ready.
 ---
 
 # write-deployment-runbook

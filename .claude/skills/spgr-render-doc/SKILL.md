@@ -1,6 +1,6 @@
 ---
 name: spgr-render-doc
-description: Render one or more confirmed typed artifacts from the run store into human-readable Markdown under a project docs/ folder, carrying confidence signals through, embedding Mermaid diagrams, and producing a best-effort excalidraw and PNG copy of each diagram. Use when an early-phase agent (Discovery, Product Manager, Architect, Design) has written artifacts to runs/<run-id>/artifacts/ and the human needs a readable review copy to drive a human-in-the-loop checkpoint, or when an artifact changes and its docs copy must be regenerated.
+description: Render confirmed typed artifacts from the run store into human-readable Markdown under docs/, carrying confidence signals through and embedding diagrams. Use when an early-phase agent has written artifacts to runs/<run-id>/artifacts/ and the human needs a readable review copy for a checkpoint, or when a docs copy must be regenerated.
 ---
 
 # render-doc

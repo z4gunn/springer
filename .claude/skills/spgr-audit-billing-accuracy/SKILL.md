@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-billing-accuracy
-description: Produce a billing-accuracy audit report that reconciles application billing state against the billing platform (Stripe) as source of truth, recording subscription state and plan-ID discrepancies, entitlement-versus-subscription mismatches, and sampled metering-count-versus-billed-usage drift, with a revenue-impact estimate and remediation steps per finding, and a PASS or GATE verdict that escalates any discrepancy whose revenue impact exceeds the threshold in either direction. Use when the Billing Agent runs the monthly or pre-billing-cycle reconciliation, or when a nightly reconciliation sweep needs the current billing-accuracy posture so a wrong charge does not reach a customer or accrue as silent revenue loss.
+description: Produce a billing-accuracy audit report that reconciles application billing state against Stripe as source of truth, recording subscription, entitlement, and metering discrepancies, with a PASS or GATE verdict that escalates any discrepancy over the revenue threshold. Use when the Billing Agent runs a scheduled reconciliation sweep.
 ---
 
 # audit-billing-accuracy

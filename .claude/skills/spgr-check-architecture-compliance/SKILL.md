@@ -1,6 +1,6 @@
 ---
 name: spgr-check-architecture-compliance
-description: Produce an architecture-compliance report that checks a PR diff against the project's confirmed ADRs and tech-stack decision, with a per-ADR finding, a blocking-versus-advisory status on each deviation, and an overall PASS or FAIL verdict. Use when the code-reviewer agent runs PR review and must confirm a change does not drift from the approved architecture, or when the architect agent checks one ADR domain against a change.
+description: Produce an architecture-compliance report that checks a PR diff against the confirmed ADRs and tech-stack decision, with a per-ADR finding and an overall PASS or FAIL verdict. Use when the code-reviewer agent must confirm a change does not drift from the approved architecture, or when the architect agent checks one ADR domain.
 ---
 
 # check-architecture-compliance

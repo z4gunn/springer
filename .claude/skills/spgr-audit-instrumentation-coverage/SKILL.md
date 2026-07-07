@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-instrumentation-coverage
-description: Produce an instrumentation-coverage audit report that checks every event in the event taxonomy against the code that should fire it and against live analytics data, recording per-event whether it is implemented, missing, or partially implemented, whether its fire location matches the instrumentation spec, whether every required property is present and correctly sourced, and whether production volume matches expectation, then returns a PASS or GATE verdict that blocks release on any taxonomy event that never fires or fires without a required property. Use when the Analytics Agent must confirm a release is fully instrumented before launch, since coverage gaps found after launch cannot be backfilled, or when a continuous sweep needs the current instrumentation posture across the event taxonomy.
+description: Produce an instrumentation-coverage audit report that checks every taxonomy event against the code that should fire it and against live analytics data, returning a PASS or GATE verdict that blocks release on missing or malformed events. Use when the Analytics Agent must confirm a release is fully instrumented before launch.
 ---
 
 # audit-instrumentation-coverage

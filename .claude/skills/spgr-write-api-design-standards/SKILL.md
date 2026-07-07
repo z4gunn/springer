@@ -1,6 +1,6 @@
 ---
 name: spgr-write-api-design-standards
-description: Produce an api-design-standards envelope artifact that fixes the project-level conventions every endpoint must follow, covering URL and resource naming, HTTP verb semantics and idempotency, the success and error response envelope, pagination strategy, identifiers, timestamps, status codes, and a machine-readable error-code scheme, plus reusable OpenAPI `$ref` component templates derived from the standard. Use when the API Design Agent sets the API constitution before any endpoint is specified or built, or when the project extends an existing API and its conventions must be captured and reconciled into one source of truth that the consistency review skill enforces.
+description: Produce an api-design-standards artifact that fixes the project-level conventions every endpoint must follow, covering naming, verb semantics, response envelopes, pagination, status codes, and reusable OpenAPI component templates. Use when the API Design Agent sets the API constitution before any endpoint is specified or built.
 ---
 
 # write-api-design-standards

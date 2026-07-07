@@ -1,6 +1,6 @@
 ---
 name: spgr-write-security-findings
-description: Produce a security-findings artifact that consolidates SAST, DAST, dependency-audit, threat-model coverage, and auth-audit results into one prioritized, deduplicated report with a release gate status, specific remediation per finding, accepted-risk records, and a Critical/High posture trend across releases. Use when the Security Agent has gathered raw output from security assessment activities and needs the single source of truth that gates the release-checklist security sign-off, or when a new release requires its findings report for the audit trail.
+description: Produce a security-findings artifact consolidating SAST, DAST, dependency-audit, threat-model, and auth-audit results into one prioritized, deduplicated report with a release gate status and a remediation per finding. Use when the Security Agent needs the single source of truth that gates the release-checklist security sign-off.
 ---
 
 # write-security-findings

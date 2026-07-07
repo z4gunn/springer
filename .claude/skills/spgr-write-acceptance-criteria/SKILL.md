@@ -1,6 +1,6 @@
 ---
 name: spgr-write-acceptance-criteria
-description: Produce a Given/When/Then acceptance-criteria set for one user story, covering happy path, error path, and boundary conditions, with one independently testable scenario per entry. Use when a PM agent finalizes a user story and needs the QA-facing completion contract, or when a QA agent needs to validate that a story's acceptance criteria are complete before writing tests.
+description: Produce a Given/When/Then acceptance-criteria set for one user story, covering happy path, error path, and boundary conditions, one independently testable scenario per entry. Use when a PM agent finalizes a story and needs the QA-facing completion contract, or when a QA agent must confirm criteria are complete before writing tests.
 ---
 
 # write-acceptance-criteria

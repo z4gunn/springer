@@ -1,6 +1,6 @@
 ---
 name: spgr-implement-api-endpoint
-description: Implement one REST or GraphQL endpoint as backend source code that matches the approved API spec exactly, with request validation, business logic, spec-defined error handling, response serialization, auth-first middleware, and rate-limit headers, plus contract tests and timed endpoint tests. Use when the Backend Developer agent picks up an endpoint from the API spec to implement, or when the QA or code-reviewer agent needs the endpoint built against its confirmed contract and acceptance criteria before review.
+description: Implement one REST or GraphQL endpoint as backend source code that matches the approved API spec exactly, with request validation, spec-defined error handling, auth-first middleware, and contract tests. Use when the Backend Developer agent picks up an endpoint from the API spec to build against its confirmed contract.
 ---
 
 # implement-api-endpoint

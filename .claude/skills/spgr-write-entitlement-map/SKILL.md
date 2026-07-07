@@ -1,6 +1,6 @@
 ---
 name: spgr-write-entitlement-map
-description: Produce an entitlement-map artifact that defines the feature-by-plan matrix for a subscription product, recording plan definitions, the feature inclusion and usage-limit grid, paid add-on entitlements, the enforcement point for each entitlement, and the graceful-degradation behavior at each gate, so feature access lives in one queryable source of truth that changes when pricing changes while enforcement code stays fixed. Use when the Feature Flag Agent has subscription plan definitions, the feature inventory, and the billing model and must settle the plan-to-feature relationship before any entitlement enforcement is implemented, or when the Billing Agent needs the entitlement map as the input to subscription and billing configuration, or when a pricing change requires the matrix to be revised.
+description: Produce an entitlement-map artifact defining the feature-by-plan matrix for a subscription product, with usage limits, add-ons, per-entitlement enforcement points, and degradation behavior. Use when the Feature Flag Agent must settle the plan-to-feature relationship before enforcement is implemented, or when a pricing change revises the matrix.
 ---
 
 # write-entitlement-map

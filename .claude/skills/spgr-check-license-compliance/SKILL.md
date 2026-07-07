@@ -1,6 +1,6 @@
 ---
 name: spgr-check-license-compliance
-description: Produce a license-compliance report that audits every direct and transitive dependency license against the project's distribution model and allowed-license list, classifying each flagged dependency by category (copyleft, commercial restriction, unknown, disallowed), giving a per-dependency compliant, requires-review, or disallowed verdict with remediation, and returning a PASS or GATE verdict that fails the build on any disallowed license category. Use when the Security Agent must confirm a release or architecture review carries no incompatible dependency license, or when a CI dependency-introduction gate needs the current license posture before a GPL, SSPL, or unlicensed package reaches a commercial product.
+description: Produce a license-compliance report that audits every direct and transitive dependency license against the distribution model and allowed-license list, returning a PASS or GATE verdict that fails the build on any disallowed category. Use when the Security Agent must confirm a release, or when a CI dependency gate needs the current license posture.
 ---
 
 # check-license-compliance

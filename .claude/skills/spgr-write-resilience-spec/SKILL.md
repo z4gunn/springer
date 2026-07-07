@@ -1,6 +1,6 @@
 ---
 name: spgr-write-resilience-spec
-description: Produce a resilience-spec artifact that defines the resilience patterns each service must implement per dependency call (timeouts, retry policy with exponential backoff and jitter, circuit breaker, bulkhead isolation, fallback behavior, and observability), plus the chaos-engineering fault-injection plan that verifies the patterns hold under failure. Use when the Resilience Agent has a service dependency map, SLO specs, and latency budgets and must design graceful-degradation patterns before any failure occurs, or when a new external dependency is added and its failure isolation must be specified before it ships.
+description: Produce a resilience-spec artifact defining the resilience patterns each service must implement per dependency call (timeouts, retries, circuit breakers, fallbacks) plus the chaos fault-injection plan that verifies them. Use when the Resilience Agent must design graceful degradation before failure occurs or a new external dependency ships.
 ---
 
 # write-resilience-spec

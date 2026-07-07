@@ -1,6 +1,6 @@
 ---
 name: spgr-scaffold-background-job
-description: Generate the source-code scaffold for one background job from its async job spec, including the worker class, a typed message payload schema, a type-safe enqueue helper, retry and dead-letter configuration, observability instrumentation for the spec-defined metrics, and a unit test scaffold for the success, retryable-failure, and non-retryable-failure cases. Use when the Async Infrastructure agent starts a new background job from a confirmed async job spec, or when the Backend Developer agent needs the correct job scaffold before implementing the business logic inside it.
+description: Generate the source-code scaffold for one background job from its async job spec, covering the worker, typed payload schema, enqueue helper, retry and dead-letter configuration, observability, and unit test stubs. Use when the Async Infrastructure or Backend Developer agent starts a new background job from a confirmed async job spec.
 ---
 
 # scaffold-background-job

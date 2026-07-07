@@ -1,6 +1,6 @@
 ---
 name: spgr-write-data-dictionary
-description: Produce a data-dictionary artifact that defines every key entity, field, type, constraint, and PII classification as the single source of truth that the API spec, migrations, seed data, and application code all match. Use when the Architect Agent has an approved ERD and domain model and downstream agents need authoritative field names and types, or when the ERD changes and the dictionary must be updated in the same commit.
+description: Produce a data-dictionary artifact defining every entity, field, type, constraint, and PII classification as the single source of truth that the API spec, migrations, and code all match. Use when the Architect Agent has an approved ERD and downstream agents need authoritative field names and types.
 ---
 
 # write-data-dictionary

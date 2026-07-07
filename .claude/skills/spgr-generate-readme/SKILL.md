@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-readme
-description: Generate the project README.md as source code, the entry-point document that lets a new developer answer what the project is, how to run it locally from a clean environment, and how to contribute, in under ten minutes, plus a PR-time freshness check that flags a stale README when config files change without it. Use when the Documentation Agent stands up or refreshes the README for a project, or when any commit changes package.json, Dockerfile, .env.example, or another file the README describes and the README must be updated in the same change.
+description: Generate the project README.md, the entry-point document that gets a new developer from clone to running and contributing in under ten minutes, plus a PR-time freshness check that flags a stale README. Use when the Documentation Agent stands up or refreshes the README, or when a commit changes a config file the README describes.
 ---
 
 # generate-readme

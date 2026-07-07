@@ -1,6 +1,6 @@
 ---
 name: spgr-tag-vertical-agent
-description: Consult a vertical specialist agent on a specific artifact section before a horizontal agent finalizes it, capturing a structured recommendation and any required amendment. Use when a PM, Architect, or Developer agent reaches a decision in a vertical's domain (security, compliance, auth, accessibility, performance, billing, multi-tenancy) and needs specialist review before finalizing.
+description: Consult a vertical specialist agent on a specific artifact section, capturing a structured recommendation and any required amendment. Use when a PM, Architect, or Developer agent reaches a decision in a vertical's domain (security, compliance, auth, accessibility, performance, billing) and needs specialist review before finalizing.
 ---
 
 # tag-vertical-agent

@@ -1,6 +1,6 @@
 ---
 name: spgr-write-cd-pipeline
-description: Write the continuous delivery pipeline configuration that auto-deploys to staging on every merge to main and gives a controlled, audited, zero-downtime path to production, with migrations-before-code ordering, post-deploy smoke tests with automatic rollback, drift detection, and deployment notifications. Use when the DevOps agent wires CD from a tested CI build artifact and a deployment target inventory, or when the QA agent has supplied the smoke-test pass/fail contract and the release path needs to be built and verified before a release proceeds.
+description: Write the continuous delivery pipeline configuration that auto-deploys to staging on merge and gives an audited, zero-downtime path to production, with migrations-before-code ordering and smoke tests with automatic rollback. Use when the DevOps agent wires CD from a tested CI build artifact and a deployment target inventory.
 ---
 
 # write-cd-pipeline

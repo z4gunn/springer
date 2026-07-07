@@ -1,6 +1,6 @@
 ---
 name: spgr-run-submission-checklist
-description: Produce a pre-submission checklist report that verifies a release build against the App Store and Google Play technical, content, and policy requirements before the binary is submitted, with a pass or fail status per item across iOS and Android, the common rejection causes checked explicitly, and a READY or BLOCKED verdict that gates submission on any failed required item. Use when the App Store Agent must confirm a release build is submission-ready before it goes to Apple or Google review, or when the Mobile Developer or DevOps agent needs the submission posture verified against the listing, the privacy manifest, and the platform-console configuration before a release proceeds.
+description: Produce a pre-submission checklist report that verifies a release build against App Store and Google Play technical, content, and policy requirements, returning a READY or BLOCKED verdict that gates submission on any failed required item. Use when the App Store Agent must confirm a release build is submission-ready before Apple or Google review.
 ---
 
 # run-submission-checklist

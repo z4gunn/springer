@@ -1,6 +1,6 @@
 ---
 name: spgr-write-artifact
-description: Produce a typed output artifact with the shared envelope header, per-section confidence signals, an initialized decision log, and inline schema validation before write. Use whenever an agent produces a deliverable artifact for handoff (PRD, NFR, architecture options, ADR, escalation, and so on) so the result is immediately readable and validatable by downstream agents.
+description: Produce a typed output artifact with the shared envelope header, per-section confidence signals, an initialized decision log, and inline schema validation before write. Use whenever an agent produces a deliverable artifact for handoff so the result is readable and validatable by downstream agents.
 ---
 
 # write-artifact

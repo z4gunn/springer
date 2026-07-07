@@ -1,6 +1,6 @@
 ---
 name: spgr-configure-monitoring
-description: Configure metrics collection, health-check endpoints, and operational dashboards as version-controlled config so the system's operational state is continuously visible, writing the source files via spgr-write-file and verifying them in CI. Use when the DevOps Agent must stand up monitoring infrastructure for a service before alerting can be wired, or when the Observability Agent needs golden-signal and SLO burn-rate dashboards built from confirmed metric definitions and an SLO spec.
+description: Configure metrics collection, health-check endpoints, and operational dashboards as version-controlled config verified in CI. Use when the DevOps Agent stands up monitoring for a service before alerting is wired, or when the Observability Agent needs golden-signal and SLO burn-rate dashboards built.
 ---
 
 # configure-monitoring

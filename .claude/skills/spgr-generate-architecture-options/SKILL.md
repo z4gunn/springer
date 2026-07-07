@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-architecture-options
-description: Produce an architecture-options artifact holding two or more genuinely distinct architecture options, each with full topology, data, API, auth, and infrastructure choices, a strengths and weaknesses analysis, a complexity and cost-at-scale estimate, and a weighted scoring matrix. Use when the Architect Agent has an approved PRD with NFRs and constraints and must present alternatives to the human for selection at the first architecture checkpoint, before any architecture decision or build work proceeds.
+description: Produce an architecture-options artifact holding two or more genuinely distinct architecture options, each with full topology, data, API, auth, and infrastructure choices, tradeoff analysis, and a weighted scoring matrix. Use when the Architect Agent has an approved PRD and must present alternatives to the human at the architecture checkpoint.
 ---
 
 # generate-architecture-options

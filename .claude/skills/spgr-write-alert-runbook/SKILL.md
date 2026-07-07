@@ -1,6 +1,6 @@
 ---
 name: spgr-write-alert-runbook
-description: Produce an alert-runbook artifact per alert, the step-by-step investigation and remediation guide an on-call engineer follows when the alert fires, covering what the alert means, severity and response time, immediate triage steps, common causes with symptoms, per-cause remediation, the escalation path, and required post-incident follow-up. Use when the Observability Agent has confirmed alert definitions from spgr-configure-alerting and an SLO spec and must write the runbook at alert-design time before the alert goes live, or when a post-incident review surfaces a new cause or remediation step that the existing runbook must absorb.
+description: Produce an alert-runbook artifact per alert, the investigation and remediation guide an on-call engineer follows when the alert fires, covering triage steps, common causes, per-cause remediation, and escalation path. Use when the Observability Agent writes the runbook at alert-design time or absorbs a post-incident lesson.
 ---
 
 # write-alert-runbook

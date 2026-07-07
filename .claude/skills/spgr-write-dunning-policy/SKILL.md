@@ -1,6 +1,6 @@
 ---
 name: spgr-write-dunning-policy
-description: Produce a dunning-policy artifact that defines the payment-failure recovery sequence for a SaaS subscription, covering the retry schedule, the customer notification sequence, service-access degradation steps, the cancellation and data-retention trigger, the payment-recovery flow, support-team escalation, and the dunning analytics to measure whether the sequence is tuned. Use when the Billing Agent has a confirmed billing spec and entitlement map and must settle how failed payments are recovered before subscription billing goes live, or when involuntary churn data shows the existing dunning sequence is mistuned and the policy must be revised.
+description: Produce a dunning-policy artifact defining the payment-failure recovery sequence for a SaaS subscription, covering the retry schedule, customer notifications, access degradation, and cancellation triggers. Use when the Billing Agent has a confirmed billing spec and must settle failed-payment recovery before billing goes live.
 ---
 
 # write-dunning-policy
