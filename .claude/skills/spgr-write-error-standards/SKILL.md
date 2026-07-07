@@ -1,6 +1,6 @@
 ---
 name: spgr-write-error-standards
-description: Produce an error-standards artifact that fixes how errors are caught, classified, logged, surfaced to callers, and what is safe to expose externally, with an error taxonomy, catch-point rules, per-class log standards, external and internal response shapes, panic and fatal handling, and a silent-failure prohibition plus the static-analysis rule that enforces it. Use when the Resilience Agent must set project-wide error handling standards before services are built, so an error in one service looks and behaves the same as an error in another, or when a backend, API, or security agent needs the agreed error-response shape and exposure rules to implement against.
+description: Produce an error-standards artifact that fixes how errors are caught, classified, logged, and surfaced, with an error taxonomy, response shapes, and a silent-failure prohibition. Use when the Resilience Agent sets project-wide error handling before services are built, or when an agent needs the agreed error-response shape to implement against.
 ---
 
 # write-error-standards

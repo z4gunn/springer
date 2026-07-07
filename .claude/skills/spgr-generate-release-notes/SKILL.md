@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-release-notes
-description: Produce user-facing release notes for a product release, translating the technical changelog into customer-benefit language across the in-app what's-new panel, the email announcement, the App Store and Google Play store notes within each platform's character budget, and the help-center article, with each locale matched to the product UI locales. Use when the Documentation Agent prepares a release and must tell users what changed in language they care about, or when a developer or PM agent needs the customer-facing notes built from the confirmed changelog and PRD before a release ships.
+description: Produce user-facing release notes that translate the technical changelog into customer-benefit language across the in-app what's-new panel, email announcement, store notes, and help-center article. Use when the Documentation Agent prepares a release, or when a developer or PM agent needs customer-facing notes from the confirmed changelog.
 ---
 
 # generate-release-notes

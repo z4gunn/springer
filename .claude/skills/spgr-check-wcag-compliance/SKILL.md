@@ -1,6 +1,6 @@
 ---
 name: spgr-check-wcag-compliance
-description: Produce a WCAG conformance report that assesses a UI component, screen, or feature against WCAG 2.1 and 2.2 success criteria one criterion at a time, with a per-criterion pass, fail, or not-applicable verdict backed by evidence, remediation guidance per failure, and a severity mapping that gates release on any Level A failure. Use when the Accessibility Agent must confirm a UI conforms to its target WCAG level before a release proceeds, or when the QA or Frontend Developer agent needs a criterion-level conformance assessment that goes beyond an automated scan.
+description: Produce a WCAG conformance report that assesses a UI component, screen, or feature against WCAG 2.1 and 2.2 success criteria one criterion at a time, with per-criterion verdicts and a severity mapping that gates release on any Level A failure. Use when the Accessibility Agent must confirm a UI conforms to its target WCAG level before release.
 ---
 
 # check-wcag-compliance

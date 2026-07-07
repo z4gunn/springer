@@ -1,6 +1,6 @@
 ---
 name: spgr-analyze-query-plan
-description: Produce a query-analysis report from database execution plans, slow query logs, and schema, identifying full table scans, poor index usage, N+1 patterns, and unindexed sorts, with per-query findings, ranked optimization recommendations, an expected-improvement estimate, and ready-to-use index DDL. Use when the Performance Agent must diagnose a slow query or audit a query workload before it becomes a production bottleneck, or when a backend or QA agent needs query-plan evidence to justify an index, query rewrite, or eager-loading change.
+description: Produce a query-analysis report from execution plans, slow query logs, and schema, with per-query findings, ranked optimization recommendations, and ready-to-use index DDL. Use when the Performance Agent must diagnose a slow query or audit a query workload, or when a backend agent needs query-plan evidence for an index or rewrite.
 ---
 
 # analyze-query-plan

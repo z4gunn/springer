@@ -1,6 +1,6 @@
 ---
 name: spgr-write-definition-of-done
-description: Produce the project-level Definition of Done, the shared checklist every story must satisfy before it counts as complete. Use when a Product Manager or QA agent needs to establish the quality bar at the start of a project or revise it at the start of a new development phase, so completeness is settled up front rather than negotiated when a story is claimed done.
+description: Produce the project-level Definition of Done, the shared checklist every story must satisfy before it counts as complete. Use when a Product Manager or QA agent establishes the quality bar at project start or revises it at a new development phase, so completeness is settled up front.
 ---
 
 # write-definition-of-done

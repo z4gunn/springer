@@ -1,6 +1,6 @@
 ---
 name: spgr-write-webhook-spec
-description: Produce a webhook-spec artifact that defines inbound billing-platform webhook handling per event, covering the application state change required, idempotency, signature verification, error and retry behavior, ordering tolerance, and a replay procedure for re-processing historical events. Use when the Billing Agent has a confirmed billing spec and the platform webhook event catalog and must fix the webhook requirements before the Async Infrastructure Agent implements the endpoint, or when a new billing event must be mapped to an application state change.
+description: Produce a webhook-spec artifact defining inbound billing-platform webhook handling per event, covering the application state change, idempotency, signature verification, retry behavior, ordering tolerance, and replay. Use when the Billing Agent must fix webhook requirements before the Async Infrastructure Agent implements the endpoint.
 ---
 
 # write-webhook-spec

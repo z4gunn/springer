@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-env-template
-description: Create and maintain the project .env.example file as source code, the complete documented template of every environment variable the application requires, each with a one-line description, a safe example value, a required-or-optional annotation, and the environments it applies to, grouped under comment headers, and completeness-checked by scanning the codebase for env access patterns. Use when the DevOps developer agent stands up a project's configuration contract, or when any commit adds, removes, or renames an environment variable and the template must be updated in the same change.
+description: Create and maintain the project .env.example file, documenting every environment variable with a description, safe example value, and required-or-optional annotation, completeness-checked against the codebase. Use when the DevOps developer agent stands up the configuration contract, or when a commit adds, removes, or renames an env var.
 ---
 
 # generate-env-template

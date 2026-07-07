@@ -1,6 +1,6 @@
 ---
 name: spgr-create-design-system
-description: Produce a design-system artifact from the selected design direction, defining named color, typography, and spacing tokens (with a dark mode token layer), a component library where every component documents all eight states, a pattern library, and accessibility guidelines, so design and development share one token-based visual contract. Use when the Design Agent has an approved design direction and must settle the shared visual language before per-screen specs or component implementation begin, or when a developer agent needs the token set and component states to implement against.
+description: Produce a design-system artifact from the selected design direction, with named color, typography, and spacing tokens, a component library documenting all eight states per component, and accessibility guidelines. Use when the Design Agent has an approved direction and must settle the shared visual language before screen specs.
 ---
 
 # create-design-system

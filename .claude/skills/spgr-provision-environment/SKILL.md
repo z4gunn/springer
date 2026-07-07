@@ -1,6 +1,6 @@
 ---
 name: spgr-provision-environment
-description: Stand up a target environment (development, staging, or production) by executing infrastructure-as-code, then handle the post-provisioning steps IaC alone cannot, injecting secrets by reference from the secrets manager, verifying every required service-to-service path, running readiness smoke tests, and recording an environment-metadata artifact with endpoints and resource identifiers. Use when the DevOps Agent must turn confirmed IaC into a running, secrets-injected, connectivity-verified environment, or when a downstream agent needs the endpoint URLs and resource identifiers of a provisioned tier.
+description: Stand up a development, staging, or production environment from infrastructure-as-code, then inject secrets by reference, verify service connectivity, run smoke tests, and record an environment-metadata artifact. Use when the DevOps Agent must turn confirmed IaC into a running environment that downstream agents can target.
 ---
 
 # provision-environment

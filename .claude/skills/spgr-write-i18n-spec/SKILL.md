@@ -1,6 +1,6 @@
 ---
 name: spgr-write-i18n-spec
-description: Produce an i18n-spec envelope artifact that fixes the internationalization architecture before development, covering i18n library and message-format selection, string-key naming convention, plural rules, locale-aware date/number/currency formatting, locale detection and switching, the translation workflow, the missing-string fallback chain, and a pseudo-localization CI step. Use when the i18n Agent must settle the internationalization approach before any string is written, or when product scope adds a target locale or a right-to-left language and the existing i18n architecture must be set or revisited so i18n is built in rather than bolted on later.
+description: Produce an i18n-spec artifact that fixes the internationalization architecture, covering library and message-format selection, key naming, plural rules, locale-aware formatting, and the translation workflow. Use when the i18n Agent must settle the i18n approach before any string is written, or when scope adds a locale or an RTL language.
 ---
 
 # write-i18n-spec

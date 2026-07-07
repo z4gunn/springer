@@ -1,6 +1,6 @@
 ---
 name: spgr-design-auth-model
-description: Produce an auth-model artifact that recommends an identity approach for the project, covering provider selection, token strategy, session management, MFA, and access control, each chosen against a scored comparison of the top candidate combinations rather than by habit. Use when the Auth Agent has user types, compliance constraints, product identity requirements, and the tech stack and must settle the auth model before architecture or any auth implementation begins.
+description: Produce an auth-model artifact recommending the identity approach, covering provider selection, token strategy, session management, MFA, and access control, each chosen against a scored comparison of candidates. Use when the Auth Agent has user types, compliance constraints, and the tech stack and must settle the auth model before architecture.
 ---
 
 # design-auth-model

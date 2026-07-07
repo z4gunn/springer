@@ -1,6 +1,6 @@
 ---
 name: spgr-run-tests
-description: Execute a test suite against a target environment, capture pass/fail counts, coverage, and per-failure diagnostics, and exit non-zero on any failure or coverage-floor breach. Use when the QA, backend developer, frontend developer, mobile developer, or DevOps agent needs to run tests on a local build, in CI, in a pre-deployment gate, or as a post-deployment smoke check, and needs an unambiguous result with enough output to locate every failure without a re-run.
+description: Execute a test suite against a target environment, capture pass/fail counts, coverage, and per-failure diagnostics, and exit non-zero on any failure or coverage-floor breach. Use when a QA, developer, or DevOps agent needs to run tests locally, in CI, or as a deployment gate, with enough output to locate every failure without a re-run.
 ---
 
 # run-tests

@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-auth-implementation
-description: Produce an auth-implementation audit report that checks the implemented auth code against the auth model, the auth flow specs, and the RBAC policy, recording per-finding deviations, vulnerabilities, and enforcement gaps with exact file and line references and a remediation per finding, classified Critical, High, Medium, or Low, and returning a PASS or GATE verdict that blocks the architecture confirmation gate on any open Critical or High finding. Use when the Auth Agent must confirm the auth implementation matches its specs before a release or before the architecture artifact can be marked confirmed, or when a CI sweep needs the current auth posture so an insecure token store, a missing PKCE flow, or a bypassable permission check does not reach production.
+description: Produce an auth-implementation audit report that checks implemented auth code against the auth model, auth flow specs, and RBAC policy, returning a PASS or GATE verdict that blocks the architecture confirmation gate on any Critical or High finding. Use when the Auth Agent must confirm the auth implementation before a release.
 ---
 
 # audit-auth-implementation

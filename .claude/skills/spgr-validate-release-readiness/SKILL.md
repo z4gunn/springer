@@ -1,6 +1,6 @@
 ---
 name: spgr-validate-release-readiness
-description: Produce a release-readiness verdict artifact (GO or NO-GO) by independently verifying that every release checklist item is actually complete, that all required agent sign-offs exist, and that CI is green on the release branch, with each NO-GO blocker naming its owning agent, the evidence needed to close it, and whether a human waiver is acceptable. Use when the DevOps Agent reaches the final gate before authorizing a deployment, or when the Orchestrator needs an evidence-backed GO or NO-GO before invoking the deployment, or when more than 24 hours have elapsed since the last readiness check and the state must be re-verified.
+description: Produce a release-readiness verdict artifact (GO or NO-GO) by independently verifying every release checklist item, all required agent sign-offs, and green CI on the release branch, with each blocker naming its owning agent. Use when the DevOps Agent or Orchestrator reaches the final gate before authorizing a deployment.
 ---
 
 # validate-release-readiness

@@ -1,6 +1,6 @@
 ---
 name: spgr-write-test-plan
-description: Produce a test-plan artifact that defines the full testing strategy for a release or sprint before implementation begins, covering scope, a per-type test matrix with tooling and owner agent, coverage targets by layer, risk-weighted coverage, entry and exit criteria, environment requirements, and a test-data strategy. Use when the QA Agent starts a release or sprint and developers need the blocking quality contract before they write code, or when the developer or code-reviewer agent needs the test plan that defines required coverage and done conditions for a story.
+description: Produce a test-plan artifact defining the full testing strategy for a release or sprint, covering scope, a per-type test matrix, coverage targets by layer, entry and exit criteria, and a test-data strategy. Use when the QA Agent starts a release or sprint and developers need the blocking quality contract before they write code.
 ---
 
 # write-test-plan

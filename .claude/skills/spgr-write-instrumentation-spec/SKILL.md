@@ -1,6 +1,6 @@
 ---
 name: spgr-write-instrumentation-spec
-description: Produce an instrumentation-spec artifact that maps every event from the event taxonomy to the exact code location where it fires, with file path and function, the precise trigger condition, per-property resolution to a concrete source, and a test-coverage requirement per event, plus a CI coverage check that flags taxonomy events not yet fired in the test suite. Use when the Analytics Agent has a confirmed event taxonomy and the application architecture and must remove instrumentation ambiguity before developers wire the events, or when a backend or frontend agent needs the firing location and property mapping for an event it is about to implement.
+description: Produce an instrumentation-spec artifact mapping every event-taxonomy event to the exact code location where it fires, with trigger condition, per-property source, and a test-coverage requirement. Use when the Analytics Agent has a confirmed event taxonomy and must remove instrumentation ambiguity before developers wire the events.
 ---
 
 # write-instrumentation-spec

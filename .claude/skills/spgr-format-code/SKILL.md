@@ -1,6 +1,6 @@
 ---
 name: spgr-format-code
-description: Run the project's configured code formatter on every file touched in a change, apply the results in place, and wire a pre-commit hook so staged files are formatted before each commit. Use when the backend, frontend, mobile, or DevOps developer agent has edited or created source files and needs them formatted to the committed config before lint, test, or commit, or when a repo has no formatter hook yet and one must be installed.
+description: Run the project's configured code formatter on every file touched in a change, apply the results in place, and wire a pre-commit hook so staged files are formatted before each commit. Use when a developer agent needs edited files formatted before lint, test, or commit, or when a repo needs the formatter hook installed.
 ---
 
 # format-code

@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-async-coverage
-description: Produce an async-coverage audit report that checks every background job, scheduled job, webhook delivery, email send, and event consumer against the async job spec registry, recording per-process whether a spec exists, a dead letter queue is bound, a finite retry count is configured, and observability is instrumented, listing codebase processes missing from the registry, flagging infinite retry and missing DLQ as high priority, and returning a PASS or GATE verdict that blocks release on any unguarded async process. Use when the Async Infrastructure Agent must confirm a release or architecture review has retry, DLQ, and observability on every async process, or when a CI sweep needs the current async-coverage posture before a silent failure reaches production.
+description: Produce an async-coverage audit report that checks every background job, webhook delivery, email send, and event consumer against the async job spec registry for retry, DLQ, and observability coverage, returning a PASS or GATE verdict that blocks release on any unguarded async process. Use when the Async Infrastructure Agent must confirm a release.
 ---
 
 # audit-async-coverage

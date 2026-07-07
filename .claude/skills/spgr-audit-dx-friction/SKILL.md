@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-dx-friction
-description: Produce a developer-experience friction audit report that scores the development cycle against four friction surfaces (CI timing and flakiness, local setup, error-message quality, and tooling-automation gaps), records per-surface findings with a measured cost, tracks CI duration, flaky-test rate, and onboarding time across releases, and returns a prioritized improvement list ordered by impact-to-effort with a PASS or GATE verdict that gates on a fast CI suite over the time budget or a flaky-test rate above the threshold. Use when the DevOps Agent runs a DX health sweep at sprint start or before a release, or when a developer agent reports recurring workflow friction and needs evidence to justify a CI, setup, error-message, or tooling fix.
+description: Produce a developer-experience friction audit report that scores CI timing and flakiness, local setup, error-message quality, and tooling gaps, with a PASS or GATE verdict on the CI time budget and flaky-test rate. Use when the DevOps Agent runs a DX health sweep, or when a developer agent needs evidence for a workflow fix.
 ---
 
 # audit-dx-friction

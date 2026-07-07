@@ -1,6 +1,6 @@
 ---
 name: spgr-render-diagram-excalidraw
-description: Convert a committed code-first diagram (Mermaid or PlantUML) into an editable .excalidraw file, apply presentation polish, and render a PNG, while the code-first source stays authoritative. Use when the Documentation, Architect, or Design agent needs a human-facing version of a generated diagram for an onboarding deck, a design review, or docs, without forking the diagram away from its committed source. This is the only presentation and rendering skill in the diagram family. It authors no model.
+description: Convert a committed Mermaid or PlantUML diagram into an editable .excalidraw file and a rendered PNG, keeping the code-first source authoritative. Use when the Documentation, Architect, or Design agent needs a polished human-facing copy of a generated diagram for a deck, review, or docs. It authors no model.
 ---
 
 # render-diagram-excalidraw

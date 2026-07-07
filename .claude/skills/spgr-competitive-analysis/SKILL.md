@@ -1,6 +1,6 @@
 ---
 name: spgr-competitive-analysis
-description: Produce a competitive-analysis artifact comparing direct competitors, indirect alternatives, and the status-quo option across a fixed matrix of dimensions, with a pricing comparison, a positioning map, and the specific differentiation gaps the product could credibly own, every data point source-cited with a retrieval date. Use when the Discovery Agent needs competitive context before a go/no-go recommendation, or when the PM Agent needs the competitive matrix to ground differentiation strategy in evidence rather than aspiration.
+description: Produce a competitive-analysis artifact comparing direct competitors, indirect alternatives, and the status quo across a fixed matrix, with pricing, positioning, and differentiation gaps, every data point source-cited. Use when the Discovery Agent needs competitive context before a go/no-go recommendation.
 ---
 
 # competitive-analysis

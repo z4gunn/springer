@@ -1,6 +1,6 @@
 ---
 name: spgr-mine-social-media
-description: Produce a social-media signal artifact from public posts on Twitter/X, LinkedIn, Facebook Groups, and Bluesky about a problem space, capturing pain-point themes with engagement-weighted frequency, an emotional-tone read per theme, a platform-activity breakdown, switching signals where users seek or announce alternatives, and a cited source list with engagement metrics. Use when the Discovery agent needs real-time sentiment and the emotional register of a problem space during Phase 1 research, or when the PM agent needs switching signals and tone evidence to inform positioning and messaging.
+description: Produce a social-media signal artifact from public posts on Twitter/X, LinkedIn, Facebook Groups, and Bluesky, capturing engagement-weighted pain-point themes, emotional tone, and switching signals. Use when the Discovery agent needs real-time sentiment on a problem space, or when the PM agent needs tone evidence for positioning.
 ---
 
 # mine-social-media

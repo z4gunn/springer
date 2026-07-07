@@ -1,6 +1,6 @@
 ---
 name: spgr-write-component
-description: Implement one UI component that matches the design spec exactly, with every required state (default, hover, focus, active, loading, error, empty, disabled, plus any spec-defined states), using design system tokens exclusively and the accessibility annotations as written, with Storybook stories and a typed props contract. Use when the Frontend Developer or Mobile Developer agent has an approved screen spec, design tokens, and a component contract and must build the component test-first before it is integrated into a screen.
+description: Implement one UI component that matches the design spec exactly, with every required state, design system tokens exclusively, accessibility annotations as written, Storybook stories, and a typed props contract. Use when the Frontend or Mobile Developer agent must build a component test-first from an approved screen spec.
 ---
 
 # write-component

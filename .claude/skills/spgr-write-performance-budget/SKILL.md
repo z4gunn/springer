@@ -1,6 +1,6 @@
 ---
 name: spgr-write-performance-budget
-description: Produce a performance-budget artifact that sets explicit pass/fail latency and throughput thresholds for each critical user journey, covering API response time (p50, p95, p99) per endpoint category, web page load (TTFB, LCP, FID), mobile frame rate, database query time per category, and background job completion time, plus a regression threshold that turns any over-budget metric into a release-blocking issue and a CI benchmark gate that enforces it. Use when the Performance Agent has the critical user journeys, product context, infrastructure constraints, and any competitive benchmarks and must replace subjective "fast enough" with measurable thresholds before load tests, SLO definitions, or release gating are written, or when product context or scale changes and the existing budget must be re-derived.
+description: Produce a performance-budget artifact that sets pass/fail latency and throughput thresholds for each critical user journey, with a regression threshold and a CI benchmark gate that enforces it. Use when the Performance Agent must replace subjective speed judgments with measurable thresholds before load tests, SLOs, or release gating are written.
 ---
 
 # write-performance-budget

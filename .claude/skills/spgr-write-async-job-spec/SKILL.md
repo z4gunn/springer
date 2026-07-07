@@ -1,6 +1,6 @@
 ---
 name: spgr-write-async-job-spec
-description: Produce an async-job-spec artifact that fully specifies one background job before it is built, covering its trigger and payload schema, ordered processing steps, idempotency strategy, retryable-versus-non-retryable failure handling with a finite retry cap and dead letter queue, SLA latency targets, the metrics it must emit, and its concurrency constraints. Use when the Async Infrastructure Agent must specify a queue-driven, scheduled, or event-driven job ahead of implementation, or when a backend or QA agent needs the job contract settled before a worker is scaffolded or tested.
+description: Produce an async-job-spec artifact that specifies one background job before it is built, covering trigger, payload schema, idempotency, retry cap with dead letter queue, SLA targets, and required metrics. Use when the Async Infrastructure Agent must specify a job ahead of implementation, or a backend or QA agent needs the job contract settled.
 ---
 
 # write-async-job-spec

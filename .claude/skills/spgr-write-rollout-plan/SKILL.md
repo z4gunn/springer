@@ -1,6 +1,6 @@
 ---
 name: spgr-write-rollout-plan
-description: Produce a rollout-plan artifact that defines the staged release schedule for a feature flag, with an ordered stage sequence (internal, then ramping percentages to 100), a minimum dwell time per stage, green-metric advancement criteria, measurable rollback triggers, a per-stage monitoring plan, and a stage-by-stage communication plan. Use when the Feature Flag Agent has a confirmed feature-flag spec and must define the staged rollout before deployment, or when the DevOps or QA agent needs an explicit ramp schedule and automatic rollback thresholds for a flagged release.
+description: Produce a rollout-plan artifact defining the staged release schedule for a feature flag, with an ordered stage sequence, minimum dwell times, green-metric advancement criteria, and measurable rollback triggers. Use when the Feature Flag Agent has a confirmed feature-flag spec and must define the staged rollout before deployment.
 ---
 
 # write-rollout-plan

@@ -1,6 +1,6 @@
 ---
 name: spgr-write-app-store-listing
-description: Produce an app-store-listing artifact carrying App Store Connect and Google Play Console listing content (app name, subtitle, description, keywords, screenshot plan, preview-video spec, localization scope, and a product-page A/B test plan) optimized for discoverability and conversion within each store's character limits and content policies. Use when the App Store Agent prepares a release for submission and needs the listing content written from the product value proposition, core features, and target keywords, or when an existing listing must be revised for new features, new markets, or a product-page optimization test.
+description: Produce an app-store-listing artifact carrying App Store Connect and Google Play Console listing content, optimized for discoverability and conversion within each store's character limits and policies. Use when the App Store Agent prepares a submission or revises a listing for new features, markets, or a product-page test.
 ---
 
 # write-app-store-listing

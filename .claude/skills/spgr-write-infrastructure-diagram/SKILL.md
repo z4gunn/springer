@@ -1,6 +1,6 @@
 ---
 name: spgr-write-infrastructure-diagram
-description: Produce an infrastructure-diagram artifact that maps the cloud topology to the IaC configuration, covering provider and regions, compute and managed services, VPC and subnet networking, CDN, load balancers, DNS, and summary IAM, with public-facing surfaces and environment boundaries marked explicitly. Use when the Architect Agent has an approved architecture option, deployment targets, and a cloud provider selection and needs the authoritative deployment-and-networking reference, or when the DevOps Agent must document or update the topology so the diagram stays in sync with the IaC.
+description: Produce an infrastructure-diagram artifact mapping the cloud topology to the IaC configuration, covering provider, regions, compute, networking, CDN, DNS, and summary IAM. Use when the Architect Agent needs the authoritative deployment-and-networking reference, or when the DevOps Agent must keep the diagram in sync with the IaC.
 ---
 
 # write-infrastructure-diagram

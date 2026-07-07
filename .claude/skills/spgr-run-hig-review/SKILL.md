@@ -1,6 +1,6 @@
 ---
 name: spgr-run-hig-review
-description: Produce a HIG review report that checks an iOS app against Apple's Human Interface Guidelines, recording findings by severity (rejection risk, conformance issue, advisory) with the screen and component affected and a remediation per finding, and returning a PASS or GATE verdict that blocks submission on any rejection-risk violation. Use when the App Store Agent must confirm an iOS build conforms to platform conventions before App Store submission so a HIG violation does not trigger a review rejection, or when the Mobile Developer or QA agent needs HIG conformance checked against the screen inventory before a release proceeds.
+description: Produce a HIG review report that checks an iOS app against Apple's Human Interface Guidelines, returning a PASS or GATE verdict that blocks submission on any rejection-risk violation. Use when the App Store Agent must confirm an iOS build conforms to platform conventions before App Store submission.
 ---
 
 # run-hig-review

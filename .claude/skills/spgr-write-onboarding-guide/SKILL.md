@@ -1,6 +1,6 @@
 ---
 name: spgr-write-onboarding-guide
-description: Write the developer onboarding guide, the document that takes a developer from fresh repository access to a first safe contribution, covering the architecture mental model, local setup, a codebase tour, the development workflow, common gotchas, who-to-ask routing, first-task recommendations, and a first-week onboarding checklist that proves the guide works. Use when the Documentation Agent stands up onboarding for a new project, or when an architecture change, workflow change, or a newly discovered gotcha makes the existing guide stale.
+description: Write the developer onboarding guide that takes a developer from fresh repository access to a first safe contribution, covering local setup, a codebase tour, the development workflow, and a first-week checklist. Use when the Documentation Agent stands up onboarding for a new project or a change makes the existing guide stale.
 ---
 
 # write-onboarding-guide

@@ -1,6 +1,6 @@
 ---
 name: spgr-build-persona
-description: Construct research-grounded user personas from UGC mining output, interview summaries, and review-platform data, where every persona attribute traces to a cited source. Use when the Discovery Agent has research inputs and must turn them into shared, evidence-backed personas before ICP selection, or when the PM agent needs a concrete user model to anchor stories and success metrics.
+description: Construct research-grounded user personas from UGC mining output, interview summaries, and review-platform data, where every attribute traces to a cited source. Use when the Discovery Agent must turn research inputs into evidence-backed personas before ICP selection, or when the PM Agent needs a concrete user model to anchor stories.
 ---
 
 # build-persona

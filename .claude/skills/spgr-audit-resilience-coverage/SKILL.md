@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-resilience-coverage
-description: Produce a resilience-coverage audit report that checks every external dependency call site against the resilience spec and error standards, recording per-call whether a timeout, retry, circuit breaker, and fallback are configured, listing coverage gaps by severity with unguarded critical-path calls and silent error swallowing as highest severity, and returning a PASS or GATE verdict that blocks release on any unguarded external call in a critical path. Use when the Resilience Agent must confirm a release or architecture review has resilience patterns applied at every external call site, or when a CI sweep needs the current resilience posture across the codebase.
+description: Produce a resilience-coverage audit report that checks every external dependency call site for timeout, retry, circuit breaker, and fallback coverage against the resilience spec, returning a PASS or GATE verdict that blocks release on any unguarded call in a critical path. Use when the Resilience Agent must confirm coverage before a release.
 ---
 
 # audit-resilience-coverage

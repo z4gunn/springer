@@ -1,6 +1,6 @@
 ---
 name: spgr-mine-support-data
-description: Produce a support-data analysis artifact from customer support tickets, chat transcripts, and NPS verbatims, surfacing top issue categories by volume and sentiment, recurring feature requests, product failure patterns, churn-risk signals, per-category resolution rate, and a growing-stable-declining trend. Use when the PM agent needs post-launch ground truth on where real users fail before re-prioritizing the backlog, or when the QA agent needs failure-mode evidence from production support volume.
+description: Produce a support-data analysis artifact from support tickets, chat transcripts, and NPS verbatims, surfacing top issue categories by volume and sentiment, recurring feature requests, and churn-risk signals. Use when the PM agent needs post-launch ground truth before re-prioritizing the backlog, or when the QA agent needs failure-mode evidence.
 ---
 
 # mine-support-data

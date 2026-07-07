@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-activity-diagram
-description: Produce a UML activity diagram or a flowchart as committed diagram-as-code (Mermaid flowchart by default, PlantUML activity for true swimlanes or formal fork and join) that shows the control and process flow of a workflow, algorithm, or business process, with branches, loops, concurrent work, and which actor performs each step, then render it to SVG and lint it for unmatched fork/join, unmatched decision/merge, and non-exhaustive guards. Use when the Architect agent models a pipeline or algorithm, the Product Manager maps a business workflow, or the Backend Developer reasons about a control-heavy procedure, and a process must be made explicit and reviewable before it is built or refactored. Do not use for time-ordered messages between participants (use spgr-generate-sequence-diagram), a single entity's lifecycle (use spgr-generate-state-diagram), the data model (spgr-generate-erd), C4 structure (spgr-generate-system-diagram), or deployment topology (spgr-write-infrastructure-diagram).
+description: Produce a UML activity diagram or flowchart (Mermaid flowchart by default, PlantUML activity for swimlanes) showing the control flow of a workflow, algorithm, or business process. Use when the Architect, Product Manager, or Backend Developer agent must make a process flow explicit, not for message sequences, entity lifecycles, or data models.
 ---
 
 # generate-activity-diagram

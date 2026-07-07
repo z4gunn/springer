@@ -1,6 +1,6 @@
 ---
 name: spgr-write-api-versioning-strategy
-description: Produce an api-versioning-strategy artifact that fixes how the API absorbs breaking changes, covering the versioning scheme with rationale, the breaking-versus-non-breaking change definition, the deprecation window, the sunset notification process, migration support obligations, the internal-versus-external distinction, and the automated deprecation-header injection rule. Use when the API Design Agent must settle versioning policy before the first breaking change is needed, or when a backend or architect agent asks the API Design vertical to advise on a version bump, a deprecation timeline, or a sunset commitment.
+description: Produce an api-versioning-strategy artifact that fixes how the API absorbs breaking changes, covering the versioning scheme, the breaking-change definition, deprecation windows, and the sunset process. Use when the API Design Agent must settle versioning policy before the first breaking change, or advise on a version bump or deprecation timeline.
 ---
 
 # write-api-versioning-strategy

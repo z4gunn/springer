@@ -1,6 +1,6 @@
 ---
 name: spgr-scaffold-project
-description: Generate a new project skeleton from the approved architecture ADRs and tech-stack decision, with directory structure, pinned dependencies, a passing linter and formatter, a test runner with one passing example test, a working CI stub, an .env.example, and a README stub. Use when a Backend, Frontend, or Mobile Developer agent starts a project and must lay down the foundation before any feature code is written, or when a new service or app in the system needs its own scaffold from the same stack decision.
+description: Generate a new project skeleton from the approved architecture ADRs and tech-stack decision, with directory structure, pinned dependencies, passing lint and format, a test runner with one example test, a CI stub, and an .env.example. Use when a developer agent starts a project and must lay the foundation before any feature code.
 ---
 
 # scaffold-project

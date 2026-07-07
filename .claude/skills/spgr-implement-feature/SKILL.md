@@ -1,6 +1,6 @@
 ---
 name: spgr-implement-feature
-description: Implement one confirmed user story in a feature branch under test-first XP discipline, writing the failing acceptance test before any implementation, then the code that makes it pass, plus unit tests for non-trivial logic, and an opened pull request that confirms every acceptance criterion is tested. Use when the backend, frontend, or mobile developer agent has a story with confirmed acceptance criteria, the relevant API spec, and the approved architecture constraints, and must turn that story into working, reviewable code.
+description: Implement one confirmed user story in a feature branch under test-first XP discipline, writing the failing acceptance test before the code that makes it pass, ending in an opened pull request. Use when a backend, frontend, or mobile developer agent has a story with confirmed acceptance criteria to turn into working, reviewable code.
 ---
 
 # implement-feature

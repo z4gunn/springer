@@ -1,6 +1,6 @@
 ---
 name: spgr-write-prd
-description: Produce a Product Requirements Document artifact from confirmed Discovery outputs and human vision inputs, covering problem, goals, personas, scope, out-of-scope, NFR summary, success metrics, and open questions. Use when the PM Agent needs to write the canonical product contract that architects, developers, and QA all read before any architecture or build work begins.
+description: Produce a Product Requirements Document artifact from confirmed Discovery outputs and human vision inputs, covering problem, goals, personas, scope, NFR summary, success metrics, and open questions. Use when the PM Agent writes the canonical product contract that architects, developers, and QA read before build work begins.
 ---
 
 # write-prd

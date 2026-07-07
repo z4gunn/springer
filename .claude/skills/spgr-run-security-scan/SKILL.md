@@ -1,6 +1,6 @@
 ---
 name: spgr-run-security-scan
-description: Run SAST, dependency vulnerability, and secrets scanning against the codebase and package manifests, then produce a prioritized scan-report with CWE and CVE references, per-finding remediation, and a blocking summary of the Critical and High findings that gate the PR or release. Use when the QA, developer, or code-reviewer agent needs an automated security gate on a PR or scheduled sweep, before a PR is allowed to merge or a release is signed off.
+description: Run SAST, dependency vulnerability, and secrets scanning against the codebase and package manifests, producing a prioritized scan-report with a blocking summary of the Critical and High findings that gate the PR or release. Use when the QA, developer, or code-reviewer agent needs an automated security gate on a PR or scheduled sweep.
 ---
 
 # run-security-scan

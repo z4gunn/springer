@@ -1,6 +1,6 @@
 ---
 name: spgr-write-error-ux-spec
-description: Produce an error-ux-spec artifact that maps each internal error category to its user-facing experience, covering the plain-language message, recovery actions, UI treatment, user-perceived severity, the empty-state versus error-state distinction, retry guidance, and a centralized error message registry ready for review and i18n. Use when the Resilience Agent has an error classification taxonomy and the user flows and must define how failures are communicated to users before any error UI is built, or when the Design Agent needs the error experience specified before translating it into components.
+description: Produce an error-ux-spec artifact mapping each internal error category to its user-facing experience, covering plain-language messages, recovery actions, UI treatment, and a centralized message registry. Use when the Resilience Agent must define how failures are communicated to users before any error UI is built.
 ---
 
 # write-error-ux-spec

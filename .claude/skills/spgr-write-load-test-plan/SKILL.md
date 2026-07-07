@@ -1,6 +1,6 @@
 ---
 name: spgr-write-load-test-plan
-description: Produce a load-test-plan artifact that specifies the scenarios, load profiles, virtual-user models, and pass/fail criteria needed to verify a system meets its performance budget under expected and peak traffic, plus capacity-planning analysis for 3x and 10x growth. Use when the Performance Agent must define the load test specification before any launch, scaling event, or feature spike, or when the QA Agent needs the plan to implement load test scripts against a staging environment.
+description: Produce a load-test-plan artifact specifying the scenarios, load profiles, virtual-user models, and pass/fail criteria to verify the performance budget under expected and peak traffic, plus capacity planning for growth. Use when the Performance Agent must define the load test specification before a launch, scaling event, or feature spike.
 ---
 
 # write-load-test-plan

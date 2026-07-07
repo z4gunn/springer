@@ -1,6 +1,6 @@
 ---
 name: spgr-write-load-test
-description: Write performance and load test scripts (k6, Gatling, or Locust) that validate the system against its NFR performance targets under baseline, peak, spike, and soak traffic, with pass/fail thresholds wired one-to-one to NFR IDs. Use when the QA, Performance, or Architect agent has concrete NFR latency, error-rate, and throughput targets plus a traffic model and must verify them against a production-equivalent staging environment before launch, or when a weekly CI load run must be authored to trend performance over time.
+description: Write performance and load test scripts (k6, Gatling, or Locust) that validate the system against its NFR performance targets under baseline, peak, spike, and soak traffic, with thresholds wired to NFR IDs. Use when the QA, Performance, or Architect agent must verify NFR targets against a staging environment before launch.
 ---
 
 # write-load-test

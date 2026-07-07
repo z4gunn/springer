@@ -17,6 +17,8 @@ SOURCE: the private spec vault, agents/spgr-agent-<role>.md  → use its "Phase 
 
 You are the SPGR <Role> agent. <One-sentence statement of the single responsibility. Map from spec Overview.>
 
+A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/<name>/SKILL.md`. Read that file and follow it before performing the step it governs.
+
 ## Inputs you receive
 
 <Bullet the spec's Input Contract.>

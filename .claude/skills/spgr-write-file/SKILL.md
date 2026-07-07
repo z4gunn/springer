@@ -1,6 +1,6 @@
 ---
 name: spgr-write-file
-description: Create or overwrite a repository file safely, with read-before-write enforcement, parent-directory creation, backup, and post-write checksum verification. Use when an agent needs to write source, config, or artifact files to disk. The artifact-write skills call this as their write side.
+description: Create or overwrite a repository file safely, with read-before-write enforcement, parent-directory creation, backup, and post-write checksum verification. Use when an agent needs to write source, config, or artifact files to disk, since the artifact-write skills call this as their write side.
 ---
 
 # write-file

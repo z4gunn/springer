@@ -1,6 +1,6 @@
 ---
 name: spgr-write-ia
-description: Produce an information-architecture artifact that fixes the complete screen inventory and navigation model for a product, with a site map, every screen named with its purpose, entry points, and exit points, a navigation model matched to the selected design direction, a content hierarchy, and a screen-count metric, cross-referenced so every user story maps to at least one screen. Use when the Design Agent has approved requirements and a selected design direction and must settle the full screen scope before any wireframing begins, or when a downstream design or development task needs the authoritative index of what screens exist and how users move between them.
+description: Produce an information-architecture artifact fixing the complete screen inventory and navigation model, with a site map, per-screen purpose and entry and exit points, and every user story mapped to a screen. Use when the Design Agent has approved requirements and a selected design direction and must settle screen scope before wireframing begins.
 ---
 
 # write-ia

@@ -1,6 +1,6 @@
 ---
 name: spgr-write-interaction-spec
-description: Produce an interaction-spec artifact that documents the trigger, behavior, duration, easing, state transitions, reduced-motion equivalent, and accessibility notes for every interactive element on the approved screens, so developer agents implement motion and behavior consistently. Use when the Design Agent has approved high-fidelity screen specs and must pin down interaction behavior before frontend or mobile implementation begins, or when a developer agent needs the exact timing, easing, and keyboard behavior for an animation it is about to build.
+description: Produce an interaction-spec artifact documenting the trigger, behavior, duration, easing, state transitions, reduced-motion equivalent, and accessibility notes for every interactive element. Use when the Design Agent must pin down interaction behavior after screen specs are approved and before frontend or mobile implementation begins.
 ---
 
 # write-interaction-spec

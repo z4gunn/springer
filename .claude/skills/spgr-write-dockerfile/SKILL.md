@@ -1,6 +1,6 @@
 ---
 name: spgr-write-dockerfile
-description: Write a secure multi-stage Dockerfile plus a matching .dockerignore that builds a production container image with a minimal runtime layer, a pinned base image, a non-root user, and no embedded secrets. Use when the DevOps agent containerizes a service, when the Backend Developer agent supplies a service's runtime and build dependencies for packaging, or when the Security agent needs the image hardened to non-root and pinned-base before a release.
+description: Write a secure multi-stage Dockerfile plus a matching .dockerignore, with a minimal runtime layer, a pinned base image, a non-root user, and no embedded secrets. Use when the DevOps agent containerizes a service, or when the Security agent needs the image hardened before a release.
 ---
 
 # write-dockerfile

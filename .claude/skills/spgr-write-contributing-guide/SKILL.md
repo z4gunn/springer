@@ -1,6 +1,6 @@
 ---
 name: spgr-write-contributing-guide
-description: Generate the project CONTRIBUTING.md as source code, the explicit social and technical contract for how contributions are reported, branched, committed, reviewed, and merged, calibrated to the project's contributor audience, plus a `.github/PULL_REQUEST_TEMPLATE.md` checklist that surfaces the guide's PR requirements in the PR creation form. Use when the Documentation Agent stands up or refreshes the contribution contract for a project, or when the PR process, code standards, review SLA, or merge requirements change and the guide must be updated in the same change.
+description: Generate the project CONTRIBUTING.md, the contract for how contributions are reported, branched, committed, reviewed, and merged, plus a PR template checklist that surfaces its requirements. Use when the Documentation Agent stands up the contribution contract, or when the PR process, code standards, or merge requirements change.
 ---
 
 # write-contributing-guide

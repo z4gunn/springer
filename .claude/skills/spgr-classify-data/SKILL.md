@@ -1,6 +1,6 @@
 ---
 name: spgr-classify-data
-description: Produce a data-classification artifact that sorts every data field the system collects, processes, or stores into a sensitivity tier (Restricted, Confidential, Internal, Public), and records per-tier encryption, retention, access-control, and breach-notification requirements plus enforcement annotations for column-level encryption and audit logging. Use when the Compliance Agent has a data model and compliance scope and must produce the data map that retention policy, access control, encryption, and breach-notification work all depend on, or when the Auth Agent needs the classification to set RBAC permission boundaries.
+description: Produce a data-classification artifact that sorts every data field into a sensitivity tier with per-tier encryption, retention, access-control, and breach-notification requirements. Use when the Compliance Agent has a data model and compliance scope, or when the Auth Agent needs the classification for RBAC boundaries.
 ---
 
 # classify-data

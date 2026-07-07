@@ -1,6 +1,6 @@
 ---
 name: spgr-run-compliance-audit
-description: Produce a compliance-audit report that checks the implemented system against its compliance scope, classifying each in-scope control as implemented, partially implemented, or not implemented with specific verifiable evidence, recording gaps with regulatory-violation severity and remediation, building a control mapping matrix that links each framework requirement to the code or configuration that implements it, scoring readiness per framework, and returning a PASS or GATE verdict that blocks release for any project in scope for a regulated framework until the gaps are closed. Use when the Compliance Agent runs an internal readiness assessment before a formal external audit (SOC 2 readiness, GDPR DPA review, HIPAA), or when a regulated project needs the audit sign-off the release checklist requires.
+description: Produce a compliance-audit report that checks the implemented system against its compliance scope, with per-control status and per-framework readiness scores, returning a PASS or GATE verdict that blocks release on open gaps in a regulated framework. Use when the Compliance Agent runs a readiness assessment before a formal external audit.
 ---
 
 # run-compliance-audit

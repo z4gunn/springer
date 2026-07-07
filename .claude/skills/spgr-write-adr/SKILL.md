@@ -1,6 +1,6 @@
 ---
 name: spgr-write-adr
-description: Record one Architecture Decision Record in standard format, capturing the context and forces, the decision made, its status, the alternatives rejected, and honest positive and negative consequences. Use when the Architect Agent makes a significant architectural choice that constrains future work, involves a real tradeoff, or would surprise a new team member, and the reasoning must be preserved so the decision is not re-litigated later.
+description: Record one Architecture Decision Record in standard format, capturing context, the decision, status, rejected alternatives, and honest consequences. Use when the Architect Agent makes a significant architectural choice whose reasoning must be preserved so the decision is not re-litigated.
 ---
 
 # write-adr

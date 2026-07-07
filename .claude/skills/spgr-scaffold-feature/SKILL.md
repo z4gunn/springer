@@ -1,6 +1,6 @@
 ---
 name: spgr-scaffold-feature
-description: Generate the boilerplate file set for one new feature, following the project's existing structure and naming conventions exactly, with the story's acceptance criteria pre-filled as machine-readable TODO comments in every stub and the ERD change recorded in the migration stub. Use when the backend or frontend developer agent picks up a confirmed user story and wants a clean, conventionally-structured starting point (route, controller, service, model or repository, migration, and test stubs) before writing feature logic.
+description: Generate the boilerplate file set for one new feature (route, controller, service, model, migration, and test stubs) following the project's conventions, with acceptance criteria pre-filled as TODO comments. Use when a backend or frontend developer agent picks up a confirmed user story and needs a starting point before writing feature logic.
 ---
 
 # scaffold-feature

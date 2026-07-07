@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-keyboard-navigation
-description: Produce a keyboard-navigation audit report that verifies every interactive element and user flow is reachable, operable, and focus-managed by keyboard alone, with a per-section Tab order trace, reachability and operability findings, focus-trap and focus-restoration checks for overlays, a custom-shortcut inventory, and a PASS or GATE verdict that blocks release on any core function that a mouse can reach but a keyboard cannot. Use when the Accessibility Agent must confirm a release or component library is fully keyboard-operable before it ships, or when the QA or Frontend Developer agent needs keyboard operability checked against the ARIA spec and the interactive-flow list before review.
+description: Produce a keyboard-navigation audit report that verifies every interactive element and user flow is reachable, operable, and focus-managed by keyboard alone, with a PASS or GATE verdict that blocks release on any core function a keyboard cannot reach. Use when the Accessibility Agent must confirm a release or component library is keyboard-operable.
 ---
 
 # audit-keyboard-navigation

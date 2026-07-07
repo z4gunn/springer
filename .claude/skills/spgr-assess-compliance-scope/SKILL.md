@@ -1,6 +1,6 @@
 ---
 name: spgr-assess-compliance-scope
-description: Produce a compliance-scope artifact that names which regulatory frameworks apply to the project and which do not, each with applicability or exclusion rationale, a legal-vs-competitive priority order, and a high-level requirements summary per applicable framework. Use when the Compliance Agent starts a project and needs the scope determination that drives all later compliance work, or when product requirements change (new geography, new data type, new business model) and the existing scope must be re-evaluated for newly applicable frameworks.
+description: Produce a compliance-scope artifact that names which regulatory frameworks apply to the project and which do not, with rationale, a priority order, and a requirements summary per applicable framework. Use when the Compliance Agent starts a project, or when changed requirements force a scope re-evaluation.
 ---
 
 # assess-compliance-scope

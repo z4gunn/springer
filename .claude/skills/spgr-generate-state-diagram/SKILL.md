@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-state-diagram
-description: Produce a UML state machine diagram for one stateful entity as committed diagram-as-code (Mermaid stateDiagram-v2 by default, PlantUML state when the model needs history, entry/exit/do behaviors, internal transitions, or orthogonal regions) plus a rendered SVG, with transitions in canonical trigger[guard]/action form, one initial pseudostate per region, a final state, and durable behavior in entry, exit, or do. Use when the Architect Agent must capture the authoritative lifecycle of an entity such as an order, subscription, connection, document, job, or payment, naming its states and the events, guards, and actions that move between them, or when the Backend Developer Agent needs a verifiable contract for a status field and its allowed transitions before implementing it. Do not use for ordered messages between participants (use spgr-generate-sequence-diagram), for control or process flow with branches and lanes (use spgr-generate-activity-diagram), for static code structure (use spgr-generate-uml-class-diagram), or for the data model that holds the status field itself (use spgr-generate-erd).
+description: Produce a UML state machine diagram for one stateful entity, committed diagram-as-code (Mermaid stateDiagram-v2 or PlantUML state) plus a rendered SVG. Use when the Architect Agent must capture the authoritative lifecycle of an entity, or the Backend Developer needs a verifiable contract for a status field and its allowed transitions.
 ---
 
 # generate-state-diagram

@@ -1,6 +1,6 @@
 ---
 name: spgr-check-rate-limit-consistency
-description: Produce a rate-limit-consistency report that checks every API endpoint against the rate-limit configuration and the plan entitlement map, verifying limits are enforced at the tenant or API-key level rather than per IP, that paid-plan differentiation is actually enforced, that 429 responses carry Retry-After and X-RateLimit headers, and that one tenant at 10x its limit cannot degrade other tenants' p95 latency, returning per-finding severity and a PASS or GATE verdict that blocks release on any IP-only limit on a tenant-scoped endpoint or any cross-tenant degradation. Use when the Multi-tenancy Agent must confirm a release or architecture review enforces tenant-fair rate limiting before a noisy-neighbor tenant reaches production, or when a CI sweep needs the current rate-limit posture across the API surface.
+description: Produce a rate-limit-consistency report that checks every API endpoint against the rate-limit configuration and entitlement map, verifying tenant-level enforcement, with a PASS or GATE verdict that blocks release on IP-only limits or cross-tenant degradation. Use when the Multi-tenancy Agent must confirm tenant-fair rate limiting before a release.
 ---
 
 # check-rate-limit-consistency

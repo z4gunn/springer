@@ -1,6 +1,6 @@
 ---
 name: spgr-write-event-taxonomy
-description: Produce an event-taxonomy artifact that defines the product's complete analytics event schema, with per-event name in object_action snake_case, an exact trigger, typed properties marked required or optional, the auto-included context properties, prohibited PII, and a per-day volume estimate, plus a generated type-safe tracking SDK so misnamed or incomplete instrumentation fails at compile time. Use when the Analytics Agent must settle the event contract before any instrumentation is written, or when a new core user journey or business question requires the taxonomy extended before tracking is added.
+description: Produce an event-taxonomy artifact defining the product's complete analytics event schema, with per-event triggers, typed properties, prohibited PII, and a generated type-safe tracking SDK. Use when the Analytics Agent must settle the event contract before any instrumentation is written, or when a new user journey extends the taxonomy.
 ---
 
 # write-event-taxonomy

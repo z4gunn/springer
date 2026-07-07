@@ -1,6 +1,6 @@
 ---
 name: spgr-run-dast
-description: Run dynamic application security testing against a running staging environment, probing it unauthenticated and authenticated as each role, then produce a dast-findings report with tool and version, per-finding severity, URL, parameter, attack type, and evidence, confirmed vulnerabilities with reproduction steps, false-positive assessments, and a blocking gate verdict on Critical and High findings. Use when the Security Agent runs DAST before a major release or after a significant architecture change, or when a running staging environment must be probed for runtime vulnerabilities that source-code scanning cannot find.
+description: Run dynamic application security testing against a running staging environment, unauthenticated and authenticated as each role, producing a dast-findings report with per-finding evidence and a gate verdict that blocks on Critical and High findings. Use when the Security Agent runs DAST before a major release or architecture change.
 ---
 
 # run-dast

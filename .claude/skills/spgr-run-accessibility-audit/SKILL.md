@@ -1,6 +1,6 @@
 ---
 name: spgr-run-accessibility-audit
-description: Scan a built UI for WCAG violations with axe-core, supplement with manual keyboard and screen reader testing, and produce a prioritized accessibility-audit report plus reusable axe-core test scaffolds, with Level A violations set as a hard release gate. Use when the QA, Accessibility, or Frontend Developer agent has a running UI and a target WCAG level and must confirm conformance and document remediation before a release proceeds, or when a new design-system component needs an accompanying accessibility test before it is published.
+description: Scan a built UI for WCAG violations with axe-core, supplement with manual keyboard and screen reader testing, and produce a prioritized accessibility-audit report with Level A violations as a hard release gate. Use when the QA, Accessibility, or Frontend Developer agent must confirm WCAG conformance before a release proceeds.
 ---
 
 # run-accessibility-audit

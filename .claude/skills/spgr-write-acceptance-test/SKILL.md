@@ -1,6 +1,6 @@
 ---
 name: spgr-write-acceptance-test
-description: Write an automated acceptance test suite in Gherkin Given/When/Then form from a confirmed acceptance-criteria set, one .feature file per story with one scenario per criterion, exercised at the integration level and confirmed failing before any implementation begins. Use when a QA agent turns a story's confirmed acceptance criteria into the executable specification, or when a developer agent is blocked from starting because the failing acceptance tests for a story do not yet exist.
+description: Write an automated Gherkin acceptance test suite from a confirmed acceptance-criteria set, one .feature file per story with one scenario per criterion, confirmed failing before implementation begins. Use when a QA agent turns confirmed acceptance criteria into the executable specification a developer agent needs before starting.
 ---
 
 # write-acceptance-test

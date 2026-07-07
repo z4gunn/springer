@@ -1,6 +1,6 @@
 ---
 name: spgr-write-unit-test
-description: Write a unit test suite for one function, method, or class, covering happy path, error paths, boundary conditions, and edge cases, with every external dependency mocked at the unit boundary and 100% branch coverage on business logic. Use when the QA, Backend Developer, Frontend Developer, or Mobile Developer agent needs unit tests for a unit of logic, either test-first against a planned interface before implementation or alongside implementation of core algorithmic logic.
+description: Write a unit test suite for one function, method, or class, covering happy path, error paths, boundaries, and edge cases, with every external dependency mocked at the unit boundary. Use when the QA or a developer agent needs unit tests for a unit of logic, test-first against a planned interface or alongside implementation.
 ---
 
 # write-unit-test

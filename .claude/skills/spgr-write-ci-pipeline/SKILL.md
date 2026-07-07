@@ -1,6 +1,6 @@
 ---
 name: spgr-write-ci-pipeline
-description: Produce the CI pipeline configuration that builds, lints, tests, and scans the codebase on every push, structured as a fast run under 3 minutes on every push and a full run under 10 minutes on PR and merge per the XP ten-minute build rule, with aggressive caching, fail-fast staging, pinned runtimes, and no literal secrets. Use when the DevOps Agent must stand up or change the automated quality gate for a project from a confirmed tech stack, test-suite structure, and security-scan requirements, or when the QA or Security Agent needs the pipeline wired to its coverage thresholds and SAST finding gates before a release proceeds.
+description: Produce the CI pipeline configuration that builds, lints, tests, and scans on every push, with a fast run under 3 minutes and a full run under 10 minutes per the XP ten-minute build rule. Use when the DevOps Agent must stand up or change the automated quality gate from a confirmed tech stack and test-suite structure.
 ---
 
 # write-ci-pipeline

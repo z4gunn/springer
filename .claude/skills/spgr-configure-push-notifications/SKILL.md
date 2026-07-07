@@ -1,6 +1,6 @@
 ---
 name: spgr-configure-push-notifications
-description: Implement end-to-end mobile push notification infrastructure as source code, covering iOS APNs and Android FCM credential setup, device token registration with refresh and de-registration, foreground, background, and terminated state handlers, tap-to-deep-link routing, per-category notification preferences, delivery and open-rate monitoring, and a staging delivery test against a real device. Use when the Mobile Developer agent picks up a push notification story with confirmed notification requirements and platform targets, or when the QA or code-reviewer agent needs the push delivery chain built test-first against its acceptance criteria before review.
+description: Implement end-to-end mobile push notification infrastructure as source code, covering APNs and FCM credentials, device token lifecycle, all app-state handlers, tap-to-deep-link routing, preferences, and delivery monitoring. Use when the Mobile Developer agent picks up a push notification story with confirmed requirements.
 ---
 
 # configure-push-notifications

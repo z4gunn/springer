@@ -1,6 +1,6 @@
 ---
 name: spgr-refactor
-description: Improve the internal structure of a code section without changing its external behavior, using the existing test suite as the safety net and applying XP simple-design rules in priority order. Use when the Backend, Frontend, or Mobile Developer agent has a clear refactor goal (extract method, eliminate duplication, simplify a conditional, rename for clarity) on a covered code section, or when the Code Reviewer agent identifies a complexity hotspot that should be reduced before it becomes a bottleneck.
+description: Improve the internal structure of a code section without changing its external behavior, using the existing test suite as the safety net and XP simple-design rules in priority order. Use when a developer agent has a clear refactor goal on a covered code section, or when the Code Reviewer agent flags a complexity hotspot to reduce.
 ---
 
 # refactor

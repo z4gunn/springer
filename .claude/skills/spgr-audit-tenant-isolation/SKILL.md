@@ -1,6 +1,6 @@
 ---
 name: spgr-audit-tenant-isolation
-description: Produce a tenant-isolation audit report that tests whether one tenant's data, resources, and operations can be accessed or affected by another tenant, checking isolation at the API, database, storage, cache, and session layers, recording per-layer findings with cross-tenant access evidence, and returning a PASS or GATE verdict that blocks release on any confirmed cross-tenant access path. Use when the Multi-tenancy Agent must confirm a multi-tenant release or architecture review enforces isolation at every layer, or when a CI sweep needs the current isolation posture before a cross-tenant data leak reaches production.
+description: Produce a tenant-isolation audit report that tests whether one tenant's data or operations can be accessed or affected by another at the API, database, storage, cache, and session layers, returning a PASS or GATE verdict that blocks release on any cross-tenant access path. Use when the Multi-tenancy Agent must confirm isolation before a release.
 ---
 
 # audit-tenant-isolation

@@ -1,6 +1,6 @@
 ---
 name: spgr-generate-api-docs
-description: Generate developer-facing API reference documentation from a validated OpenAPI spec, producing a getting-started guide, per-endpoint-group reference, tested request and response examples in curl plus one SDK language, an authentication reference, an error-code reference, rate-limiting docs, and a changelog link, plus a CI lint check that fails on undocumented parameters, missing response schemas, and undescribed properties. Use when the Documentation Agent must publish or refresh API reference docs for a release so the docs stay in sync with the actual API surface, or when the QA or code-reviewer agent needs the generated reference and its CI doc-lint gate stood up before a release proceeds.
+description: Generate developer-facing API reference documentation from a validated OpenAPI spec, with a getting-started guide, per-endpoint reference, tested examples, and a CI lint check that fails on undocumented parameters. Use when the Documentation Agent must publish or refresh API reference docs so they stay in sync with the API surface.
 ---
 
 # generate-api-docs

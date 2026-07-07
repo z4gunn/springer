@@ -1,6 +1,6 @@
 ---
 name: spgr-review-api-consistency
-description: Produce an api-consistency review report that checks an API spec against the project's API design standards, recording naming, resource-modeling, response-envelope, and error-format deviations as findings by severity, with the standard pattern and a fixed example per finding, and returning a PASS or GATE verdict that blocks new or modified endpoints on any high-severity inconsistency. Use when the API Design Agent reviews a PR that adds or changes API endpoints, or when a backend, QA, or code-reviewer agent needs the API surface confirmed consistent against the standards before an endpoint ships.
+description: Produce an api-consistency review report that checks an API spec against the project's API design standards, returning a PASS or GATE verdict that blocks new or changed endpoints on any high-severity inconsistency. Use when the API Design Agent reviews a PR that adds or modifies API endpoints.
 ---
 
 # review-api-consistency

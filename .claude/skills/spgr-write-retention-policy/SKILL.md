@@ -1,6 +1,6 @@
 ---
 name: spgr-write-retention-policy
-description: Produce a retention-policy artifact that sets a retention period, retention trigger, deletion trigger, deletion mechanism, deletion verification, and right-to-erasure handling for each data classification tier, satisfying regulatory minimums and maximums while staying implementable in the system's data architecture. Use when the Compliance Agent has a data classification registry and a compliance scope and must define how long each data type is kept and how it is deleted before the product launches, or when a new framework, jurisdiction, or business-driven retention need requires the policy to be revised.
+description: Produce a retention-policy artifact setting the retention period, deletion trigger, deletion mechanism and verification, and right-to-erasure handling for each data classification tier. Use when the Compliance Agent must define how long each data type is kept and how it is deleted before launch, or when a new framework requires revision.
 ---
 
 # write-retention-policy

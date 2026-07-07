@@ -1,6 +1,6 @@
 ---
 name: spgr-go-no-go
-description: Synthesize all discovery findings into a single build recommendation (go, no-go, or conditional-go) with evidence-cited rationale, top risks with mitigations, a defensible differentiation case, and dissenting evidence, then route it to a mandatory human checkpoint before the pipeline can advance to planning. Use when the Discovery Agent has completed problem validation, ICP definition, competitive analysis, pain-point synthesis, market sizing, and feasibility assessment, and must decide whether the product is worth building before any engineering begins.
+description: Synthesize all discovery findings into a single build recommendation (go, no-go, or conditional-go) with evidence-cited rationale, top risks, and dissenting evidence, then route it to a mandatory human checkpoint. Use when the Discovery Agent has completed discovery and must decide whether the product is worth building before planning begins.
 ---
 
 # go-no-go

@@ -1,6 +1,6 @@
 ---
 name: spgr-write-uat-report
-description: Produce a uat-report envelope artifact that records per-story acceptance-criteria status, tester observations, blocking issues, and a formal human sign-off block, then sets a go or hold deployment gate. Use when the QA Agent compiles UAT session notes and automated test results into the final pre-production checkpoint, or when the Product Manager Agent records human sign-off on a release before it deploys.
+description: Produce a uat-report envelope artifact that records per-story acceptance-criteria status, tester observations, blocking issues, and a formal human sign-off block, then sets a go or hold deployment gate. Use when the QA Agent compiles UAT results into the final pre-production checkpoint, or when the PM Agent records human sign-off on a release.
 ---
 
 # write-uat-report

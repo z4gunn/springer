@@ -1,6 +1,6 @@
 ---
 name: spgr-diff-artifact
-description: Compare two versions of an artifact field by field, summarize the changes, and flag scope changes that require human approval. Use when an artifact is revised and a downstream agent or the orchestrator needs to know what changed, whether the change expands or contracts scope, and which agents are affected.
+description: Compare two versions of an artifact field by field, summarize the changes, and flag scope changes that require human approval. Use when an artifact is revised and a downstream agent or the orchestrator needs to know what changed, whether scope expanded or contracted, and which agents are affected.
 ---
 
 # diff-artifact

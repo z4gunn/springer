@@ -1,6 +1,6 @@
 ---
 name: spgr-write-fixture-factory
-description: Generate fixture factories for test data, one factory per domain entity, with valid defaults that encode domain constraints, per-call override support, named traits for recurring states, association factories for foreign keys, and sequence-based uniqueness, using Factory Boy, FactoryBot, Fishery, or the stack equivalent. Use when the QA Agent defines or updates the project's test data factories, or when the Backend Developer Agent needs factories to set up integration tests or flags that a factory breaks after a data model change.
+description: Generate fixture factories for test data, one per domain entity, with valid defaults, overrides, named traits, and association factories, using Factory Boy, FactoryBot, Fishery, or the stack equivalent. Use when the QA Agent defines or updates the project's test data factories, or when a data model change breaks a factory.
 ---
 
 # write-fixture-factory
