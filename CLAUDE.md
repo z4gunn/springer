@@ -92,7 +92,7 @@ Hard:
 
 Guidance:
 - Tools follow the role. A review or audit agent is read-only (`Read, Grep, Glob`), with `Bash` added only to run a linter or scanner. A developer agent uses `Read, Edit, Write, Bash, Grep, Glob`.
-- The `model` field is omitted (inherit) by default. Use `haiku` for a low-cost read-only research agent, and `opus` for an architecture or judgment-heavy role.
+- The `model` field is omitted (inherit) by default. Use `haiku` for a low-cost read-only research agent, `sonnet` for an auditor vertical whose per-cycle work is checklist verification against a confirmed spec, and `opus` for an architecture or judgment-heavy role. The architecture-gate verticals (Auth, Security, Compliance) stay on `opus` because their findings block the architecture checkpoint.
 - A subagent cannot spawn a subagent. The Orchestrator is the main agent that delegates, and the sub-roles return summaries. Cross-agent handoffs are encoded as artifact contracts, not as nested agent calls.
 
 ### Per-Artifact Checklist
