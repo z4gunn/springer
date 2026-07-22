@@ -107,6 +107,38 @@ an implicit sixth gate violates minimal-human-in-the-loop. At a gate the harness
 writes the hil-checkpoint with pipeline_status paused, fires spgr-notify-human,
 records the pending batch in the cycle artifact, and terminates.
 
+### pr-merge gate: publish before pausing
+
+The pr-merge gate is reached by remote pull request, never a local-only branch.
+Before pausing at a pr-merge checkpoint the harness MUST, once all automated
+sign-offs pass (Code Reviewer APPROVE with no open P0 or P1, and every triggered
+vertical gate signed off): commit the change on its story branch, push the branch
+to origin, and open a pull request via spgr-create-pr against the protected base.
+Only then does it write the pr-merge hil-checkpoint (pipeline_status paused,
+carrying the PR URL in the checkpoint) and fire spgr-notify-human. The run stays
+paused until a human merges the PR. On the next entry the harness reads the merge
+as the checkpoint response, stamps it resumed, and continues from the pending
+batch. The harness pushes and opens the PR but never merges it and never bypasses
+protection, because the human merge is the gate. This is the default for every
+story PR. A local-only, unpushed branch is used only when a human explicitly
+requests it for a specific change.
+
+Verify CI green before pausing. After opening or updating the PR, the harness
+MUST wait for the remote CI checks on the PR head to complete and confirm every
+required check passes before it writes the paused pr-merge checkpoint. A green
+local suite is NOT sufficient, because CI runs the live-DB, integration, and any
+other jobs the local Check necessarily skips (for example DB-gated D-suites that
+skip without a live Postgres), and those jobs are the real gate on that work. If
+any required check fails, the harness treats it as a Check failure on this cycle:
+diagnose the failure from the CI logs, decide whether it is a product defect or a
+test-construction defect, route the fix as a bounded retry to the owning agent
+(the same two-retry bound applies, then escalate), push, and re-verify CI. Only a
+fully green required-check set permits the pause. The harness never pauses at a
+pr-merge checkpoint, nor reports the story as ready to merge, while a required
+check is failing or still pending. Non-required or advisory checks that fail are
+recorded in the checkpoint rather than blocking, and the harness says so
+explicitly instead of implying all of CI is green.
+
 ## Escalations
 
 An escalation is a first-class artifact. The harness feeds every open escalation
