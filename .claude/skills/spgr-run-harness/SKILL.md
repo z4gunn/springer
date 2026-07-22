@@ -82,6 +82,22 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 6. Pause at a gate. Write the hil-checkpoint with pipeline_status paused, set the
    act transition to pause, record the pending batch in the cycle artifact, fire
    spgr-notify-human, and terminate cleanly. Resuming is step 1 on the next entry.
+   For a pr-merge gate, first publish: once all automated sign-offs pass, commit
+   the change on its story branch, push to origin, and open the PR with
+   spgr-create-pr against the protected base. Then wait for the remote CI checks
+   on the PR head and confirm every required check passes BEFORE writing the
+   checkpoint, because a green local suite is not sufficient. CI runs the live-DB,
+   integration, and other jobs the local Check skips (for example DB-gated
+   D-suites), and those jobs are the real gate on that work. If any required check
+   fails, treat it as a Check failure on this cycle, diagnose it from the CI logs,
+   route the fix as a bounded retry to the owning agent (same two-retry bound,
+   then escalate), push, and re-verify, before pausing. Only on a fully green
+   required-check set write the checkpoint carrying the PR URL and pause. Never
+   pause or report the story ready while a required check is failing or pending.
+   The harness pushes and opens but never merges. The human merge is the gate and
+   is read as the checkpoint response on resume. A local-only unpushed branch is
+   used only when a human explicitly asks for it. See the pr-merge gate rule in
+   [../../references/pdca-harness.md](../../references/pdca-harness.md).
 7. Complete. When the orchestrator reports no further work, write the
    run-retrospective summarizing the run's learnings, each tagged with its
    category, its evidence cycle refs, and a requires_human_promotion flag that is
