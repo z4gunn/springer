@@ -586,11 +586,16 @@ async function cmdCreateIssue(argv: string[]): Promise<void> {
 interface BacklogStory {
   story_id: string;
   epic_id?: string;
+  /** Written by spgr-prioritize-backlog, for example "P0". */
+  priority_tier?: string;
+  /** Older field name for the same thing. */
   priority?: string;
   title: string;
   as_a?: string;
   i_want?: string;
   so_that?: string;
+  /** Written by spgr-prioritize-backlog. `depends_on` is the older name. */
+  dependencies?: string[];
   depends_on?: string[];
   estimated_size?: string;
 }
@@ -630,10 +635,19 @@ interface StoredArtifact {
 
 /** Story priority -> Linear priority (1 Urgent, 2 High, 3 Normal, 4 Low). */
 const STORY_PRIORITY_TO_LINEAR = new Map<string, number>([
+  ['P0', 1],
   ['P1', 2],
   ['P2', 3],
   ['P3', 4],
 ]);
+
+/**
+ * Priority tier for a backlog entry. spgr-prioritize-backlog writes
+ * `priority_tier`; `priority` is the older field name.
+ */
+function storyPriority(s: BacklogStory): string {
+  return s.priority_tier ?? s.priority ?? '';
+}
 
 function loadRunArtifacts(runDir: string): StoredArtifact[] {
   const dir = join(runDir, 'artifacts');
@@ -847,7 +861,7 @@ async function cmdSyncRun(argv: string[]): Promise<void> {
               runDir,
             ),
             stateId: stateId(config, state),
-            priority: STORY_PRIORITY_TO_LINEAR.get(story.priority ?? '') ?? 0,
+            priority: STORY_PRIORITY_TO_LINEAR.get(storyPriority(story)) ?? 0,
             labelIds: featureLabel ? [featureLabel] : [],
             projectMilestoneId: defaultMilestone,
           },
