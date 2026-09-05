@@ -58,6 +58,6 @@ Produce one ordered backlog whose sequence reflects where the product delivers t
 
 ## Notes
 
-- The `prioritized-backlog` artifact type is not yet in the schema registry. It is written through spgr-write-artifact, and its registered schema is added in a later build increment. Validate the upstream story, PRD, and pain point inputs against their registered schemas through spgr-validate-artifact.
+- The `prioritized-backlog` artifact type is registered at `schemas/prioritized-backlog-v1.json` and is content-validated. It is written through spgr-write-artifact. Its ordered entries live in `content.backlog`, and that is the field the Linear board projection reads: `user-story` describes exactly one story and never carried the order. Validate the upstream story, PRD, and pain point inputs against their registered schemas through spgr-validate-artifact.
 - Prioritize by value delivered to the ICP, not by stakeholder volume. The loudest stakeholder and the highest-priority story are often not the same.
 - Output shape: `{ backlog: [{story_id, title, priority_tier, priority_score, rationale, dependencies_met}], tech_debt_slots: [{position_in_backlog, story_id|null, reason}], deferred_stories: [{story_id, deferral_reason, revisit_condition}] }`.

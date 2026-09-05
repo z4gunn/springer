@@ -598,7 +598,15 @@ interface BacklogStory {
 interface BacklogContent {
   epics?: Array<{epic_id: string; name: string}>;
   backlog_order?: string[];
-  stories: BacklogStory[];
+  /** Ordered entries on a `prioritized-backlog` artifact. */
+  backlog?: BacklogStory[];
+  /** Legacy shape. Kept so an existing run store still syncs. */
+  stories?: BacklogStory[];
+}
+
+/** The rollup's ordered entries, whichever field carries them. */
+function backlogStories(b: BacklogContent): BacklogStory[] {
+  return b.backlog ?? b.stories ?? [];
 }
 
 interface AcceptanceCriterion {
@@ -614,6 +622,7 @@ interface StoredArtifact {
   artifact_type?: string;
   timestamp?: string;
   content?: {
+    backlog?: BacklogStory[];
     stories?: BacklogStory[];
     criteria?: AcceptanceCriterion[];
   };
@@ -713,10 +722,13 @@ async function cmdSyncRun(argv: string[]): Promise<void> {
 
   const artifacts = loadRunArtifacts(runDir);
   const backlogs = artifacts
-    .filter(a => a.artifact_type === 'user-story' && a.content?.stories)
+    .filter(a =>
+      (a.artifact_type === 'prioritized-backlog' && a.content?.backlog) ||
+      (a.artifact_type === 'user-story' && a.content?.stories),
+    )
     .sort((a, b) => (a.timestamp ?? '').localeCompare(b.timestamp ?? ''));
   const backlogArtifact = backlogs.at(-1);
-  if (!backlogArtifact) fail(`no user-story backlog artifact in ${runDir}`);
+  if (!backlogArtifact) fail(`no prioritized-backlog artifact in ${runDir}`);
   const backlog = backlogArtifact.content as BacklogContent;
   const epicNames = new Map(
     (backlog.epics ?? []).map(e => [e.epic_id, e.name]),
@@ -794,10 +806,11 @@ async function cmdSyncRun(argv: string[]): Promise<void> {
   const defaultMilestone = defaultMilestoneId(config);
 
   const labels = new Map(Object.entries(config.labels));
+  const entries = backlogStories(backlog);
   const order = backlog.backlog_order?.length
     ? backlog.backlog_order
-    : backlog.stories.map(s => s.story_id);
-  const storiesById = new Map(backlog.stories.map(s => [s.story_id, s]));
+    : entries.map(s => s.story_id);
+  const storiesById = new Map(entries.map(s => [s.story_id, s]));
   let created = 0;
   let moved = 0;
   let milestoned = 0;
@@ -895,7 +908,7 @@ async function cmdSyncRun(argv: string[]): Promise<void> {
     }
   }
   const orderSet = new Set(order);
-  const unlisted = backlog.stories
+  const unlisted = entries
     .map(s => s.story_id)
     .filter(id => !orderSet.has(id));
   if (unlisted.length) {
