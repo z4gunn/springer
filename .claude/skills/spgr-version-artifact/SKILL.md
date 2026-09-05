@@ -7,7 +7,7 @@ description: Stamp a new version on an artifact, incrementing minor on agent rev
 
 ## Purpose
 
-Keep artifact history honest. Artifacts are immutable once written, so every change is a new version rather than an edit. This skill computes the next version number, records the version header, and on approval writes a content checksum so downstream agents can detect tampering with a confirmed baseline.
+Keep artifact history honest. Artifacts are immutable once written, so every change is a new version rather than an edit. This skill computes the next version number, records the version header, and on approval writes a content checksum so downstream agents can detect tampering with a confirmed baseline. The procedure is mechanical and runs correctly on the smallest model tier, so the harness dispatches it as a mechanical unit per the dispatch tiers in `.claude/references/pdca-harness.md`.
 
 ## Inputs
 
