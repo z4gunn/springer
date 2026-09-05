@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/story-brief-v1.json",
+  "title": "SPGR Story Context Brief v1",
+  "description": "A compact per-story projection the harness refreshes at Act when a story's operative contract or rulings change. Dispatched units read it first and open a full artifact only for a section it cites. Derived and regenerable, never the source of truth.",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "story-brief" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["story", "operative_artifacts"],
+      "properties": {
+        "story": { "type": "string", "minLength": 1 },
+        "operative_artifacts": {
+          "type": "object",
+          "description": "Name -> repo-relative path (optionally with a cited section) of each artifact that currently governs the story",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "root_cause": { "type": ["string", "null"] },
+        "criteria_summary": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "pinned_rulings": {
+          "type": "array",
+          "description": "Strings and rulings a human or a gate has fixed, quoted so a unit does not re-derive them",
+          "items": { "type": "string" }
+        },
+        "open_conditions": {
+          "type": "array",
+          "description": "Vertical conditions and review findings still to be satisfied before the story can advance",
+          "items": { "type": "string" }
+        },
+        "merge_bar_state": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

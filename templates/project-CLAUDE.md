@@ -38,3 +38,4 @@ This project follows a trunk-based workflow: `main` is always deployable, every 
 - Use conventional commit messages, scoped by what changed (for example `feat(api): add subscription endpoint`, `chore(ci): add typecheck stage`).
 - One logical change per commit. Lint, format, and the type checker pass before every commit.
 - Never commit secrets or `.env`.
+- At a `pr-merge` gate the harness publishes automatically: once all automated sign-offs pass it commits, pushes the branch to origin, and opens a PR via `spgr-create-pr`, then pauses at the human merge checkpoint carrying the PR URL. It never merges the PR itself, and it uses a local-only unpushed branch only when a human explicitly asks. See the pr-merge gate rule in `.claude/references/pdca-harness.md`.

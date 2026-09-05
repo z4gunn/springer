@@ -1,0 +1,47 @@
+{
+  "//": "Linear integration config for the Springer harness. Copy to runs/_linear/config.json and fill in the ids from your workspace (Linear -> Settings, or the API). Read only by the harness skill's scripts/linear-sync.ts, the single channel for Linear I/O. The typed artifacts under runs/ remain the source of truth. Linear is the human-facing projection, and backlog_provider selects which board humans review. After filling team and project, run `npx tsx .claude/skills/spgr-run-harness/scripts/linear-sync.ts ensure-labels` to create the agent:* labels and record their ids here.",
+  "schema_version": "v1",
+  "backlog_provider": "linear",
+  "team": {
+    "id": "<team-uuid>",
+    "key": "<TEAM-KEY>"
+  },
+  "project": {
+    "id": "<project-uuid>",
+    "name": "<project name>"
+  },
+  "states": {
+    "//": "Workflow state name -> id for the team. Names must match the workspace exactly. Add or rename to match your workflow, and keep wip_board_state_map pointing at names that exist here.",
+    "Backlog": "<state-uuid>",
+    "Todo": "<state-uuid>",
+    "In Progress": "<state-uuid>",
+    "In Review": "<state-uuid>",
+    "Done": "<state-uuid>",
+    "Canceled": "<state-uuid>"
+  },
+  "labels": {
+    "//": "Label name -> id. Feature is applied to stories published by sync-run. agent:ready and agent:blocked are created and filled in by ensure-labels.",
+    "Feature": "<label-uuid>",
+    "Bug": "<label-uuid>",
+    "agent:ready": null,
+    "agent:blocked": null
+  },
+  "wip_board_state_map": {
+    "//": "run-state wip_board column -> Linear state name. review and validation both map to In Review: the board is the human view and a human cares that the story is out of development, not which internal check it is in.",
+    "backlog": "Backlog",
+    "development": "In Progress",
+    "review": "In Review",
+    "validation": "In Review",
+    "done": "Done"
+  },
+  "milestones": {
+    "//": "Optional. Project milestone name -> id. default_milestone (omit to disable) is applied to newly created issues and to mapped issues that have no milestone. A milestone a human has set is never overridden."
+  },
+  "intake_assignee_email": "",
+  "//intake_assignee_email": "Optional. When set, fetch-ready also treats assignment to this identity as an intake trigger, alongside the agent:ready label.",
+  "close_policy": {
+    "//": "Harness-facing policy, applied procedurally at Act and on resume. An issue is moved to Done only when its work is complete AND fully validated by the run (acceptance suite green, vertical sign-offs passed, PR merged). If close-out requires human manual testing, the issue stays open with a comment flagging what the human must verify. It is never auto-closed.",
+    "auto_close": "complete-and-fully-validated",
+    "keep_open": "requires-human-manual-testing"
+  }
+}

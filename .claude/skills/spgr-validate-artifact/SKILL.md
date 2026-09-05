@@ -7,7 +7,7 @@ description: Validate an artifact against its registered JSON Schema and report 
 
 ## Purpose
 
-Hold the line on the typed-artifact contract. A receiving agent validates before acting so it never builds on a malformed or version-mismatched input, and `spgr-write-artifact` validates inline so no invalid artifact is ever written. Schema and field validation is deterministic and runs through the shared validator. Semantic consistency checks that need judgment run separately.
+Hold the line on the typed-artifact contract. A receiving agent validates before acting so it never builds on a malformed or version-mismatched input, and `spgr-write-artifact` validates inline so no invalid artifact is ever written. Schema and field validation is deterministic and runs through the shared validator. Semantic consistency checks that need judgment run separately. The schema pass is deterministic and needs no model at all: a dispatcher runs `schemas/validate.py` directly and opens this skill only to interpret a failure, and even then it runs correctly on the smallest model tier.
 
 ## Inputs
 
