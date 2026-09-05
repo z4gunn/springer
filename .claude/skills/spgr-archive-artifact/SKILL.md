@@ -7,7 +7,7 @@ description: Move a superseded or retired artifact to the dated archive store, a
 
 ## Purpose
 
-Keep the active artifact store free of stale versions while preserving an auditable history. Archiving is deterministic. The skill moves the artifact to a dated path, records an index entry, and confirms the active copy is cleared so no agent reads a superseded artifact by accident.
+Keep the active artifact store free of stale versions while preserving an auditable history. Archiving is deterministic. The skill moves the artifact to a dated path, records an index entry, and confirms the active copy is cleared so no agent reads a superseded artifact by accident. The procedure is mechanical and runs correctly on the smallest model tier, so the harness dispatches it as a mechanical unit per the dispatch tiers in `.claude/references/pdca-harness.md`.
 
 ## Inputs
 

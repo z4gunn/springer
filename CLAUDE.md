@@ -82,6 +82,9 @@ Hard:
 - References are one level deep from SKILL.md. A reference file longer than 100 lines opens with a table of contents.
 - A `scripts/` file is added only when the same code would be rewritten on each run, or when determinism matters. Test every script by running it. An `assets/` file is added only for files used in the output (e.g. schema files, templates, boilerplate).
 
+Guidance:
+- A skill has no model of its own and runs at the tier of whatever invokes it. A skill whose procedure is mechanical (transcription, file moves, deterministic checks) says so in its body so a dispatcher knows it needs no reasoning budget. The assignment of units to model tiers lives in the dispatch-tier table in `.claude/references/pdca-harness.md`, not in skill frontmatter.
+
 ### Agent Rules
 
 Hard:
@@ -92,7 +95,7 @@ Hard:
 
 Guidance:
 - Tools follow the role. A review or audit agent is read-only (`Read, Grep, Glob`), with `Bash` added only to run a linter or scanner. A developer agent uses `Read, Edit, Write, Bash, Grep, Glob`.
-- The `model` field is omitted (inherit) by default. Use `haiku` for a low-cost read-only research agent, `sonnet` for an auditor vertical whose per-cycle work is checklist verification against a confirmed spec, and `opus` for an architecture or judgment-heavy role. The architecture-gate verticals (Auth, Security, Compliance) stay on `opus` because their findings block the architecture checkpoint.
+- Every agent declares `model`. Omitting it inherits the session model, which is the most expensive tier and has driven session-limit exhaustion on ordinary PDCA loops. Use `haiku` for a low-cost read-only research agent, `sonnet` for an auditor vertical whose per-cycle work is checklist verification against a confirmed spec and for the spec-constrained implementation and coordination roles (the developer agents, QA, DevOps, the orchestrator), and `opus` for an architecture or judgment-heavy role. The Architect, the Code Reviewer (the last automated gate before merge), and the architecture-gate verticals (Auth, Security, Compliance) stay on `opus` because their findings block a checkpoint.
 - A subagent cannot spawn a subagent. The Orchestrator is the main agent that delegates, and the sub-roles return summaries. Cross-agent handoffs are encoded as artifact contracts, not as nested agent calls.
 
 ### Per-Artifact Checklist
@@ -100,7 +103,7 @@ Guidance:
 Run this checklist on every artifact before it is committed.
 - [ ] Started from a template, not a blank file
 - [ ] Name matches the file or directory, lowercase-kebab, `spgr-` prefix, globally unique
-- [ ] Skill frontmatter is exactly `name` and `description`. Agent declares `tools` at least privilege
+- [ ] Skill frontmatter is exactly `name` and `description`. Agent declares `tools` at least privilege and `model`
 - [ ] Description states what the artifact does and when to use it, within the length cap. Agent description is framed for delegation
 - [ ] Body is imperative and single-responsibility. Skill body is under 500 lines
 - [ ] Detail is in `references/`, with no duplication, references one level deep

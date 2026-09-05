@@ -57,14 +57,27 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    -phase artifact is unconfirmed. Pass the pinned learnings too. The orchestrator
    may cite a learning as proposed rationale in the cycle decision log, but every
    routing decision derives from the artifacts and config, never from a learning
-   alone.
+   alone. When a unit's story touches UI error or retry paths, cascade or
+   foreign-key delete paths, or pagination, the batch carries the pre-build
+   vertical consultations ahead of the build unit, per the reference.
 3. Do. Dispatch each routed unit to its domain agent as a subagent. When the
    batch holds several independent units, dispatch them in one turn so they run in
    parallel, and do not proceed to Check until every dispatched agent has
    returned. The turn boundary is the fork-join barrier, and because all run-state
    writes happen here in the main session after the barrier, there is a single
    writer. Collect the artifacts each agent wrote. Agents never write run state.
-4. Check. Validate every produced artifact with spgr-validate-artifact. Fan out
+   Dispatch under the token-economy rules and the dispatch-tier table in
+   [../../references/pdca-harness.md](../../references/pdca-harness.md). A
+   bounded fix goes to a FRESH agent with a tight prompt, never a resumed
+   heavy-transcript agent. Units point at the story brief plus cited artifact
+   sections rather than the full corpus. Mechanical units (version, archive,
+   render-doc, story-brief refresh, chore commits) go to a haiku subagent
+   through the model override, never inline in this session. Units verify with
+   scoped test runs and leave whole-suite proof to CI.
+4. Check. Validate every produced artifact by running
+   `python3 schemas/validate.py <artifact>` directly, and open
+   spgr-validate-artifact only when the script reports a failure, so the green
+   path costs no model tokens. Fan out
    the always-active vertical audits relevant to the produced artifact type as
    read-only subagents in parallel, and wait for all to return. Compare the actual
    outcome against the expected outcome from Plan. Reduce to one verdict: pass,
@@ -73,7 +86,16 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 5. Act. Append one pdca-cycle artifact with the plan, the dispatched batch, the
    check verdicts, and the act transition. Refresh the projection with
    `scripts/rebuild-projection.py <run-dir>`. Version or archive any superseded
-   artifact with spgr-version-artifact and spgr-archive-artifact. Then take the
+   artifact with spgr-version-artifact and spgr-archive-artifact. When
+   `runs/_linear/config.json` exists with `backlog_provider` set to `linear`,
+   also refresh the Linear board projection with
+   `npx tsx scripts/linear-sync.ts sync-run <run-dir>`. A sync failure is
+   logged in the cycle decision log and never blocks the transition, because
+   the board is a projection, not run state. When the cycle changed a story's
+   operative contract or rulings, refresh the story context brief
+   (`artifacts/story-brief-<story-id>.json`, a few thousand tokens: operative
+   refs, pinned rulings, open conditions, merge-bar state) so later units read
+   it instead of the full artifact corpus. Then take the
    transition: advance and loop, retry, escalate by routing per the orchestrator
    rules, or pause. On a fail verdict, retry by filing a bug report with
    spgr-write-bug-report and a regression test, then routing the fix to the
@@ -98,6 +120,11 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    is read as the checkpoint response on resume. A local-only unpushed branch is
    used only when a human explicitly asks for it. See the pr-merge gate rule in
    [../../references/pdca-harness.md](../../references/pdca-harness.md).
+   When the Linear board is active, attach the PR to the story's issue with
+   `npx tsx scripts/linear-sync.ts link-pr <story-id> <pr-url>` after opening
+   it. The story's move into the wip_board review column carries the issue to
+   In Review through the Act-step sync, and the merge read on resume moves the
+   story to the done column, which carries the issue to Done the same way.
 7. Complete. When the orchestrator reports no further work, write the
    run-retrospective summarizing the run's learnings, each tagged with its
    category, its evidence cycle refs, and a requires_human_promotion flag that is
@@ -125,3 +152,8 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 - The artifact contracts (pdca-cycle, run-state, run-retrospective) live in the
   schema registry at `schemas/`. Reference them through spgr-validate-artifact
   rather than restating field lists here.
+- Session limits are account-wide: every subagent's spend shares the main
+  session's window. The token-economy section of the reference is the operative
+  rule set. Its origin case is a test-bed story where resumed heavy-transcript
+  agents doing small fixes were the two most expensive dispatches of the run
+  and both session-limit deaths.

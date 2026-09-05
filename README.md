@@ -189,7 +189,7 @@ To run a project, drive it end to end with the PDCA harness described below, whi
 
 ### Drive a run with the PDCA harness
 
-The harness automates the loop a person otherwise runs by hand. The orchestrator decides the next unit of work and then stops. The `spgr-run-harness` skill is the loop around it. It reads run state, asks the orchestrator what runs next, dispatches the work, checks the result, records the tick, and repeats, pausing only at the human gates. It models the cycle as Plan-Do-Check-Act. Plan is the orchestrator routing the next batch of work. Do is each domain agent producing its artifact. Check is schema validation plus the read-only vertical audits. Act records the transition and then advances, retries a failure, routes an escalation, or pauses at a gate.
+The harness automates the loop a person otherwise runs by hand. The orchestrator decides the next unit of work and then stops. The `spgr-run-harness` skill is the loop around it. It reads run state, asks the orchestrator what runs next, dispatches the work, checks the result, records the tick, and repeats, pausing only at the human gates. It models the cycle as Plan-Do-Check-Act. Plan is the orchestrator routing the next batch of work. Do is each domain agent producing its artifact. Check is schema validation plus the read-only vertical audits. Act records the transition and then advances, retries a failure, routes an escalation, or pauses at a gate. The harness dispatches under a token-economy rule set: bounded fixes go to fresh agents, mechanical units go to the smallest model tier, and each story carries a compact context brief so units read a projection instead of the full artifact corpus.
 
 To start a run, open this repository in Claude Code and ask for the harness by name, giving it a run id and a one-paragraph problem statement:
 
@@ -237,6 +237,12 @@ python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py --once   # one 
 ```
 
 Token and timing figures cover activity recorded since the event hook was installed. Runs that predate it show run state and gates but no agent metrics.
+
+### Project the backlog onto a Linear board
+
+Optionally, a project can use a Linear board as the human-facing backlog and kanban. The typed artifacts under `runs/` stay the source of truth, and the harness projects them onto the board: confirmed stories become issues, each story's position on the WIP board moves its issue through the Linear states, and the pull request opened at a pr-merge gate is attached to the issue. A human dragging cards is never fought, and a sync failure never blocks the run.
+
+It is off unless `runs/_linear/config.json` exists. To turn it on, copy the template at `.claude/skills/spgr-run-harness/assets/linear-config.template.json` to that path, fill in the workspace ids, set `LINEAR_API_KEY` in your environment or the project's `.env`, and run `npx tsx .claude/skills/spgr-run-harness/scripts/linear-sync.ts ensure-labels`. It needs Node. The projection rules and the intake path are in the Linear section of `.claude/references/pdca-harness.md`.
 
 ### Quickstart: start a new project
 
