@@ -11,9 +11,12 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 - Verdict and transition table
 - Rehydration: start equals resume
 - Parallel Do: the barrier and disjoint scheduling
+- Token economy and dispatch efficiency
+- Pre-build vertical consultation
 - Human gates
 - Escalations
 - Self-improvement: advisory learnings
+- Linear board projection
 - Determinism scripts
 - Increment status
 
@@ -98,6 +101,86 @@ Two rules keep a parallel batch safe.
 The read-only audit fan-out in Check parallelizes with zero contention and is the
 low-risk half of parallelism.
 
+## Token economy and dispatch efficiency
+
+Session limits are account-wide and rolling: every subagent's spend counts
+against the same window as the main session, so a story driven gate-to-gate in
+one sitting can exhaust the window even when no single agent is oversized. The
+reference case is one story in a test-bed run: roughly 3.7M subagent tokens and
+two session-limit terminations, where the two most expensive dispatches were
+resumed agents doing small fixes. A +18/-6 source fix cost 322k tokens because
+resuming the implementation agent re-paid its ~300k transcript before any work
+began. These rules keep a run inside its window without lowering the quality bar.
+
+1. Fresh-by-default for bounded fixes. A bounded fix or follow-up dispatches a
+   NEW agent carrying a tight prompt, the finding text, and artifact refs.
+   Resume an existing agent only when its accumulated context is itself the
+   input: the orchestrator across Plans, or an interrupted unit with
+   substantial un-persisted work in its own transcript. Never resume a
+   heavy-transcript agent for light work.
+2. Story context brief. At Act, when a story's operative contract or rulings
+   changed that cycle, the harness refreshes a compact brief at
+   `runs/<run-id>/artifacts/story-brief-<story-id>.json`: operative artifact
+   refs, pinned strings and rulings, open conditions, and merge-bar state, held
+   to a few thousand tokens. Dispatched units read the brief first and open a
+   full artifact only for a section the brief cites. The brief is a projection
+   like run-state: derived, regenerable, never the source of truth. Its
+   contract is `schemas/story-brief-v1.json`.
+3. Scoped verification inside units. A unit runs the named test files its work
+   touches with filtered output, and single-workspace typechecks when the diff
+   is contained. Whole-suite, all-workspace proof belongs to CI at the publish
+   step, not to every unit locally.
+4. Effort and model tiering. Mechanical units (seed folds, doc renders, chore
+   commits, artifact transcription) dispatch at reduced effort on a smaller
+   model. Full effort is reserved for design, implementation, adversarial
+   review, and vertical sign-off, where the depth has repeatedly paid for
+   itself. The dispatch-tier table below is the operative assignment.
+5. Recovery from a session-limit death. Resume the dead agent in place only if
+   it held substantial un-persisted progress. Otherwise re-dispatch fresh under
+   rule 1. When limits recur within a run, serialize the heavy units across
+   ticks rather than stacking them in one parallel batch, and let the run span
+   windows instead of forcing it through one.
+6. Artifact diet. A producing agent writes what downstream consumers need and
+   links the rest by reference. Folded-in history belongs to the archived prior
+   version, not the operative artifact. An operative artifact that has grown
+   past roughly 30k tokens is a smell the producing agent should flag.
+
+### Dispatch tiers
+
+A skill carries no model of its own. It runs at the tier of whatever invokes
+it, so a skill the harness opens inline runs at the main-session model, the most
+expensive tier. Assign every unit to a tier before dispatch. The Agent tool
+takes a `model` override per dispatch, so a mechanical unit goes to haiku even
+when the skill it uses is one an opus-pinned agent normally runs. A mechanical
+unit is fresh every time under rule 1 and never inherits a transcript.
+
+| Tier | Runs as | Units |
+|------|---------|-------|
+| Deterministic | Bash, no model | `schemas/validate.py`, `rebuild-projection.py`, `derive-ready-queue.py`, `pin-learnings.py`, `linear-sync.ts` |
+| Mechanical | haiku subagent, fresh each time | spgr-version-artifact, spgr-archive-artifact, spgr-render-doc, story-brief refresh, spgr-write-bug-report from a captured failure, spgr-create-pr from a finished branch, chore commits, artifact transcription |
+| Pinned agent | the agent's own `model` | every domain-agent unit at full effort: design, implementation, adversarial review, vertical sign-off |
+| Inline main session | the session model, kept minimal | orchestrator dispatch, the Check comparison of expected versus actual, the verdict and transition, spgr-notify-human, run-state writes |
+
+## Pre-build vertical consultation
+
+A story whose scope touches UI error or retry paths, cascade or foreign-key
+delete paths, or pagination runs its vertical consultations before the build
+unit is dispatched, and folds their conditions into the acceptance criteria and
+the developer handoff. The orchestrator routes the consultation units in the
+batch ahead of the build unit through spgr-tag-vertical-agent: Accessibility
+for focus management on error and retry paths, Performance and Multi-tenancy
+for delete and cascade paths, API Design and Performance for pagination. The
+build unit does not dispatch until the handoff carries the folded conditions.
+
+The evidence behind the rule: in a test-bed run, seven build ticks gated at
+their first Check on late Critical or High findings in exactly these classes
+(WCAG 2.4.3 focus loss on error paths, unindexed foreign-key and cascade joins,
+unbounded embeds and keyset-pagination correctness), each burning a bounded
+retry after the code was written. The one story that ran its consultations
+pre-build and folded the conditions into its acceptance criteria came back
+APPROVE and PASS with zero retries on those classes. The rule was promoted from
+a run retrospective through a human gate, per the self-improvement rules below.
+
 ## Human gates
 
 Pause only at the five enumerated checkpoint types: architecture-options
@@ -162,9 +245,52 @@ consult it, under three rules that prevent silent drift. See ADR-004.
   set, a routing policy) carries requires_human_promotion true and is applied only
   through a human gate, never by the loop.
 
+## Linear board projection
+
+Optional. When `runs/_linear/config.json` exists with `backlog_provider` set to
+`linear`, the human-facing backlog and kanban is a Linear board, and the harness
+maintains it as a second projection of run state alongside run-state.json. The
+typed artifacts stay the source of truth. Linear is regenerable from them at
+any time.
+
+Setup, once per project: copy `assets/linear-config.template.json` (relative to
+the spgr-run-harness skill) to `runs/_linear/config.json`, fill in the team,
+project, state, and label ids from the workspace, set `LINEAR_API_KEY` in the
+environment or the project's root `.env` (a personal API key, never committed),
+and run `npx tsx scripts/linear-sync.ts ensure-labels` to create the `agent:*`
+labels and record their ids. The script needs Node and runs through `npx tsx`.
+For interactive triage a project may also register the Linear MCP server
+(`https://mcp.linear.app/mcp`) in its `.mcp.json`. The harness does not use it.
+
+- All Linear I/O goes through `scripts/linear-sync.ts`. Agents never call the
+  Linear API directly, and the harness never treats Linear as the database.
+- The Act step, after `rebuild-projection.py`, runs
+  `npx tsx scripts/linear-sync.ts sync-run <run-dir>`: unpublished confirmed
+  stories are created as issues, and each story present on the wip_board is
+  transitioned to the mapped Linear state (config `wip_board_state_map`). A
+  story absent from the board never demotes its issue, so a human dragging
+  cards is not fought and an idle board changes nothing.
+- A sync failure is recorded in the cycle decision log and never blocks the
+  Act transition. A projection must not gate the pipeline it projects.
+- At a pr-merge gate the harness attaches the PR to the story's issue
+  (`link-pr <story-id> <pr-url>`) after opening it. The review column carries
+  the issue to In Review. The merge, read on resume, moves the story to the
+  done column and the issue to Done.
+- So that Done accumulates on the board, a story that reaches done stays in
+  the wip_board done column permanently. Done entries do not count against
+  any WIP limit.
+- An issue is moved to Done only when its work is complete and fully validated
+  by the run (config `close_policy`). Work that needs human manual testing stays
+  open with a comment saying what the human must verify.
+- Intake runs the other way through `fetch-ready`: an issue carrying the
+  `agent:ready` label, or assigned to the configured intake assignee, is the
+  queue a human hands to the loop. A human edit to a story's scope made in
+  Linear is surfaced by the intake side as a scope-change gate. The sync never
+  reads Linear content back into artifacts silently.
+
 ## Determinism scripts
 
-Two scripts keep the deterministic work out of the model.
+These scripts keep the deterministic work out of the model.
 - `scripts/derive-ready-queue.py <run-dir>` prints the readiness snapshot. Pure
   function of the store. Makes no routing decision.
 - `scripts/rebuild-projection.py <run-dir> [--validate]` rebuilds run-state.json
@@ -173,6 +299,13 @@ Two scripts keep the deterministic work out of the model.
 - `scripts/pin-learnings.py <retrospective.json> ...` freezes the advisory
   learnings set by content hash at run start. Pure function of the inputs. Makes
   no judgment about which learnings apply.
+- `scripts/linear-sync.ts <command>` is the only channel for Linear I/O when the
+  Linear board projection is on. It pushes repo state to Linear or reads Linear
+  intake, and never treats Linear as the database.
+
+The story brief (`artifacts/story-brief-<story-id>.json`) is a projection in the
+same sense as run-state.json: derived from the operative artifacts, regenerable,
+never the source of truth.
 
 The store-reading scripts scan the active run-store subdirectories (artifacts,
 escalations, checkpoints, consultations) and never archive, so a checkpoint or
@@ -191,4 +324,6 @@ self-improvement loop is live: learnings are pinned by hash at run start, cited
 as advisory proposed rationale in Plan, and written to a retrospective at
 completion, with rule changes gated on human promotion. The run-state wip_board
 is maintained by the harness after each barrier, and rebuild-projection carries
-it forward when replaying the log.
+it forward when replaying the log. The token-economy rules, the dispatch tiers,
+the per-story brief, and the pre-build consultation rule are live. The Linear
+board projection is opt-in per project.
