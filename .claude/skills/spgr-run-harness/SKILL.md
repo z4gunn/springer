@@ -73,8 +73,11 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    vertical consultations ahead of the build unit, per the reference.
 3. Do. Dispatch each routed unit to its domain agent as a subagent. When the
    batch holds several independent units, dispatch them in one turn so they run in
-   parallel, and do not proceed to Check until every dispatched agent has
-   returned. The turn boundary is the fork-join barrier, and because all run-state
+   parallel, in the foreground and never with `run_in_background`, and do not
+   proceed to Check until every dispatched agent has
+   returned. If a background dispatch is ever used, append an `agent_joined`
+   event with its tool_use_id to `events.jsonl` when its task notification
+   arrives, because the hook cannot see a background agent finish. The turn boundary is the fork-join barrier, and because all run-state
    writes happen here in the main session after the barrier, there is a single
    writer. Collect the artifacts each agent wrote. Agents never write run state.
    Dispatch under the token-economy rules and the dispatch-tier table in
