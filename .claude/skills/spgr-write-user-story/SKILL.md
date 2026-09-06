@@ -32,7 +32,7 @@ Produce a single user story that is the atomic unit of the backlog, the smallest
 
 1. Read the PRD and the persona set with spgr-read-artifact. Confirm `prd_goal_ref` resolves to a real PRD goal and `target_persona` resolves to a real persona in the set. If either does not resolve, stop at step 6.
 2. Draft the story. Write the As a clause naming the persona archetype, never "the user" or "the system". Write the I want clause as an observable capability. Write the So that clause as business or user value, not a technical outcome. "So that I can see my account balance without calling support" is value. "So that I can update the database" is not.
-3. Frame a purely technical story (infrastructure, refactoring, observability) in the same template, with a developer or ops engineer as the actor and a system-quality outcome as the value. Technical stories are not exempt from the template.
+3. Frame a purely technical story (infrastructure, refactoring, observability) in the same template, with a developer or ops engineer as the actor and a system-quality outcome as the value. Technical stories are not exempt from the template. On `brochure` and `small` a story is a user-visible increment: a check script, a budget script, a source register, or a record that a criterion needs is an obligation inside the first story whose criterion needs it, never a story of its own. A reference run wrote twelve tooling stories for a one-page site and shipped scaffold, disclosure, and headers before any content.
 4. Run the INVEST check and set each letter:
    - Independent fails if the story explicitly depends on another story not yet delivered.
    - Negotiable holds when the story states the need, not a fixed implementation.

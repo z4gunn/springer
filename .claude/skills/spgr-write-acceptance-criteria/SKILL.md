@@ -24,7 +24,7 @@ Acceptance criteria are the contract between the PM and QA agents. They state ex
 |----------|-------------|
 | `acceptance-criteria` | The artifact, written via spgr-write-artifact against its registered schema. Holds the array of criteria, the coverage summary, and the scenario count. |
 
-Each criterion entry carries: `ac_id`, `story_ref`, `scenario_type` (one of `happy-path`, `error-path`, `boundary`), `given`, `when`, `then`, and `nfr_constraint_ref` (or null). The `ac_id` format is `AC-{story_id}-{seq}`, which ties each criterion to its parent story. The artifact also records a `coverage_summary` confirming all three scenario types are present and a `scenarios_count`.
+On the `brochure` and `small` profiles a criterion is one statement plus the command or test file that checks it, and the full Given/When/Then set is written only on `saas` and `mobile`. Each criterion entry carries: `ac_id`, `story_ref`, `scenario_type` (one of `happy-path`, `error-path`, `boundary`), `given`, `when`, `then`, and `nfr_constraint_ref` (or null). The `ac_id` format is `AC-{story_id}-{seq}`, which ties each criterion to its parent story. The artifact also records a `coverage_summary` confirming all three scenario types are present and a `scenarios_count`.
 
 ## Procedure
 
@@ -41,4 +41,5 @@ Each criterion entry carries: `ac_id`, `story_ref`, `scenario_type` (one of `hap
 
 - The artifact type `acceptance-criteria` is in the schema registry at schemas/. Reference field rules through spgr-validate-artifact rather than inlining them.
 - A story with N criteria should yield at least N test cases at the QA handoff, given the 1:1 criterion-to-test relationship. Do not collapse distinct behaviors into one criterion to keep the count down. Split the story instead.
-- When a criterion touches a vertical domain (security, accessibility, performance), consult the specialist through spgr-tag-vertical-agent before finalizing that criterion.
+- When a criterion touches a vertical domain (security, accessibility, performance), consult the specialist through spgr-tag-vertical-agent before finalizing that criterion. On `brochure` and `small`, apply the vertical's checklist from its skill body instead of tagging it.
+- A criterion names its check. It does not design it. Fixture suites, coverage gates, surface enumerations, and matcher rules belong in the project's test suite and check script, where they run. A criteria artifact over roughly 30k tokens, or a single criterion over roughly 2k tokens, is split or moved to the suite before the write. A reference run let three criteria grow to 72 KB describing a checker in more detail than the checker's own source.

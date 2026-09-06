@@ -13,11 +13,12 @@ This repository holds the build: 27 agents and 197 skills, almost all mapped fro
 These constraints shape every agent and are non-negotiable.
 
 1. Architecture first. No development begins until the human approves the architecture. The Architecture agent proposes at least two distinct options with full tradeoffs and does not select. Once approved, the architecture is an immutable constraint. A developer agent that cannot satisfy a requirement within it escalates rather than deviating.
-2. Minimal human-in-the-loop. The only required gates are architecture approval, design-direction selection, PR merge, a vertical security or compliance flag, and a scope change. Work between these gates flows agent to agent.
+2. Minimal human-in-the-loop. The only required gates are architecture approval, design-direction selection, PR merge, a vertical security or compliance flag, and a scope change. Work between these gates flows agent to agent. The PR-merge gate fires per batch or per page, not per story, and a `brochure` or `small` run may opt into auto-merge on reviewer approval plus green CI.
 3. Structured artifact contracts. Every handoff is a typed artifact with enumerated required fields, per-section rationale, explicit confidence signals (confirmed, proposed, needs-human-input), and a versioned schema. The receiving agent validates the artifact before acting on it.
 4. Escalation is not failure. An agent that refuses to proceed on incomplete or contradictory input, and returns a precise list of what is missing, is doing its job. Agents do not fill gaps with assumptions.
 5. Vertical agents are always active. Cross-cutting concerns (auth, security, compliance, observability, performance, accessibility) are not bound to a single phase. A vertical agent operates as a consultant when tagged, as an auditor on a scheduled sweep, and as a gate whose sign-off is required before certain artifacts can be marked confirmed.
 6. Design agents receive maximum creative latitude. They receive the problem and the personas, not wireframes, and produce multiple distinct directions. The human selects one direction, and the agent executes it with precision.
+7. Process scales to the product. Every run declares a profile (`brochure`, `small`, `saas`, `mobile`) that fixes the phase set, the story and criteria caps, the architecture depth, and the PR unit. The table and the policies that follow from it (mechanical Check, fold-in and docs rendering policy, the review bound, the main-session budget) live in `.claude/references/pdca-harness.md`. A brochure run that executes the SaaS lifecycle is a defect in the harness, not diligence.
 
 ## Repository Layout
 

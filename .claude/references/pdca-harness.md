@@ -7,13 +7,19 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 
 ## Contents
 - Roles and the single delegation hop
+- Run profiles
 - The PDCA tick
+- Mechanical Check
 - Verdict and transition table
 - Rehydration: start equals resume
 - Parallel Do: the barrier and disjoint scheduling
 - Token economy and dispatch efficiency
+- Main-session budget
+- Fold-in policy
+- Docs rendering policy
 - Pre-build vertical consultation
 - Human gates
+- Gate batching and auto-merge
 - Escalations
 - Self-improvement: advisory learnings
 - Linear board projection
@@ -28,6 +34,35 @@ domain agents for the work, both as sibling subagents. The orchestrator returns
 routing only and never invokes a domain agent. This keeps exactly one delegation
 hop, so Springer's rule that a subagent cannot spawn a subagent holds by
 construction. See ADR-002.
+
+## Run profiles
+
+A run declares a profile when it opens, on a `profile:` line in the problem
+statement and in `runs/<run-id>/run-brief.json`. The profile scales the
+lifecycle to the product. The reference case is a one-page brochure site with a
+written spec and a working prototype in hand that ran the full SaaS lifecycle:
+29 stories, 55 criteria, seven ADRs, 32 fold-ins, nine human gates, and thirty
+hours before the first visible content. Nothing in the harness said "small".
+
+| Profile | Fits | Phases routed | Stories | Architecture | Criteria | PR unit |
+|---------|------|---------------|---------|--------------|----------|---------|
+| brochure | static site, landing page, docs site, no backend | requirements, design, development | at most 10, one per visible section or behavior | one architecture note (stack, file layout, constraints), no ADR set | one sentence plus one check command each | one PR per page |
+| small | one service or app, one or two integrations, no tenancy or billing | requirements, architecture, design, development | at most 25 | ADRs only for decisions a later change would regret | statement plus check | one PR per co-scheduled batch |
+| saas | multi-tenant product with auth, billing, or an API surface | the full lifecycle | as scoped by the PM | full ADR set | full Given/When/Then sets | per story or batch |
+| mobile | store-distributed app | the full lifecycle plus the App Store vertical | as scoped | full ADR set | full sets | per story or batch |
+
+Rules the profile carries:
+- A phase outside the profile's set is not routed. Discovery runs on brochure
+  or small only when the human asks for it. Compliance scope on brochure is one
+  line in the requirements unit, not a consultation.
+- NFR consultations on brochure and small fold into the PM unit as a checklist.
+  A vertical is dispatched only when a later diff touches its surface.
+- The definition of done on brochure is the CI check. No DoD artifact is written.
+- The orchestrator reads the profile from the readiness snapshot and holds any
+  unit outside the profile's phase set. Changing the profile mid-run is a
+  scope-change gate.
+- The PM agent enforces the story and criteria caps at authoring time. A
+  backlog over the cap is merged or cut before the prd-approval gate.
 
 ## The PDCA tick
 
@@ -49,6 +84,27 @@ Each tick runs four phases in order.
    refresh the projection with `rebuild-projection.py`, then version or archive
    any artifact that a transition supersedes. Carry out the transition the
    verdict implies, then loop back to Plan or terminate.
+
+## Mechanical Check
+
+Check is mechanical first. It runs `schemas/validate.py` on every produced
+artifact, runs the project check script or the scoped test files the unit
+named, and reads CI on the PR head. The main session never re-runs an agent's
+verification by hand, never re-derives a finding an agent reported, and never
+opens an artifact to re-read a claim the check script already covers. A claim
+that no script or CI job can check is recorded as unverified. It is not
+verified by the harness reading files.
+
+A model-based audit is dispatched only when the diff touches a vertical's
+declared surface: UI markup or styles for Accessibility, dependencies, headers,
+or data handling for Security, a schema or a query for Performance. A change
+that touches only `runs/`, `docs/`, or the run's own ledgers is never sent to
+the Code Reviewer and never audited. Its check is validate plus a diff summary.
+
+Review is bounded to one review pass and one re-review. A second
+REQUEST_CHANGES routes the open findings to the human at the pr-merge gate as a
+list. The bound exists because one docs-regeneration chore in the reference
+case received three REQUEST_CHANGES passes, 45 findings, and five hours.
 
 ## Verdict and transition table
 
@@ -101,6 +157,17 @@ Two rules keep a parallel batch safe.
 The read-only audit fan-out in Check parallelizes with zero contention and is the
 low-risk half of parallelism.
 
+A cycle is not closed while a unit it dispatched is still running, and a new
+cycle is not planned while any dispatch from a prior cycle lacks a completion.
+A background agent outlives the turn that dispatched it, so the turn boundary
+alone does not enforce the barrier. `derive-ready-queue.py` reads
+`events.jsonl`, reports `unjoined_dispatches`, and sets blocked while any exist.
+The check keys on unmatched dispatch ids, never on elapsed time. When a dispatch
+is known dead (a session-limit death, a killed agent), the harness appends an
+`agent_abandoned` event carrying the same tool_use_id to release it. The
+reference case planned a cycle against a tree that a fifty-minute unit from the
+prior cycle was still writing, then blamed a different agent for the writes.
+
 ## Token economy and dispatch efficiency
 
 Session limits are account-wide and rolling: every subagent's spend counts
@@ -142,8 +209,19 @@ began. These rules keep a run inside its window without lowering the quality bar
    windows instead of forcing it through one.
 6. Artifact diet. A producing agent writes what downstream consumers need and
    links the rest by reference. Folded-in history belongs to the archived prior
-   version, not the operative artifact. An operative artifact that has grown
-   past roughly 30k tokens is a smell the producing agent should flag.
+   version, not the operative artifact. An operative artifact is capped at
+   roughly 30k tokens. Fixtures, coverage gates, and check design live in the
+   test suite and the check script, not in the criteria artifact. A producing
+   agent that would exceed the cap splits the artifact or links by reference.
+   The reference case let a criteria artifact grow to 45k tokens over seven
+   versions, three criteria of which described a checker in more detail than
+   the checker's own source.
+7. Run brief. `runs/<run-id>/run-brief.json` holds the profile, the run flags,
+   the pinned human rulings as one line each, and the operative artifact list
+   with versions, held to a few thousand tokens. The harness refreshes it at
+   Act whenever a ruling lands or an artifact is versioned. Rehydration reads
+   the run brief and the story brief, not the corpus. Its contract is
+   `schemas/run-brief-v1.json`.
 
 ### Dispatch tiers
 
@@ -160,6 +238,44 @@ unit is fresh every time under rule 1 and never inherits a transcript.
 | Mechanical | haiku subagent, fresh each time | spgr-version-artifact, spgr-archive-artifact, spgr-render-doc, story-brief refresh, spgr-write-bug-report from a captured failure, spgr-create-pr from a finished branch, chore commits, artifact transcription |
 | Pinned agent | the agent's own `model` | every domain-agent unit at full effort: design, implementation, adversarial review, vertical sign-off |
 | Inline main session | the session model, kept minimal | orchestrator dispatch, the Check comparison of expected versus actual, the verdict and transition, spgr-notify-human, run-state writes |
+
+## Main-session budget
+
+The main session runs the harness on sonnet by default. It writes run state and
+the cycle record, dispatches, and reads script output. The cycle record is
+capped at roughly 2k tokens: the batch, the verdicts, the transition, and the
+pending batch. A human ruling is recorded as the human's own words plus a
+one-line list of the artifacts it changes. The harness never writes a findings
+narrative longer than the diff it describes. In the reference case the main
+session issued 771 shell commands and 2.26M output tokens on opus, more than
+all 71 subagents combined, while the dispatch-tier table said it was kept
+minimal.
+
+## Fold-in policy
+
+A fold-in is a correction to a confirmed artifact found downstream. It is one
+line in `runs/<run-id>/pending-foldins.md`: id, target artifact, the change in
+one sentence, and the story or gate that consumes it. It is applied by a haiku
+unit in the same cycle it opens, or moved to a `deferred` list. A fold-in is
+opened only when it changes shipped bytes or a criterion the next build unit
+owns.
+
+Not fold-ins: confidence markers, checksums, stale prose in an artifact nothing
+reads next, doc fidelity, and any finding about the harness itself. Those are
+one batched hygiene pass at a human gate, or skipped. A fold-in never has
+another fold-in as its subject. A retraction is one line appended to the
+original. In the reference case 30 of 32 fold-ins concerned artifacts, docs, or
+the harness, one retracted another, one amended another's remedy, and the
+93 KB ledger outgrew everything the site will ever ship.
+
+## Docs rendering policy
+
+`docs/` is a review copy rendered at a human gate for the artifacts that gate
+reads, and only then. It is not refreshed on every artifact edit, and its
+fidelity is not audited beyond the render skill's own validation step. A human
+who wants a current copy of an artifact between gates asks for spgr-render-doc.
+A doc that is stale between gates is expected and says so in its header. The
+reference case spent one session of six regenerating and policing the mirror.
 
 ## Pre-build vertical consultation
 
@@ -189,6 +305,20 @@ Pause only at the five enumerated checkpoint types: architecture-options
 an implicit sixth gate violates minimal-human-in-the-loop. At a gate the harness
 writes the hil-checkpoint with pipeline_status paused, fires spgr-notify-human,
 records the pending batch in the cycle artifact, and terminates.
+
+## Gate batching and auto-merge
+
+The pr-merge gate fires per batch, where a batch is the set of stories the
+orchestrator co-scheduled onto one branch, or the whole page on brochure. It
+does not fire per story when several stories land in one PR. The reference case
+opened five PRs and five gates for six kilobytes of code.
+
+A run may set `auto_merge_on_green: true` in its run brief. Under that flag, on
+brochure and small only, a Code Reviewer APPROVE plus a fully green
+required-check set merges the PR with `gh pr merge --squash`, and the human
+reviews the deployed result instead of each PR. The harness records the merge in
+the cycle artifact. The flag defaults to false, is a human decision recorded in
+the project CLAUDE.md, and never applies to saas or mobile.
 
 ### pr-merge gate: publish before pausing
 
@@ -231,6 +361,13 @@ the upstream agent, technical conflict to the Architect, policy or compliance or
 security to the human plus the specialist, an unresolvable block to the human. A
 constraint conflict with approved architecture routes to escalation, never an
 auto-fix that edits an ADR. See the orchestrator agent for the full routing map.
+
+An escalation reaches the human only when resolving it would change a stated
+human constraint or the scope of a confirmed artifact. Everything else the
+routed specialist rules in-cycle, records in the artifact's decision log and
+the PR description, and the run moves on. In the reference case three of four
+escalations went to the human: a favicon file count, which story owns a
+heading, and TypeScript for a thirty-line script, the last ruled twice.
 
 ## Self-improvement: advisory learnings
 
@@ -326,4 +463,7 @@ completion, with rule changes gated on human promotion. The run-state wip_board
 is maintained by the harness after each barrier, and rebuild-projection carries
 it forward when replaying the log. The token-economy rules, the dispatch tiers,
 the per-story brief, and the pre-build consultation rule are live. The Linear
-board projection is opt-in per project.
+board projection is opt-in per project. Run profiles, the run brief, the
+mechanical Check, the fold-in and docs policies, the review bound, the
+un-joined dispatch barrier, and batch-level pr-merge with opt-in auto-merge
+were added after the brochure reference run.

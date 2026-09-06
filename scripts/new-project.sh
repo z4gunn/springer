@@ -8,23 +8,32 @@
 # This script lays down that copy in a target directory, which becomes the app's
 # own git repository.
 #
-# Usage: scripts/new-project.sh <target-dir>
+# Usage: scripts/new-project.sh <target-dir> [profile]
 #
 # The target directory must not already exist or must be empty. The script copies
 # the runtime subset (.claude/skills, .claude/agents, .claude/references, schemas),
 # installs the downstream project ruleset as CLAUDE.md, seeds an empty run store,
 # and initializes a git repository with one commit.
+#
+# profile is the default run profile written into CLAUDE.md: brochure, small,
+# saas (the default), or mobile. See the run-profiles table in
+# .claude/references/pdca-harness.md.
 
 set -euo pipefail
 
 usage() {
-  echo "Usage: $(basename "$0") <target-dir>" >&2
+  echo "Usage: $(basename "$0") <target-dir> [brochure|small|saas|mobile]" >&2
   echo "Create a new Springer-driven project at <target-dir>." >&2
   exit 2
 }
 
-[ $# -eq 1 ] || usage
+[ $# -ge 1 ] && [ $# -le 2 ] || usage
 TARGET="$1"
+PROFILE="${2:-saas}"
+case "$PROFILE" in
+  brochure|small|saas|mobile) ;;
+  *) echo "Error: unknown profile '$PROFILE'." >&2; usage ;;
+esac
 
 # Resolve the Springer source root from this script's own location.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -58,8 +67,10 @@ cp -R "$SRC/.claude/hooks"      "$TARGET/.claude/hooks"
 cp "$SRC/.claude/settings.json" "$TARGET/.claude/settings.json"
 cp -R "$SRC/schemas"            "$TARGET/schemas"
 
-# 2. Install the downstream ruleset as the project's CLAUDE.md.
-cp "$SRC/templates/project-CLAUDE.md" "$TARGET/CLAUDE.md"
+# 2. Install the downstream ruleset as the project's CLAUDE.md, stamping the
+#    default run profile.
+sed "s/^Default profile for this project: \`saas\`\./Default profile for this project: \`$PROFILE\`./" \
+  "$SRC/templates/project-CLAUDE.md" > "$TARGET/CLAUDE.md"
 
 # 3. Derive a .gitignore from Springer's, minus the rule that ignores the run
 #    store. In an application project the run artifacts are the design record and
@@ -84,9 +95,11 @@ Done. Next steps:
   claude
 
 Then describe the app you want to build and delegate to the Orchestrator agent
-(spgr-agent-orchestrator), or start with spgr-agent-discovery. The team pauses at
-the five human checkpoints: architecture approval, design-direction selection,
-pull-request merge, a security or compliance flag, and a scope change.
+(spgr-agent-orchestrator), or start with spgr-agent-discovery. The run profile is
+$PROFILE. Put a "profile: $PROFILE" line in the run's problem statement. The
+team pauses at the five human checkpoints: architecture approval,
+design-direction selection, pull-request merge, a security or compliance flag,
+and a scope change.
 
 Artifacts accumulate under runs/<run-id>/. Application source code is written into
 the project tree.

@@ -138,6 +138,7 @@ def self_check():
     #    a representative invalid sample fails.
     for label, obj in (("pdca-cycle", _sample_pdca_cycle()),
                        ("run-state", _sample_run_state()),
+                       ("run-brief", _sample_run_brief()),
                        ("run-retrospective", _sample_retrospective())):
         issues = _validate_object(obj, registry)
         if issues:
@@ -152,6 +153,11 @@ def self_check():
     bad_state["content"]["wip_board"]["development"] = ["S1", "S2", "S3"]
     if not _validate_object(bad_state, registry):
         failures.append("run-state exceeding the WIP limit was accepted")
+
+    bad_brief = _sample_run_brief()
+    bad_brief["content"]["profile"] = "enterprise"
+    if not _validate_object(bad_brief, registry):
+        failures.append("run-brief with an unknown profile was accepted")
 
     bad_retro = _sample_retrospective()
     bad_retro["content"]["run_outcome"] = "nope"
@@ -275,6 +281,22 @@ def _sample_run_state():
         "open_escalations": [],
         "cycle_counter": 1,
         "learnings_pinned": [],
+    }
+    return obj
+
+
+def _sample_run_brief():
+    obj = _harness_header("run-brief-demo", "run-brief", "run_brief")
+    obj["content"] = {
+        "run_id": "demo",
+        "profile": "brochure",
+        "phase_set": ["requirements", "design", "development"],
+        "flags": {"auto_merge_on_green": False, "docs_render": "at-gates"},
+        "caps": {"max_stories": 10, "max_artifact_tokens": 30000,
+                 "max_cycle_record_tokens": 2000, "max_review_passes": 2},
+        "pinned_rulings": ["HD-001: headline is fixed. Changes prd, STORY-006."],
+        "operative_artifacts": {"prd": "runs/demo/artifacts/prd-demo.json@v1.0"},
+        "pr_unit": "page",
     }
     return obj
 

@@ -51,6 +51,18 @@ def load_good(run_dir):
     return out
 
 
+def run_profile(run_dir):
+    """Read the profile from run-brief.json when it exists. The brief is the
+    source for the profile, run-state only projects it."""
+    bp = Path(run_dir) / "run-brief.json"
+    if not bp.exists():
+        return None
+    try:
+        return json.loads(bp.read_text()).get("content", {}).get("profile")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
 def existing_state(run_dir):
     sp = Path(run_dir) / "run-state.json"
     if sp.exists():
@@ -99,6 +111,9 @@ def rebuild(run_dir):
         "cycle_counter": len(cycles),
         "learnings_pinned": prior.get("learnings_pinned", []),
     }
+    profile = run_profile(run_dir) or prior.get("profile")
+    if profile:
+        content["profile"] = profile
     artifact = {
         "artifact_id": f"run-state-{run_id}",
         "artifact_type": "run-state",
@@ -131,7 +146,8 @@ def main(argv):
     out_path.write_text(json.dumps(artifact, indent=2))
     c = artifact["content"]
     print(f"wrote {out_path}")
-    print(f"  cycle_counter={c['cycle_counter']} active_phase={c['active_phase']} "
+    print(f"  profile={c.get('profile')} cycle_counter={c['cycle_counter']} "
+          f"active_phase={c['active_phase']} "
           f"open_gates={c['open_gates']} open_escalations={c['open_escalations']}")
 
     if do_validate:

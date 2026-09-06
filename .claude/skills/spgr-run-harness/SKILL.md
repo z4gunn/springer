@@ -23,6 +23,7 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 | `run_id` | The run to drive. A new run-id creates the store, an existing one resumes it |
 | `problem_statement` | Required only when creating a new run, the seed the first phase consumes |
 | `mode` | `run` drives until a gate or completion, `tick` runs one cycle and returns |
+| `profile` | Required on a new run. One of `brochure`, `small`, `saas`, `mobile`. Scales the phase set, the story and criteria caps, and the PR unit per the run-profiles table in the reference. Recorded in the run brief and read from there on resume |
 
 ## Outputs
 
@@ -32,14 +33,22 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 | `run-state` | The derived projection, refreshed after every tick |
 | `hil-checkpoint` | Written when the loop pauses at a human gate |
 | `run-retrospective` | Written at run completion |
+| `run-brief` | `runs/<run-id>/run-brief.json`, the profile, flags, pinned rulings, and operative artifact list, refreshed at Act |
 
 ## Procedure
 
-1. Rehydrate. On every entry, run `scripts/derive-ready-queue.py <run-dir>`. If an
+1. Rehydrate. On every entry, run `scripts/derive-ready-queue.py <run-dir>`. If
+   the snapshot lists `unjoined_dispatches`, stop: an agent from a prior cycle
+   has no completion event, and planning against a tree it may still be writing
+   is forbidden. Wait for it, or append an `agent_abandoned` event with its
+   tool_use_id to `events.jsonl` once it is known dead, then re-enter. If an
    open gate now carries a response, stamp its hil-checkpoint resumed, consume the
    response, and prepare to continue from the pending batch the paused cycle
    recorded. If an open gate still has no response, stop and report that the run
-   is waiting on a human. Start and resume are the same path. On a new run only,
+   is waiting on a human. Start and resume are the same path. Read the run brief
+   and the story briefs the pending batch names. Do not re-read the artifact
+   corpus. On a new run only, write the run brief with the profile from the
+   problem statement's `profile:` line, and
    pin the advisory learnings set once with `scripts/pin-learnings.py` over the
    available prior run-retrospective artifacts, and record it in
    run-state.learnings_pinned so the run is reproducible. Whenever the run will
@@ -51,7 +60,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    `scripts/launch-dashboard.py on` or `off`, which persists the choice in
    runs/_dashboard/config.json.
 2. Plan. Pass the readiness snapshot and every open escalation to the
-   spgr-agent-orchestrator subagent. Receive a routed batch: each unit names the
+   spgr-agent-orchestrator subagent. The snapshot carries the profile, and the
+   orchestrator holds any unit outside the profile's phase set. Receive a routed
+   batch: each unit names the
    agent, its input artifact refs, and the expected outcome. Enforce the phase
    gate the orchestrator reports, do not route into a new phase while a prior
    -phase artifact is unconfirmed. Pass the pinned learnings too. The orchestrator
@@ -74,15 +85,21 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    render-doc, story-brief refresh, chore commits) go to a haiku subagent
    through the model override, never inline in this session. Units verify with
    scoped test runs and leave whole-suite proof to CI.
-4. Check. Validate every produced artifact by running
+4. Check, mechanical first. Validate every produced artifact by running
    `python3 schemas/validate.py <artifact>` directly, and open
    spgr-validate-artifact only when the script reports a failure, so the green
-   path costs no model tokens. Fan out
-   the always-active vertical audits relevant to the produced artifact type as
-   read-only subagents in parallel, and wait for all to return. Compare the actual
+   path costs no model tokens. Run the project check script or the scoped test
+   files the unit named, and read CI on the PR head. Do not re-run an agent's
+   verification by hand, re-derive a finding it reported, or open artifacts to
+   re-read claims a script covers. A claim no script can check is recorded as
+   unverified. Dispatch a vertical audit only when the diff touches that
+   vertical's surface, as read-only subagents in parallel, and wait for all to
+   return. A change touching only `runs/`, `docs/`, or the run ledgers gets no
+   review and no audit. Compare the actual
    outcome against the expected outcome from Plan. Reduce to one verdict: pass,
    fail, gate, or blocked. An audit that returns GATE, or any open Critical or
-   High finding, forces a hard stop, never an advance.
+   High finding, forces a hard stop, never an advance. See Mechanical Check in
+   the reference.
 5. Act. Append one pdca-cycle artifact with the plan, the dispatched batch, the
    check verdicts, and the act transition. Refresh the projection with
    `scripts/rebuild-projection.py <run-dir>`. Version or archive any superseded
@@ -95,16 +112,26 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    operative contract or rulings, refresh the story context brief
    (`artifacts/story-brief-<story-id>.json`, a few thousand tokens: operative
    refs, pinned rulings, open conditions, merge-bar state) so later units read
-   it instead of the full artifact corpus. Then take the
+   it instead of the full artifact corpus. Refresh the run brief when a ruling
+   landed or an artifact was versioned. Record a fold-in as one line and apply
+   it through a haiku unit in this cycle or defer it, per the fold-in policy in
+   the reference. Keep the cycle record to roughly 2k tokens. Then take the
    transition: advance and loop, retry, escalate by routing per the orchestrator
    rules, or pause. On a fail verdict, retry by filing a bug report with
    spgr-write-bug-report and a regression test, then routing the fix to the
    developer agent that owns the artifact. Bound retries: after two failed retries
    on the same unit, stop retrying and escalate to the human rather than looping.
+   Bound review the same way: one review pass and one re-review, then the open
+   findings go to the human at the gate as a list.
 6. Pause at a gate. Write the hil-checkpoint with pipeline_status paused, set the
    act transition to pause, record the pending batch in the cycle artifact, fire
    spgr-notify-human, and terminate cleanly. Resuming is step 1 on the next entry.
-   For a pr-merge gate, first publish: once all automated sign-offs pass, commit
+   Render `docs/` for the artifacts this gate reads, and only those, through a
+   haiku spgr-render-doc unit. A pr-merge gate fires once per batch or per page,
+   not per story. When the run brief sets `auto_merge_on_green` on a brochure
+   or small profile, a Code Reviewer APPROVE plus fully green required checks
+   merges the PR with `gh pr merge --squash` and the run advances without
+   pausing. Otherwise, for a pr-merge gate, first publish: once all automated sign-offs pass, commit
    the change on its story branch, push to origin, and open the PR with
    spgr-create-pr against the protected base. Then wait for the remote CI checks
    on the PR head and confirm every required check passes BEFORE writing the
@@ -152,6 +179,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 - The artifact contracts (pdca-cycle, run-state, run-retrospective) live in the
   schema registry at `schemas/`. Reference them through spgr-validate-artifact
   rather than restating field lists here.
+- The harness session runs on sonnet by default. The main session writes run
+  state and the cycle record and dispatches. It does not verify by hand and does
+  not author narratives.
 - Session limits are account-wide: every subagent's spend shares the main
   session's window. The token-economy section of the reference is the operative
   rule set. Its origin case is a test-bed story where resumed heavy-transcript
