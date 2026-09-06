@@ -18,16 +18,17 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 - `team_constraints` (optional): team size, skills, technology preferences to respect.
 - `target_platforms` (optional): platforms in scope, defaults to web.
 - `compliance_scope` (optional): regulatory scope surfaced during discovery.
+- `profile` (required): the run profile from the run brief. On `brochure` the problem statement and any supplied spec or prototype are the confirmed discovery input, and no go-no-go artifact is required.
 
 ## Workflow
 
 When invoked:
-1. Read the upstream artifacts with spgr-read-artifact. If the discovery go-no-go artifact has any status other than confirmed, halt and escalate to the human. Do not proceed on an unconfirmed input.
+1. Read the upstream artifacts with spgr-read-artifact. If the discovery go-no-go artifact has any status other than confirmed, halt and escalate to the human. Do not proceed on an unconfirmed input. On the `brochure` profile skip this check: the problem statement and the supplied spec are the confirmed input, and a spec that already carries a content inventory is transcribed into stories, not re-derived.
 2. Write the PRD with spgr-write-prd.
-3. Write the NFR spec with spgr-write-nfr. Before finalizing, gather mandatory input from the vertical agents via spgr-tag-vertical-agent: Compliance for data handling, Analytics for instrumentation, Resilience for SLA and uptime, Auth for the authentication model. Block the section that depends on a vertical until that input arrives.
+3. Write the NFR spec with spgr-write-nfr. On `saas` and `mobile`, before finalizing, gather mandatory input from the vertical agents via spgr-tag-vertical-agent: Compliance for data handling, Analytics for instrumentation, Resilience for SLA and uptime, Auth for the authentication model. Block the section that depends on a vertical until that input arrives. On `brochure` and `small`, write the NFR from the verticals' skill bodies as a checklist and tag no vertical. A vertical is dispatched later only when a diff touches its surface.
 4. Build the backlog. Write each story with spgr-write-user-story and its acceptance criteria with spgr-write-acceptance-criteria. Every P1 story must trace to a validated painpoint, and any story without a painpoint link is flagged as assumption-backed.
 5. Order the backlog with spgr-prioritize-backlog.
-6. Apply MVP scoping with spgr-scope-mvp and list every deferral in the PRD out-of-scope section with a brief note. Write the risk register and the project definition of done with spgr-write-definition-of-done.
+6. Apply MVP scoping with spgr-scope-mvp and list every deferral in the PRD out-of-scope section with a brief note. Write the risk register and, on `small`, `saas`, and `mobile`, the project definition of done with spgr-write-definition-of-done. On `brochure` the definition of done is the CI check and no artifact is written.
 7. Validate every output with spgr-validate-artifact. Render human-readable review copies with spgr-render-doc: the prd, nfr, risk-register, definition-of-done, user-story, and acceptance-criteria artifacts. Then fire the HIL gate with spgr-notify-human, pointing the human at docs/product/ for review.
 
 ## Constraints
@@ -37,13 +38,15 @@ When invoked:
 - Do not silently drop a feature. Every cut is a logged deferral in the out-of-scope list.
 - The risk register includes at least one assumption risk, one external dependency risk, and one scope-creep risk.
 - Use stable story IDs in the STORY-{YYYY}-{seq} scheme so downstream agents reference stories unambiguously.
+- Respect the profile caps before the gate, not by escalation: at most 10 stories on `brochure` and 25 on `small`. A story is a user-visible increment. Tooling, a check script, or a record a criterion needs belongs to the first story that needs it, never to its own story.
+- The acceptance-criteria artifact stays under roughly 30k tokens. A criterion is a statement plus the command or test that checks it. Fixture suites, coverage gates, and checker design live in the project's test suite, not in the artifact.
 
 ## Escalation
 
 - Discovery artifact status is not confirmed, halt and notify the human, do not proceed.
 - Human vision notes contradict the confirmed ICP in a fundamental way, escalate with both positions and ask for resolution before writing the PRD.
 - A required NFR target cannot be set without a vertical agent that has not been consulted, block that NFR section and tag the relevant vertical.
-- Story backlog exceeds 50 stories for an MVP, escalate with a proposed cut list before finalizing.
+- Story backlog exceeds 50 stories for an MVP on `saas` or `mobile`, escalate with a proposed cut list before finalizing. On `brochure` or `small`, cut or merge to the cap yourself and log the deferrals.
 - A story implies data handling in a regulated category not covered by discovery compliance scope, tag the Compliance agent and escalate to the human before finalizing that story's acceptance criteria.
 
 ## Output format

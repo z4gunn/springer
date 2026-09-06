@@ -3,17 +3,44 @@
   "$id": "https://springer.local/schemas/run-state-v1.json",
   "title": "SPGR Run State v1",
   "description": "Derived, rebuildable projection over the pdca-cycle log. A cache, never an independent source of truth. rebuild-projection.py regenerates it by replaying the cycle records. The regenerable field marks it as such.",
-  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "allOf": [
+    {
+      "$ref": "https://springer.local/schemas/_envelope-v1.json"
+    }
+  ],
   "properties": {
-    "artifact_type": { "const": "run-state" },
-    "content": { "$ref": "#/$defs/content" }
+    "artifact_type": {
+      "const": "run-state"
+    },
+    "content": {
+      "$ref": "#/$defs/content"
+    }
   },
   "$defs": {
     "content": {
       "type": "object",
-      "required": ["run_id", "regenerable", "active_phase", "wip_board", "cycle_counter"],
+      "required": [
+        "run_id",
+        "regenerable",
+        "active_phase",
+        "wip_board",
+        "cycle_counter"
+      ],
       "properties": {
-        "run_id": { "type": "string", "minLength": 1 },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "brochure",
+            "small",
+            "saas",
+            "mobile"
+          ],
+          "description": "The run profile, projected from run-brief.json. Scales the phase set, caps, and PR unit."
+        },
         "regenerable": {
           "const": true,
           "description": "Always true. Declares this artifact a cache that can be rebuilt from the cycle log."
@@ -23,28 +50,74 @@
           "minimum": 0,
           "description": "cycle_number of the last cycle this projection reflects, for staleness detection."
         },
-        "active_phase": { "type": "string", "minLength": 1 },
+        "active_phase": {
+          "type": "string",
+          "minLength": 1
+        },
         "workstreams": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["workstream_id", "phase"],
+            "required": [
+              "workstream_id",
+              "phase"
+            ],
             "properties": {
-              "workstream_id": { "type": "string", "minLength": 1 },
-              "phase": { "type": "string", "minLength": 1 }
+              "workstream_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "phase": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         },
         "wip_board": {
           "type": "object",
-          "required": ["backlog", "development", "review", "validation", "done"],
+          "required": [
+            "backlog",
+            "development",
+            "review",
+            "validation",
+            "done"
+          ],
           "description": "Stories by stage. development, review, and validation are capped at the WIP limit of 2.",
           "properties": {
-            "backlog": { "type": "array", "items": { "type": "string" } },
-            "development": { "type": "array", "items": { "type": "string" }, "maxItems": 2 },
-            "review": { "type": "array", "items": { "type": "string" }, "maxItems": 2 },
-            "validation": { "type": "array", "items": { "type": "string" }, "maxItems": 2 },
-            "done": { "type": "array", "items": { "type": "string" } }
+            "backlog": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "development": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 2
+            },
+            "review": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 2
+            },
+            "validation": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 2
+            },
+            "done": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         },
         "ready_queue": {
@@ -52,22 +125,41 @@
           "description": "Units ready to dispatch on the next tick.",
           "items": {
             "type": "object",
-            "required": ["agent"],
+            "required": [
+              "agent"
+            ],
             "properties": {
-              "agent": { "type": "string", "minLength": 1 },
-              "input_artifact_refs": { "type": "array", "items": { "type": "string" } },
-              "workstream": { "type": ["string", "null"] }
+              "agent": {
+                "type": "string",
+                "minLength": 1
+              },
+              "input_artifact_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "workstream": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
             }
           }
         },
         "open_gates": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "checkpoint_id of every paused hil-checkpoint awaiting a human response."
         },
         "open_escalations": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "escalation_id of every unresolved escalation."
         },
         "cycle_counter": {
@@ -80,10 +172,19 @@
           "description": "The advisory learnings set frozen at run start, pinned by hash for reproducibility.",
           "items": {
             "type": "object",
-            "required": ["retrospective_ref", "hash"],
+            "required": [
+              "retrospective_ref",
+              "hash"
+            ],
             "properties": {
-              "retrospective_ref": { "type": "string", "minLength": 1 },
-              "hash": { "type": "string", "minLength": 1 }
+              "retrospective_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hash": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         }

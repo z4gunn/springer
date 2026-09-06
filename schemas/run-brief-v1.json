@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/run-brief-v1.json",
+  "title": "SPGR Run Brief v1",
+  "description": "A compact per-run projection at runs/<run-id>/run-brief.json: the profile that scales the lifecycle, the run flags, the pinned human rulings as one line each, and the operative artifact list with versions. The harness refreshes it at Act whenever a ruling lands or an artifact is versioned, and rehydration reads it instead of the artifact corpus. Derived and regenerable, never the source of truth. Held to a few thousand tokens.",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "run-brief" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "profile": {
+      "type": "string",
+      "enum": ["brochure", "small", "saas", "mobile"],
+      "description": "Scales the phase set, the story and criteria caps, and the PR unit. See the run-profiles table in .claude/references/pdca-harness.md."
+    },
+    "content": {
+      "type": "object",
+      "required": ["run_id", "profile"],
+      "properties": {
+        "run_id": { "type": "string", "minLength": 1 },
+        "profile": { "$ref": "#/$defs/profile" },
+        "phase_set": {
+          "type": "array",
+          "description": "The phases this profile routes, in order. A unit outside this set is held.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "flags": {
+          "type": "object",
+          "properties": {
+            "auto_merge_on_green": {
+              "type": "boolean",
+              "default": false,
+              "description": "brochure and small only. Code Reviewer APPROVE plus fully green required checks merges the PR without a human pause. A human decision recorded in the project CLAUDE.md."
+            },
+            "docs_render": {
+              "type": "string",
+              "enum": ["at-gates", "on-demand"],
+              "default": "at-gates",
+              "description": "When docs/ is rendered. Never on every artifact edit."
+            }
+          },
+          "additionalProperties": false
+        },
+        "caps": {
+          "type": "object",
+          "properties": {
+            "max_stories": { "type": "integer", "minimum": 1 },
+            "max_artifact_tokens": { "type": "integer", "minimum": 1000 },
+            "max_cycle_record_tokens": { "type": "integer", "minimum": 500 },
+            "max_review_passes": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "pinned_rulings": {
+          "type": "array",
+          "description": "One line per human ruling: id, the ruling in the human's words, the artifacts it changes.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "operative_artifacts": {
+          "type": "object",
+          "description": "Name to repo-relative path plus version of each artifact that currently governs the run.",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "pr_unit": {
+          "type": "string",
+          "enum": ["page", "batch", "story"],
+          "description": "What one pull request and one pr-merge gate cover under this profile."
+        }
+      }
+    }
+  }
+}

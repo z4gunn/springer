@@ -5,8 +5,15 @@ Reads the run store and returns the facts the orchestrator needs to route the
 next tick, computed the same way every time so routing is reproducible and the
 model adjudicates only genuine ambiguity. This script makes no routing decision.
 It reports open gates, open escalations, the confirmed-artifact inventory, the
-latest phase, and a blocked flag. The orchestrator turns this into a routed
-batch.
+latest phase, the run profile and flags from run-brief.json, any dispatched
+agent that has no completion event yet, and a blocked flag. The orchestrator
+turns this into a routed batch.
+
+An un-joined dispatch blocks planning: a background agent outlives the turn
+that dispatched it, and a cycle planned against a tree it is still writing is
+the FI-024 defect. The check keys on unmatched tool_use_id values in
+events.jsonl, never on elapsed time. An `agent_abandoned` event carrying the
+same tool_use_id releases a dispatch that is known dead.
 
 Usage:
     python3 derive-ready-queue.py <run-dir>
@@ -42,8 +49,51 @@ def load_artifacts(run_dir):
     return out
 
 
+def load_run_brief(run_dir):
+    """Return the run brief content, or {} when none exists yet. The brief is a
+    projection (schemas/run-brief-v1.json): profile, flags, pinned rulings, and
+    the operative artifact list."""
+    bp = Path(run_dir) / "run-brief.json"
+    if not bp.exists():
+        return {}
+    try:
+        return json.loads(bp.read_text()).get("content", {})
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def unjoined_dispatches(run_dir):
+    """Return every agent_dispatched event whose tool_use_id has no matching
+    agent_completed or agent_abandoned event. Malformed lines are skipped, since
+    the hook writes best-effort and never blocks a tool call."""
+    ep = Path(run_dir) / "events.jsonl"
+    if not ep.exists():
+        return []
+    dispatched, joined = {}, set()
+    for line in ep.read_text().splitlines():
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        tid = ev.get("tool_use_id")
+        if not tid:
+            continue
+        kind = ev.get("event")
+        if kind == "agent_dispatched":
+            dispatched.setdefault(tid, ev)
+        elif kind in ("agent_completed", "agent_abandoned"):
+            joined.add(tid)
+    return [
+        {"tool_use_id": tid, "agent": ev.get("agent"), "ts": ev.get("ts"),
+         "description": ev.get("description", "")}
+        for tid, ev in dispatched.items() if tid not in joined
+    ]
+
+
 def derive(run_dir):
     run_id = Path(run_dir).name
+    brief = load_run_brief(run_dir)
+    unjoined = unjoined_dispatches(run_dir)
     artifacts = load_artifacts(run_dir)
 
     read_errors = [str(p) for p, a in artifacts if a is None]
@@ -94,20 +144,26 @@ def derive(run_dir):
             "all_confirmed": bool(conf) and all(v == "confirmed" for v in conf.values()),
         })
 
-    blocked = bool(open_gates or open_escalations)
+    blocked = bool(open_gates or open_escalations or unjoined)
     reason = None
-    if open_gates:
+    if unjoined:
+        ids = ", ".join(u["tool_use_id"] for u in unjoined)
+        reason = f"un-joined dispatch(es) still running or abandoned without an event: {ids}"
+    elif open_gates:
         reason = f"paused at gate(s): {', '.join(open_gates)}"
     elif open_escalations:
         reason = f"open escalation(s): {', '.join(open_escalations)}"
 
     return {
         "run_id": run_id,
+        "profile": brief.get("profile"),
+        "flags": brief.get("flags", {}),
         "cycle_counter": len(cycles),
         "latest_phase": latest_phase,
         "open_gates": open_gates,
         "open_escalations": open_escalations,
         "artifact_inventory": inventory,
+        "unjoined_dispatches": unjoined,
         "blocked": blocked,
         "blocking_reason": reason,
         "read_errors": read_errors,

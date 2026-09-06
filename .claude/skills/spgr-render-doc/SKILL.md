@@ -46,6 +46,7 @@ The early-phase agents write everything as typed JSON envelope artifacts in `run
 
 ## Notes
 
+- Render at a human gate, for the artifacts that gate reads, and only then. The harness does not refresh `docs/` on every artifact edit, and does not audit render fidelity beyond step 1's validation. Between gates a doc may be stale and its header says so. A human who wants a current copy asks for this skill directly. See the docs rendering policy in `.claude/references/pdca-harness.md`.
 - Docs are not typed artifacts. They carry no envelope, no checksum, and no schema, the same as the excalidraw render outputs and the spgr-generate-api-docs Markdown. Do not route them through spgr-write-artifact or spgr-validate-artifact.
 - This skill never writes into `runs/`. It only reads the artifact store and writes under `docs/`. The run store is the source of truth and stays unchanged.
 - This skill has no Phase 1 vault spec. It was authored to the Springer build standards as a net-new capability, so there is no "Phase 2 Build Notes" brief to map from.
