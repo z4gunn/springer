@@ -174,7 +174,7 @@ def aggregate_project(project_root):
             kind = ev.get("event")
             if kind == "agent_dispatched":
                 stats["dispatches"] += 1
-            elif kind == "agent_completed":
+            elif kind in ("agent_completed", "agent_joined", "agent_abandoned"):
                 stats["completions"] += 1
                 metrics = ev.get("metrics") or {}
                 for key, value in metrics.items():
@@ -206,7 +206,7 @@ def pair_events(events):
             open_by_key.setdefault(
                 (ev.get("agent"), ev.get("description")), []
             ).append(row)
-        elif kind == "agent_completed":
+        elif kind in ("agent_completed", "agent_joined", "agent_abandoned"):
             row = None
             if ev.get("tool_use_id") and ev["tool_use_id"] in open_by_id:
                 row = open_by_id.pop(ev["tool_use_id"])

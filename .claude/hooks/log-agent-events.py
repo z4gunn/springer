@@ -2,8 +2,15 @@
 """Dashboard event hook. Registered for PreToolUse and PostToolUse on the
 subagent dispatch tool (Task/Agent). Appends one JSON line per dispatch or
 completion to the run's events.jsonl so the dashboard TUI can show live
-agent activity. Events that cannot be attributed to a run go to
-runs/_dashboard/events.jsonl. Never blocks the tool call: always exits 0."""
+agent activity and so derive-ready-queue.py can refuse to plan while a
+dispatch is un-joined. Events that cannot be attributed to a run go to
+runs/_dashboard/events.jsonl. Never blocks the tool call: always exits 0.
+
+A foreground dispatch returns when the agent finishes, so its PostToolUse
+event is a real completion. A background dispatch (run_in_background) returns
+at once while the agent keeps running, so its PostToolUse is logged as
+agent_backgrounded, which is not a join. The harness joins it later by
+appending agent_joined (on the task notification) or agent_abandoned."""
 
 import datetime
 import json
@@ -71,15 +78,21 @@ def main():
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or "."
     tool_input = payload.get("tool_input") or {}
 
+    background = bool(tool_input.get("run_in_background"))
+    if payload.get("hook_event_name") == "PreToolUse":
+        kind = "agent_dispatched"
+    elif background:
+        kind = "agent_backgrounded"
+    else:
+        kind = "agent_completed"
     event = {
         "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-        "event": "agent_dispatched"
-        if payload.get("hook_event_name") == "PreToolUse"
-        else "agent_completed",
+        "event": kind,
         "session_id": payload.get("session_id"),
         "tool_use_id": payload.get("tool_use_id"),
         "agent": tool_input.get("subagent_type") or "unknown",
         "description": tool_input.get("description") or "",
+        "background": background,
     }
 
     run_id = detect_run_id(payload, project_dir)

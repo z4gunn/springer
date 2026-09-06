@@ -168,6 +168,15 @@ is known dead (a session-limit death, a killed agent), the harness appends an
 reference case planned a cycle against a tree that a fifty-minute unit from the
 prior cycle was still writing, then blamed a different agent for the writes.
 
+Dispatch in the foreground. Several Agent calls in one turn already run in
+parallel, and a foreground call returns when its agent finishes, so the hook's
+completion event is a real join. A background dispatch (`run_in_background`)
+returns at once, the hook logs it as `agent_backgrounded`, and it stays
+un-joined until the harness appends `agent_joined` with its tool_use_id when
+the task notification arrives. The reference run dispatched every unit in the
+background, so every dispatch showed a completion two seconds later and the
+log could not tell a finished agent from a running one.
+
 ## Token economy and dispatch efficiency
 
 Session limits are account-wide and rolling: every subagent's spend counts

@@ -12,8 +12,10 @@ turns this into a routed batch.
 An un-joined dispatch blocks planning: a background agent outlives the turn
 that dispatched it, and a cycle planned against a tree it is still writing is
 the FI-024 defect. The check keys on unmatched tool_use_id values in
-events.jsonl, never on elapsed time. An `agent_abandoned` event carrying the
-same tool_use_id releases a dispatch that is known dead.
+events.jsonl, never on elapsed time. A background dispatch is joined only by
+an `agent_joined` event the harness appends on the task notification, or by
+`agent_abandoned` for a dispatch known dead. Foreground dispatches are joined
+by the hook's own `agent_completed`.
 
 Usage:
     python3 derive-ready-queue.py <run-dir>
@@ -64,8 +66,10 @@ def load_run_brief(run_dir):
 
 def unjoined_dispatches(run_dir):
     """Return every agent_dispatched event whose tool_use_id has no matching
-    agent_completed or agent_abandoned event. Malformed lines are skipped, since
-    the hook writes best-effort and never blocks a tool call."""
+    agent_completed, agent_joined, or agent_abandoned event. A background
+    dispatch's agent_backgrounded event is not a join: the tool returned while
+    the agent kept running. Malformed lines are skipped, since the hook writes
+    best-effort and never blocks a tool call."""
     ep = Path(run_dir) / "events.jsonl"
     if not ep.exists():
         return []
@@ -81,7 +85,7 @@ def unjoined_dispatches(run_dir):
         kind = ev.get("event")
         if kind == "agent_dispatched":
             dispatched.setdefault(tid, ev)
-        elif kind in ("agent_completed", "agent_abandoned"):
+        elif kind in ("agent_completed", "agent_joined", "agent_abandoned"):
             joined.add(tid)
     return [
         {"tool_use_id": tid, "agent": ev.get("agent"), "ts": ev.get("ts"),
