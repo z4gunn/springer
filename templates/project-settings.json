@@ -1,0 +1,69 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 schemas/validate.py:*)",
+      "Bash(.venv/bin/python schemas/validate.py:*)",
+      "Bash(python3 .claude/skills/spgr-run-harness/scripts/:*)",
+      "Bash(python3 verification/:*)",
+      "Bash(bash verification/:*)",
+      "Bash(npx tsx .claude/skills/spgr-run-harness/scripts/linear-sync.ts:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout -b:*)",
+      "Bash(git switch:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull --ff-only:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git checkout -- :*)",
+      "Bash(git stash:*)",
+      "Bash(git branch -D:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-agent-events.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-agent-events.py\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-agent-events.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

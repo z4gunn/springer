@@ -37,7 +37,10 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 
 ## Procedure
 
-1. Rehydrate. On every entry, run `scripts/derive-ready-queue.py <run-dir>`. If
+1. Rehydrate. On every entry, claim the run with
+   `scripts/claim-run.py <run-dir> claim <session-id>`. If it exits 1 another
+   session holds the run: stop and report the holder. Then run
+   `scripts/derive-ready-queue.py <run-dir> --session <session-id>`. If
    the snapshot lists `unjoined_dispatches`, stop: an agent from a prior cycle
    has no completion event, and planning against a tree it may still be writing
    is forbidden. Wait for it, or append an `agent_abandoned` event with its
@@ -47,8 +50,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    recorded. If an open gate still has no response, stop and report that the run
    is waiting on a human. Start and resume are the same path. Read the run brief
    and the story briefs the pending batch names. Do not re-read the artifact
-   corpus. On a new run only, write the run brief with the profile from the
-   problem statement's `profile:` line, and
+   corpus. On a new run only, run `scripts/preflight.py --profile <profile>`
+   and record its table in the run brief, write the run brief with the profile
+   from the problem statement's `profile:` line, and
    pin the advisory learnings set once with `scripts/pin-learnings.py` over the
    available prior run-retrospective artifacts, and record it in
    run-state.learnings_pinned so the run is reproducible. Whenever the run will
@@ -77,7 +81,12 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    proceed to Check until every dispatched agent has
    returned. If a background dispatch is ever used, append an `agent_joined`
    event with its tool_use_id to `events.jsonl` when its task notification
-   arrives, because the hook cannot see a background agent finish. The turn boundary is the fork-join barrier, and because all run-state
+   arrives, because the hook cannot see a background agent finish. Every unit
+   prompt names the files to read in order, the binding rulings, the gating
+   check command, and the report format, and every report pastes its
+   verification output and quotes any unmet obligation verbatim, per the
+   dispatch contract in the reference. A report that describes a check rather
+   than pasting it counts as unverified. The turn boundary is the fork-join barrier, and because all run-state
    writes happen here in the main session after the barrier, there is a single
    writer. Collect the artifacts each agent wrote. Agents never write run state.
    Dispatch under the token-economy rules and the dispatch-tier table in
@@ -97,7 +106,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    re-read claims a script covers. A claim no script can check is recorded as
    unverified. Dispatch a vertical audit only when the diff touches that
    vertical's surface, as read-only subagents in parallel, and wait for all to
-   return. A change touching only `runs/`, `docs/`, or the run ledgers gets no
+   return. On brochure and small, the Code Reviewer carries the Accessibility
+   checklist in its pass and Accessibility is dispatched only to re-check a
+   fix by execution. A change touching only `runs/`, `docs/`, or the run ledgers gets no
    review and no audit. Compare the actual
    outcome against the expected outcome from Plan. Reduce to one verdict: pass,
    fail, gate, or blocked. An audit that returns GATE, or any open Critical or
@@ -160,8 +171,12 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    category, its evidence cycle refs, and a requires_human_promotion flag that is
    true for any learning that would change a rule. Set the final cycle transition
    to complete, and stop.
-8. Loop control. In `run` mode repeat from step 2 until a pause or completion. In
-   `tick` mode return after one Act. Never exceed a WIP limit to make progress.
+8. Loop control. In `run` mode repeat from step 2 until a pause or completion,
+   re-claiming the run at each tick so the lock heartbeat stays live. In
+   `tick` mode return after one Act. Release the run with
+   `scripts/claim-run.py <run-dir> release <session-id>` before terminating at
+   a gate, at completion, or on any exit. Never exceed a WIP limit to make
+   progress.
 
 ## Notes
 
