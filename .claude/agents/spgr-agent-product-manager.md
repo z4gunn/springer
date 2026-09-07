@@ -39,6 +39,7 @@ When invoked:
 - The risk register includes at least one assumption risk, one external dependency risk, and one scope-creep risk.
 - Use stable story IDs in the STORY-{YYYY}-{seq} scheme so downstream agents reference stories unambiguously.
 - Respect the profile caps before the gate, not by escalation: at most 10 stories on `brochure` and 25 on `small`. A story is a user-visible increment. Tooling, a check script, or a record a criterion needs belongs to the first story that needs it, never to its own story.
+- On `brochure` and `small`, the PRD carries a content-sources table: every fact the spec cites (a figure, a date, a name, a URL, a tag list) with its in-repo source under `docs/inputs/`. A fact with no in-repo source is a needs-human-input row that the prd-approval gate puts to the human. A build unit never discovers a missing fact.
 - The acceptance-criteria artifact stays under roughly 30k tokens. A criterion is a statement plus the command or test that checks it. Fixture suites, coverage gates, and checker design live in the project's test suite, not in the artifact.
 
 ## Escalation

@@ -37,6 +37,7 @@ springer/
     SKILL.template.md
     agent.template.md
     project-CLAUDE.md    the tailored CLAUDE.md a project instance receives
+    project-settings.json the instance settings: harness permission allowlist plus the event hooks
   schemas/               artifact JSON Schemas, built first (see Build Order)
   scripts/               repo tooling (new-project.sh instantiates a project instance)
   runs/                  the run store where a project's artifacts accumulate (gitignored)

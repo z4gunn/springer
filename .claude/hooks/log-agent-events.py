@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Dashboard event hook. Registered for PreToolUse and PostToolUse on the
-subagent dispatch tool (Task/Agent). Appends one JSON line per dispatch or
+subagent dispatch tool (Task/Agent) and for SubagentStop. Appends one JSON line per dispatch or
 completion to the run's events.jsonl so the dashboard TUI can show live
 agent activity and so derive-ready-queue.py can refuse to plan while a
 dispatch is un-joined. Events that cannot be attributed to a run go to
@@ -9,8 +9,11 @@ runs/_dashboard/events.jsonl. Never blocks the tool call: always exits 0.
 A foreground dispatch returns when the agent finishes, so its PostToolUse
 event is a real completion. A background dispatch (run_in_background) returns
 at once while the agent keeps running, so its PostToolUse is logged as
-agent_backgrounded, which is not a join. The harness joins it later by
-appending agent_joined (on the task notification) or agent_abandoned."""
+agent_backgrounded, which is not a join. SubagentStop fires when the subagent
+itself finishes, foreground or background, and is logged as agent_stopped
+carrying the agent_id and, when present, the tool_use_id. A background
+dispatch is joined by agent_stopped through either id, or by the harness
+appending agent_joined or agent_abandoned."""
 
 import datetime
 import json
@@ -19,6 +22,7 @@ import re
 import sys
 
 RUN_REF = re.compile(r"runs/([A-Za-z0-9._-]+)/")
+AGENT_ID = re.compile(r"agentId:\s*([A-Za-z0-9_-]+)")
 RUN_ID_FIELD = re.compile(r"run[_-]id[\"'\s:=]+([A-Za-z0-9._-]+)")
 
 TOKEN_KEYS = {
@@ -77,9 +81,12 @@ def main():
     payload = json.load(sys.stdin)
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or "."
     tool_input = payload.get("tool_input") or {}
+    hook = payload.get("hook_event_name")
 
     background = bool(tool_input.get("run_in_background"))
-    if payload.get("hook_event_name") == "PreToolUse":
+    if hook == "SubagentStop":
+        kind = "agent_stopped"
+    elif hook == "PreToolUse":
         kind = "agent_dispatched"
     elif background:
         kind = "agent_backgrounded"
@@ -90,10 +97,18 @@ def main():
         "event": kind,
         "session_id": payload.get("session_id"),
         "tool_use_id": payload.get("tool_use_id"),
-        "agent": tool_input.get("subagent_type") or "unknown",
+        "agent": tool_input.get("subagent_type") or payload.get("agent_type") or "unknown",
         "description": tool_input.get("description") or "",
         "background": background,
     }
+    if hook == "SubagentStop":
+        event["agent_id"] = payload.get("agent_id")
+        event["description"] = payload.get("agent_transcript_path") or ""
+    elif kind == "agent_backgrounded":
+        # The background Agent result text names the agent id. Keep it so a
+        # later agent_stopped can be matched back to this dispatch.
+        match = AGENT_ID.search(json.dumps(payload.get("tool_response") or ""))
+        event["agent_id"] = match.group(1) if match else None
 
     run_id = detect_run_id(payload, project_dir)
     event["run_id"] = run_id
@@ -104,6 +119,8 @@ def main():
         if metrics:
             event["metrics"] = metrics
 
+    if not run_id and hook == "SubagentStop":
+        run_id = detect_run_id({"tool_input": {}}, project_dir)
     if run_id and os.path.isdir(os.path.join(project_dir, "runs", run_id)):
         out_path = os.path.join(project_dir, "runs", run_id, "events.jsonl")
     else:

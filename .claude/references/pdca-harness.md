@@ -14,6 +14,7 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 - Rehydration: start equals resume
 - Parallel Do: the barrier and disjoint scheduling
 - Token economy and dispatch efficiency
+- Dispatch contract
 - Main-session budget
 - Fold-in policy
 - Docs rendering policy
@@ -63,6 +64,15 @@ Rules the profile carries:
   scope-change gate.
 - The PM agent enforces the story and criteria caps at authoring time. A
   backlog over the cap is merged or cut before the prd-approval gate.
+- Content sources are complete before the build. On brochure and small the
+  requirements unit lists every fact the spec cites (figures, dates, names,
+  URLs, tag lists) with its in-repo source under `docs/inputs/`, and the
+  orchestrator holds the build unit while any source is missing. A fact that
+  lives only outside the repository is a question for the human at the
+  prd-approval gate, never a discovery a build unit makes. In the reference
+  run the only findings left open after the page shipped were a date range, a
+  LinkedIn URL, and a tag list, each referenced by the spec and held only in a
+  private vault.
 
 ## The PDCA tick
 
@@ -100,6 +110,10 @@ declared surface: UI markup or styles for Accessibility, dependencies, headers,
 or data handling for Security, a schema or a query for Performance. A change
 that touches only `runs/`, `docs/`, or the run's own ledgers is never sent to
 the Code Reviewer and never audited. Its check is validate plus a diff summary.
+On brochure and small the Code Reviewer carries the Accessibility checklist
+in its own pass rather than a separate audit being dispatched, because the two
+overlapped on the same defects in the reference run. Accessibility is
+dispatched separately only for a re-check by execution after a fix.
 
 Review is bounded to one review pass and one re-review. A second
 REQUEST_CHANGES routes the open findings to the human at the pr-merge gate as a
@@ -167,6 +181,14 @@ is known dead (a session-limit death, a killed agent), the harness appends an
 `agent_abandoned` event carrying the same tool_use_id to release it. The
 reference case planned a cycle against a tree that a fifty-minute unit from the
 prior cycle was still writing, then blamed a different agent for the writes.
+
+The run is single-writer at the session level too. On entry the harness
+claims the run with `claim-run.py <run-dir> claim <session-id>` and re-claims
+at every tick as a heartbeat, and `derive-ready-queue.py --session <id>` sets
+blocked while another session's live lock exists. On exit the harness releases
+it. A lock not refreshed for thirty minutes is stale and is taken over. In the
+reference run a second session branched and committed from under a live loop
+session, and nothing detected it.
 
 Dispatch in the foreground. Several Agent calls in one turn already run in
 parallel, and a foreground call returns when its agent finishes, so the hook's
@@ -248,6 +270,19 @@ unit is fresh every time under rule 1 and never inherits a transcript.
 | Pinned agent | the agent's own `model` | every domain-agent unit at full effort: design, implementation, adversarial review, vertical sign-off |
 | Inline main session | the session model, kept minimal | orchestrator dispatch, the Check comparison of expected versus actual, the verdict and transition, spgr-notify-human, run-state writes |
 
+## Dispatch contract
+
+Every unit prompt carries the same four things, and every unit report answers
+the same four things. The prompt names the files to read in order, the rulings
+that bind, the check command that gates the work, and the report format. The
+report lists the files written with line counts, pastes the verification
+output rather than describing it, quotes verbatim every obligation it could
+not satisfy with the reason, and never fills a gap with an assumption. In the
+reference run this contract produced honest gap lists from every unit, where
+the earlier cycles had produced overstated claims the harness then re-verified
+by hand. A report that describes a check instead of pasting it is treated as
+unverified.
+
 ## Main-session budget
 
 The main session runs the harness on sonnet by default. It writes run state and
@@ -259,6 +294,14 @@ narrative longer than the diff it describes. In the reference case the main
 session issued 771 shell commands and 2.26M output tokens on opus, more than
 all 71 subagents combined, while the dispatch-tier table said it was kept
 minimal.
+
+The instance settings installed by `new-project.sh` from
+`templates/project-settings.json` carry a permission allowlist for the
+commands the harness runs itself (validate, the harness scripts, the project
+verification scripts, git add, commit, push, branch, and the gh pr commands)
+and a denylist for the destructive git forms. Without it a run stalls at a
+permission prompt on every commit, and the page batch in the reference run
+stalled three times on its own commit, its CLAUDE.md note, and its hook sync.
 
 ## Fold-in policy
 
@@ -448,6 +491,13 @@ These scripts keep the deterministic work out of the model.
 - `scripts/linear-sync.ts <command>` is the only channel for Linear I/O when the
   Linear board projection is on. It pushes repo state to Linear or reads Linear
   intake, and never treats Linear as the database.
+- `scripts/claim-run.py <run-dir> claim|release|status [<session-id>]` holds
+  the single-writer lock on a run with a heartbeat.
+- `scripts/preflight.py [--profile <profile>]` checks once at run open that
+  the interpreter, the venv, git identity, gh auth, node, npx, and a headless
+  Chromium-family browser actually work, and prints the table the harness
+  records in the run brief. A build unit in the reference run lost time
+  discovering a broken chromium wrapper on its own.
 
 The story brief (`artifacts/story-brief-<story-id>.json`) is a projection in the
 same sense as run-state.json: derived from the operative artifacts, regenerable,

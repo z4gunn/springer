@@ -64,7 +64,10 @@ cp -R "$SRC/.claude/skills"     "$TARGET/.claude/skills"
 cp -R "$SRC/.claude/agents"     "$TARGET/.claude/agents"
 cp -R "$SRC/.claude/references" "$TARGET/.claude/references"
 cp -R "$SRC/.claude/hooks"      "$TARGET/.claude/hooks"
-cp "$SRC/.claude/settings.json" "$TARGET/.claude/settings.json"
+# The instance settings carry the permission allowlist the harness needs for
+# its own git, gh, validate, and verification commands, so a run does not
+# stall on permission prompts, plus the event-logging hooks.
+cp "$SRC/templates/project-settings.json" "$TARGET/.claude/settings.json"
 cp -R "$SRC/schemas"            "$TARGET/schemas"
 
 # 2. Install the downstream ruleset as the project's CLAUDE.md, stamping the
