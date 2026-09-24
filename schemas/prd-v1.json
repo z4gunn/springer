@@ -102,13 +102,26 @@
         },
         "open_questions": {
           "type": "array",
+          "description": "The intake question sweep: every fact, asset, preference, and constraint the run will need from the human, asked once at the first gate.",
           "items": {
             "type": "object",
             "required": ["question"],
             "properties": {
               "question": { "type": "string" },
               "owner": { "type": "string" },
-              "deadline": { "type": "string" }
+              "deadline": { "type": "string" },
+              "recommended_default": {
+                "type": "string",
+                "description": "The answer the run takes if the human accepts defaults. A missing fact defaults to a visible placeholder, never an invented value."
+              },
+              "blocking": {
+                "type": "boolean",
+                "description": "True when no default is acceptable, per the decision classes in .claude/references/pdca-harness.md. A blocking question holds the work that consumes it."
+              },
+              "consumed_by": {
+                "type": "string",
+                "description": "The story id or phase that needs the answer."
+              }
             }
           }
         }

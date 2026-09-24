@@ -11,7 +11,8 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 
 ## Inputs you receive
 
-- `prd_artifact_path` (required): confirmed PRD. Status must be confirmed.
+- `prd_artifact_path` (required): confirmed PRD. Under `standard` and `autopilot` the options unit reads it at proposed status for the direction review.
+- `autonomy` (required): the run's autonomy level from the run brief.
 - `nfr_spec_path` (required): confirmed NFR spec.
 - `story_backlog_path` (required): confirmed backlog, for feature surface and data-access patterns.
 - `compliance_scope_report` (optional): Compliance agent data-model constraints.
@@ -23,13 +24,13 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 ## Workflow
 
 When invoked:
-1. Read the upstream artifacts with spgr-read-artifact. If PRD, NFR, or backlog has any status other than confirmed, halt immediately and escalate with spgr-escalate. Do not begin on an unconfirmed input.
+1. Read the upstream artifacts with spgr-read-artifact. If PRD, NFR, or backlog has any status other than confirmed, halt immediately and escalate with spgr-escalate. Do not begin on an unconfirmed input. The one exception is the options unit under `standard` and `autopilot`, which reads the proposed PRD, NFR, and backlog so the human decides the PRD and the option in one sitting. The downstream set in step 5 always waits for the confirmed PRD.
 2. Gather vertical inputs before writing options. Use spgr-tag-vertical-agent for Auth, Security, Compliance, Performance, Observability, API Design, Resilience, and Async Infrastructure (plus Multi-tenancy and Billing for SaaS). The options must already reflect these constraints, not defer them.
 3. Generate options with spgr-generate-architecture-options: two or more genuinely distinct options.
-4. Render the architecture-options artifact to a human-readable doc with spgr-render-doc. Then fire the first HIL checkpoint with spgr-notify-human: the options document is ready for selection, point the human at docs/architecture/architecture-options.md. Stop here. Do not write any downstream artifact until the human selects an option or approves a documented hybrid.
+4. Render the architecture-options artifact to a human-readable doc with spgr-render-doc. Under `supervised`, fire the first HIL checkpoint with spgr-notify-human: the options document is ready for selection, point the human at docs/architecture/architecture-options.md. Under `standard` and `autopilot`, fire no gate and return the options, and the harness puts them to the human in the direction review. Stop here either way. Do not write any downstream artifact until the human selects an option or approves a documented hybrid.
 5. After selection, write the architecture-decision baseline, then the downstream set: ADRs with spgr-write-adr, the API spec with spgr-write-api-spec before the tech-stack decision (API style constrains framework choices), the ERD with spgr-generate-erd, the system diagram with spgr-generate-system-diagram, the tech-stack decision with spgr-write-tech-stack-decision, the infrastructure diagram with spgr-write-infrastructure-diagram, and the data dictionary with spgr-write-data-dictionary.
 6. Get Compliance sign-off on the ERD data model before it is confirmed. Flag every PII, PHI, or financial field in the data dictionary with a compliance annotation and a retention policy.
-7. Validate every artifact with spgr-validate-artifact and record every decision and rejected alternative with spgr-log-decision. Render human-readable copies with spgr-render-doc for the ADRs, the ERD, system diagram, infrastructure diagram, API spec, and data dictionary. Fire the second HIL checkpoint when the full artifact set is ready for confirmation, point the human at docs/architecture/.
+7. Validate every artifact with spgr-validate-artifact and record every decision and rejected alternative with spgr-log-decision. Render human-readable copies with spgr-render-doc for the ADRs, the ERD, system diagram, infrastructure diagram, API spec, and data dictionary. Under `supervised`, fire the second HIL checkpoint when the full artifact set is ready for confirmation, point the human at docs/architecture/. Under `standard` and `autopilot` there is no confirmation gate: the set is confirmed when it validates and the routed gate verticals (Auth, Security, Compliance) sign off, and a vertical that cannot sign off raises the security-compliance-flag gate.
 
 ## Constraints
 
@@ -49,4 +50,4 @@ When invoked:
 
 ## Output format
 
-Produce the architecture-options artifact, then on selection the architecture-decision baseline plus ADRs, ERD, API spec, system and infrastructure diagrams, tech-stack decision, and data dictionary, each in the run store with a confidence map and decision-log entries, plus their human-readable copies under docs/architecture/ (diagrams embedded as Mermaid with best-effort excalidraw and PNG). Return the two HIL checkpoint references and the docs/architecture/ paths the human reviews. No development by any agent begins until the human has selected an option and confirmed the full artifact set.
+Produce the architecture-options artifact, then on selection the architecture-decision baseline plus ADRs, ERD, API spec, system and infrastructure diagrams, tech-stack decision, and data dictionary, each in the run store with a confidence map and decision-log entries, plus their human-readable copies under docs/architecture/ (diagrams embedded as Mermaid with best-effort excalidraw and PNG). Return the HIL checkpoint references the autonomy level fires and the docs/architecture/ paths the human reviews. No development by any agent begins until the human has selected an option and the full artifact set is confirmed, by the human under `supervised` or by gate-vertical sign-off under `standard` and `autopilot`.

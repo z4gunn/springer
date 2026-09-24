@@ -28,6 +28,8 @@ Make refusing to proceed a first-class action. An agent that stops on incomplete
 
 ## Procedure
 
+Classify the decision before anything else, per the decision classes in `.claude/references/pdca-harness.md`. When the run's autonomy is `standard` or `autopilot` and the decision is deferrable, do not escalate. Take the recommended option, report it as one defaults-ledger line (decision, default taken, alternative, cost to reverse, artifact), and continue. A missing fact takes a visible `TODO(DEF-<n>)` placeholder, never an invented value. Otherwise proceed.
+
 1. Determine the routing target from the type. Ambiguity in specs or requirements routes to the upstream agent. A technical conflict between agents routes to the Architect. A policy, compliance, or security issue routes to the human and the specialist agent. A `scope-change` routes to the human. A blocked item with no agent resolution path routes to the human.
 2. Assign `escalation_id` as `ESC-{YYYYMMDD}-{4-digit-seq}`. Set `status` to `open`.
 3. Write the escalation with `spgr-write-artifact` (type `escalation`).
@@ -36,5 +38,5 @@ Make refusing to proceed a first-class action. An agent that stops on incomplete
 
 ## Notes
 
-- Do not fill gaps with assumptions to avoid escalating. An itemized escalation is cheaper than rework built on a guess.
+- Do not fill gaps with assumptions to avoid escalating. An itemized escalation is cheaper than rework built on a guess. A recorded default is not an assumption: it is named, visible, and reviewed at the next gate, and it applies only to deferrable decisions.
 - Resolution flow: the orchestrator or human sets `status` to `resolved` with resolution notes, and the pipeline re-routes to the originating agent with the resolved input.

@@ -45,7 +45,7 @@ The second position is architecture first. Architecture is the most consequentia
 
 Structured artifact contracts. Every handoff is a typed, versioned artifact with enumerated required fields, per-section rationale, and an explicit confidence signal of confirmed, proposed, or needs-human-input. The receiving agent validates the artifact against its JSON Schema before acting on it. The schemas live in `schemas/`.
 
-Minimal human-in-the-loop. The only required gates are architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Work between these gates flows from agent to agent without a person in the path.
+Minimal human-in-the-loop. The only required gates are architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Work between these gates flows from agent to agent without a person in the path. A run's autonomy level (`supervised`, `standard`, `autopilot`) sets how many sittings those decisions take. Under `standard` the PRD, the questions the run needs answered, the architecture option, and the design direction are one direction review, reversible decisions are taken by default and reviewed in a batch, and an open gate holds only the work that depends on it.
 
 Escalation is a feature, not a failure. An agent that refuses to proceed on incomplete or contradictory input, and returns a precise list of what is missing, is doing its job. Agents do not fill gaps with assumptions.
 
@@ -185,7 +185,7 @@ springer/
 
 Open this repository in Claude Code. The agents in `.claude/agents/` and the skills in `.claude/skills/` load automatically, so no install step is needed for the core team.
 
-To run a project, drive it end to end with the PDCA harness described below, which loops the orchestrator and the domain agents autonomously and pauses only at the human gates. You can also invoke a specific agent for a specific phase, such as Discovery to start research or Architect to produce options, when you want to run one step by hand. Either way the agents pause at the five human checkpoints: architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Artifacts accumulate in `runs/` and validate against the schemas in `schemas/` as they pass between agents.
+To run a project, drive it end to end with the PDCA harness described below, which loops the orchestrator and the domain agents autonomously and pauses only at the human gates. You can also invoke a specific agent for a specific phase, such as Discovery to start research or Architect to produce options, when you want to run one step by hand. Either way the agents pause only at the human checkpoints: architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change, combined into fewer sittings by the run's autonomy level. Artifacts accumulate in `runs/` and validate against the schemas in `schemas/` as they pass between agents.
 
 ### Drive a run with the PDCA harness
 
@@ -197,7 +197,7 @@ To start a run, open this repository in Claude Code and ask for the harness by n
 Use spgr-run-harness to start run-id acme-1 on this problem: <one paragraph>
 ```
 
-The harness drives phase to phase and stops at the first human gate, for example prd-approval or architecture-options-selection. It writes a checkpoint and reports what it needs. Answer the checkpoint, then ask the harness to resume:
+The harness drives phase to phase and stops at the first human gate that holds all work, for example the direction review under `standard` or prd-approval under `supervised`. It writes a checkpoint and reports what it needs. Answer the checkpoint, then ask the harness to resume:
 
 ```
 The architecture gate is answered, resume spgr-run-harness for run-id acme-1
