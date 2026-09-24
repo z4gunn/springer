@@ -4,10 +4,16 @@
 Reads the run store and returns the facts the orchestrator needs to route the
 next tick, computed the same way every time so routing is reproducible and the
 model adjudicates only genuine ambiguity. This script makes no routing decision.
-It reports open gates, open escalations, the confirmed-artifact inventory, the
-latest phase, the run profile and flags from run-brief.json, any dispatched
-agent that has no completion event yet, and a blocked flag. The orchestrator
-turns this into a routed batch.
+It reports open gates with what each one holds, open escalations, the
+confirmed-artifact inventory, the latest phase, the run profile, autonomy, and
+flags from run-brief.json, the open default count, any dispatched agent that
+has no completion event yet, and a blocked flag. The orchestrator turns this
+into a routed batch.
+
+An open gate blocks the whole run only when it holds all, which is the case for
+a checkpoint that names no holds. Otherwise its holds are reported in `held`
+and the orchestrator routes around them, so work that does not depend on the
+decision keeps running while the human is away.
 
 An un-joined dispatch blocks planning: a background agent outlives the turn
 that dispatched it, and a cycle planned against a tree it is still writing is
@@ -28,6 +34,7 @@ success, 1 on a usage or read error.
 """
 
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -66,6 +73,32 @@ def load_run_brief(run_dir):
         return json.loads(bp.read_text()).get("content", {})
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+# The autonomy level a profile runs at when the run brief does not name one.
+DEFAULT_AUTONOMY = {"brochure": "standard", "small": "standard",
+                    "saas": "supervised", "mobile": "supervised"}
+
+
+def resolve_autonomy(brief):
+    """Return the run's autonomy level: the brief's flag, else the profile
+    default, else supervised. autopilot outside brochure and small falls back
+    to standard, because the schema allows it on those profiles only."""
+    profile = brief.get("profile")
+    level = brief.get("flags", {}).get("autonomy") or DEFAULT_AUTONOMY.get(profile, "supervised")
+    if level == "autopilot" and profile not in ("brochure", "small"):
+        level = "standard"
+    return level
+
+
+def open_defaults(run_dir):
+    """Count the DEF- lines in pending-defaults.md still marked open. The ledger
+    is one line per default taken, reviewed in a batch at the next gate."""
+    lp = Path(run_dir) / "pending-defaults.md"
+    if not lp.exists():
+        return 0
+    return sum(1 for line in lp.read_text().splitlines()
+               if re.match(r"^\s*[-*]?\s*DEF-\d+", line) and re.search(r"\bopen\b", line))
 
 
 def unjoined_dispatches(run_dir):
@@ -159,13 +192,19 @@ def derive(run_dir, session_id=None):
         c = latest_cycle.get("content", {})
         latest_phase = c.get("next_phase") or c.get("phase")
 
-    open_gates = [
-        a["content"]["checkpoint_id"]
-        for a in good
-        if a.get("artifact_type") == "hil-checkpoint"
-        and a.get("content", {}).get("pipeline_status") == "paused"
-        and a.get("content", {}).get("response_received") in (None, {})
-    ]
+    paused = [a["content"] for a in good
+              if a.get("artifact_type") == "hil-checkpoint"
+              and a.get("content", {}).get("pipeline_status") == "paused"]
+    gates = [{"checkpoint_id": c["checkpoint_id"],
+              "checkpoint_type": c.get("checkpoint_type"),
+              "holds": c.get("holds") or ["all"],
+              "answered": c.get("response_received") not in (None, {})}
+             for c in paused]
+    open_gates = [g["checkpoint_id"] for g in gates if not g["answered"]]
+    answered_gates = [g["checkpoint_id"] for g in gates if g["answered"]]
+    gates_holding_all = [g["checkpoint_id"] for g in gates
+                         if not g["answered"] and "all" in g["holds"]]
+    held = sorted({h for g in gates if not g["answered"] for h in g["holds"] if h != "all"})
     open_escalations = [
         a["content"]["escalation_id"]
         for a in good
@@ -186,25 +225,30 @@ def derive(run_dir, session_id=None):
             "all_confirmed": bool(conf) and all(v == "confirmed" for v in conf.values()),
         })
 
-    blocked = bool(open_gates or open_escalations or unjoined or held_by_other)
+    blocked = bool(gates_holding_all or open_escalations or unjoined or held_by_other)
     reason = None
     if held_by_other:
         reason = f"run held by another live session {lock.get('session_id')} since {lock.get('claimed_at')}"
     elif unjoined:
         ids = ", ".join(u["tool_use_id"] for u in unjoined)
         reason = f"un-joined dispatch(es) still running or abandoned without an event: {ids}"
-    elif open_gates:
-        reason = f"paused at gate(s): {', '.join(open_gates)}"
+    elif gates_holding_all:
+        reason = f"paused at gate(s) holding all work: {', '.join(gates_holding_all)}"
     elif open_escalations:
         reason = f"open escalation(s): {', '.join(open_escalations)}"
 
     return {
         "run_id": run_id,
         "profile": brief.get("profile"),
+        "autonomy": resolve_autonomy(brief),
         "flags": brief.get("flags", {}),
         "cycle_counter": len(cycles),
         "latest_phase": latest_phase,
         "open_gates": open_gates,
+        "open_gate_detail": [g for g in gates if not g["answered"]],
+        "answered_gates": answered_gates,
+        "held": held,
+        "open_defaults": open_defaults(run_dir),
         "open_escalations": open_escalations,
         "artifact_inventory": inventory,
         "unjoined_dispatches": unjoined,

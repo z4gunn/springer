@@ -23,6 +23,7 @@
         "checkpoint_type": {
           "type": "string",
           "enum": [
+            "direction-review",
             "architecture-options-selection",
             "architecture-confirmation",
             "prd-approval",
@@ -63,7 +64,56 @@
             "notes": { "type": ["string", "null"] }
           }
         },
-        "resume_instruction": { "type": ["string", "null"] }
+        "resume_instruction": { "type": ["string", "null"] },
+        "decisions": {
+          "type": "array",
+          "description": "The separate decisions one sitting answers. A direction-review carries the intake questions, the PRD approval, the architecture option, and the design direction. Any gate may carry default-review items from pending-defaults.md. decision_prompt and options summarize the set.",
+          "items": {
+            "type": "object",
+            "required": ["decision_id", "kind", "prompt"],
+            "properties": {
+              "decision_id": { "type": "string", "minLength": 1 },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "question",
+                  "prd-approval",
+                  "architecture-options-selection",
+                  "design-direction-selection",
+                  "default-review"
+                ]
+              },
+              "prompt": { "type": "string", "minLength": 1 },
+              "artifact_ref": { "type": ["string", "null"] },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["option", "consequence"],
+                  "properties": {
+                    "option": { "type": "string" },
+                    "consequence": { "type": "string" }
+                  }
+                }
+              },
+              "recommended": {
+                "type": ["string", "null"],
+                "description": "The option or default taken if the human answers accept-defaults. Never set on architecture-options-selection or design-direction-selection, which the human always picks."
+              },
+              "response": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "holds": {
+          "type": "array",
+          "description": "What this open gate holds: phase names, story or artifact ids, or all. Work outside the list keeps running while the gate is open. A checkpoint without holds holds all.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "held_batch": {
+          "type": ["array", "null"],
+          "description": "The routed units this gate holds, dispatched on resume. Replaces reconstructing held work from prose.",
+          "items": { "type": "object" }
+        }
       }
     }
   }

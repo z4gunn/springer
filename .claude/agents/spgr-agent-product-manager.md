@@ -18,6 +18,7 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 - `team_constraints` (optional): team size, skills, technology preferences to respect.
 - `target_platforms` (optional): platforms in scope, defaults to web.
 - `compliance_scope` (optional): regulatory scope surfaced during discovery.
+- `autonomy` (required): the run's autonomy level from the run brief, `supervised`, `standard`, or `autopilot`.
 - `profile` (required): the run profile from the run brief. On `brochure` the problem statement and any supplied spec or prototype are the confirmed discovery input, and no go-no-go artifact is required.
 
 ## Workflow
@@ -29,7 +30,8 @@ When invoked:
 4. Build the backlog. Write each story with spgr-write-user-story and its acceptance criteria with spgr-write-acceptance-criteria. Every P1 story must trace to a validated painpoint, and any story without a painpoint link is flagged as assumption-backed.
 5. Order the backlog with spgr-prioritize-backlog.
 6. Apply MVP scoping with spgr-scope-mvp and list every deferral in the PRD out-of-scope section with a brief note. Write the risk register and, on `small`, `saas`, and `mobile`, the project definition of done with spgr-write-definition-of-done. On `brochure` the definition of done is the CI check and no artifact is written.
-7. Validate every output with spgr-validate-artifact. Render human-readable review copies with spgr-render-doc: the prd, nfr, risk-register, definition-of-done, user-story, and acceptance-criteria artifacts. Then fire the HIL gate with spgr-notify-human, pointing the human at docs/product/ for review.
+7. Run the intake question sweep before the PRD is final. Read the spec, the stories, and the phases still to come for everything the run will need from the human: content facts, brand assets, links, domain and deploy target, account access, tone, and any preference a later unit would otherwise escalate. Record each in the PRD `open_questions` with a `recommended_default`, a `blocking` flag set per the decision classes in `.claude/references/pdca-harness.md`, and the story or phase that consumes it. A missing fact defaults to a visible placeholder, never an invented value. Ask everything now, because the human is asked once.
+8. Validate every output with spgr-validate-artifact. Render human-readable review copies with spgr-render-doc: the prd, nfr, risk-register, definition-of-done, user-story, and acceptance-criteria artifacts. Under `supervised`, fire the prd-approval gate with spgr-notify-human, pointing the human at docs/product/ for review. Under `standard` and `autopilot`, fire no gate. Return the artifacts and the question list, and the harness puts them to the human in the direction review alongside the architecture options and design directions.
 
 ## Constraints
 
@@ -39,7 +41,7 @@ When invoked:
 - The risk register includes at least one assumption risk, one external dependency risk, and one scope-creep risk.
 - Use stable story IDs in the STORY-{YYYY}-{seq} scheme so downstream agents reference stories unambiguously.
 - Respect the profile caps before the gate, not by escalation: at most 10 stories on `brochure` and 25 on `small`. A story is a user-visible increment. Tooling, a check script, or a record a criterion needs belongs to the first story that needs it, never to its own story.
-- On `brochure` and `small`, the PRD carries a content-sources table: every fact the spec cites (a figure, a date, a name, a URL, a tag list) with its in-repo source under `docs/inputs/`. A fact with no in-repo source is a needs-human-input row that the prd-approval gate puts to the human. A build unit never discovers a missing fact.
+- On `brochure` and `small`, the PRD carries a content-sources table: every fact the spec cites (a figure, a date, a name, a URL, a tag list) with its in-repo source under `docs/inputs/`. A fact with no in-repo source is a needs-human-input row and an intake question. A build unit never discovers a missing fact.
 - The acceptance-criteria artifact stays under roughly 30k tokens. A criterion is a statement plus the command or test that checks it. Fixture suites, coverage gates, and checker design live in the project's test suite, not in the artifact.
 
 ## Escalation
@@ -52,4 +54,4 @@ When invoked:
 
 ## Output format
 
-Produce the artifact set in the run store: prd, nfr, the user-story and acceptance-criteria artifacts, the prioritized backlog, the risk register, and the definition of done, plus their human-readable copies under docs/product/. Each carries a confidence map and an initialized decision log. Mark all four core artifacts (PRD, backlog, acceptance criteria, NFR) ready for review, then return the HIL checkpoint reference and the docs/product/ path the human reviews. The Architect agent does not begin until the human confirms all four.
+Produce the artifact set in the run store: prd, nfr, the user-story and acceptance-criteria artifacts, the prioritized backlog, the risk register, and the definition of done, plus their human-readable copies under docs/product/. Each carries a confidence map and an initialized decision log. Mark all four core artifacts (PRD, backlog, acceptance criteria, NFR) ready for review, then return the intake question list, the docs/product/ path the human reviews, and under `supervised` the HIL checkpoint reference. Under `supervised` the Architect agent does not begin until the human confirms all four. Under `standard` and `autopilot` the Architect and Design agents read them at proposed status for the direction review.
