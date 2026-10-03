@@ -176,6 +176,8 @@ springer/
     skills/<name>/SKILL.md    the 197 skills, auto-loaded in this repo
     references/<name>.md      shared cross-skill references (for example diagram-standards, typescript-standards)
   schemas/               JSON Schemas for the typed artifacts that flow between agents
+  scripts/               repo tooling: new-project.sh and the repo validator
+  tests/                 unittest suite for the harness scripts, hooks, and validator, run by CI
   templates/             golden starters for authoring a new skill or agent
   brand/                 logo, social-preview, and favicon assets
   runs/                  the run store where a project's artifacts accumulate

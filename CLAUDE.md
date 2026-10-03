@@ -39,7 +39,9 @@ springer/
     project-CLAUDE.md    the tailored CLAUDE.md a project instance receives
     project-settings.json the instance settings: harness permission allowlist plus the event hooks
   schemas/               artifact JSON Schemas, built first (see Build Order)
-  scripts/               repo tooling (new-project.sh instantiates a project instance)
+  scripts/               repo tooling (new-project.sh instantiates a project instance, validate-repo.py enforces the hard rules below)
+  tests/                 unittest suite for the harness scripts, the hooks, and the validator, run by CI
+  .github/workflows/     CI: the repo validator, the schema self-check, and the test suite on every push and PR
   runs/                  the run store where a project's artifacts accumulate (gitignored)
   brand/                 brand assets (avatars, favicon, social preview)
 ```
@@ -102,7 +104,7 @@ Guidance:
 
 ### Per-Artifact Checklist
 
-Run this checklist on every artifact before it is committed.
+Run this checklist on every artifact before it is committed. The shape rules in it (frontmatter keys, the description cap, the body cap, reference depth and contents, agent model and tools, the em-dash ban) are enforced by `python3 scripts/validate-repo.py`, which CI runs with `schemas/validate.py --self-check` and `python3 -m unittest discover -s tests -t tests` on every push. A harness script or hook change ships with a test in `tests/`.
 - [ ] Started from a template, not a blank file
 - [ ] Name matches the file or directory, lowercase-kebab, `spgr-` prefix, globally unique
 - [ ] Skill frontmatter is exactly `name` and `description`. Agent declares `tools` at least privilege and `model`
