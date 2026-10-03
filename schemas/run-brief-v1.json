@@ -28,10 +28,15 @@
         "flags": {
           "type": "object",
           "properties": {
+            "autonomy": {
+              "type": "string",
+              "enum": ["supervised", "standard", "autopilot"],
+              "description": "Which gates pause the run and which decisions are taken by default and reviewed in a batch. Defaults to standard on brochure and small and supervised on saas and mobile. autopilot is allowed on brochure and small only. See Autonomy levels in .claude/references/pdca-harness.md."
+            },
             "auto_merge_on_green": {
               "type": "boolean",
               "default": false,
-              "description": "brochure and small only. Code Reviewer APPROVE plus fully green required checks merges the PR without a human pause. A human decision recorded in the project CLAUDE.md."
+              "description": "brochure and small only. Code Reviewer APPROVE plus fully green required checks merges the PR without a human pause. A human decision recorded in the project CLAUDE.md. Implied true under autonomy autopilot."
             },
             "docs_render": {
               "type": "string",

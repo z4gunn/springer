@@ -1,6 +1,6 @@
 ---
 name: spgr-run-harness
-description: Drive a Springer run autonomously through the Plan-Do-Check-Act loop, advancing artifact to artifact between the five human gates. Use to start a run, advance it, or resume it after a paused checkpoint. Run this in the main session, never as a subagent, because it dispatches the orchestrator and domain agents as subagents.
+description: Drive a Springer run autonomously through the Plan-Do-Check-Act loop, pausing only at the human gates its autonomy level fires. Use to start a run, advance it, or resume it after a checkpoint. Run this in the main session, never as a subagent, because it dispatches the orchestrator and domain agents as subagents.
 ---
 
 # run-harness
@@ -10,8 +10,8 @@ description: Drive a Springer run autonomously through the Plan-Do-Check-Act loo
 Turn the orchestrator from a one-shot router into a running loop. The orchestrator
 decides the next unit of work and stops. This skill is the engine around it: it
 reads run state, asks the orchestrator what runs next, dispatches the work,
-checks the result, persists the transition, and loops, pausing only at the five
-human gates. It runs in the main session and owns all run-state writes, so there
+checks the result, persists the transition, and loops, pausing only at the
+human gates the run's autonomy level fires. It runs in the main session and owns all run-state writes, so there
 is exactly one delegation hop and one writer. For the state machine, the
 rehydration algorithm, the parallel barrier, and the learnings rules, see
 [../../references/pdca-harness.md](../../references/pdca-harness.md).
@@ -23,6 +23,7 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 | `run_id` | The run to drive. A new run-id creates the store, an existing one resumes it |
 | `problem_statement` | Required only when creating a new run, the seed the first phase consumes |
 | `mode` | `run` drives until a gate or completion, `tick` runs one cycle and returns |
+| `autonomy` | Optional on a new run. `supervised`, `standard`, or `autopilot`, recorded in the run brief `flags.autonomy`. Defaults to standard on brochure and small and supervised on saas and mobile. See Autonomy levels in the reference |
 | `profile` | Required on a new run. One of `brochure`, `small`, `saas`, `mobile`. Scales the phase set, the story and criteria caps, and the PR unit per the run-profiles table in the reference. Recorded in the run brief and read from there on resume |
 
 ## Outputs
@@ -34,6 +35,7 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 | `hil-checkpoint` | Written when the loop pauses at a human gate |
 | `run-retrospective` | Written at run completion |
 | `run-brief` | `runs/<run-id>/run-brief.json`, the profile, flags, pinned rulings, and operative artifact list, refreshed at Act |
+| `pending-defaults.md` | `runs/<run-id>/pending-defaults.md`, one line per deferrable decision a unit took by default, reviewed in a batch at the next gate |
 
 ## Procedure
 
@@ -44,15 +46,17 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    the snapshot lists `unjoined_dispatches`, stop: an agent from a prior cycle
    has no completion event, and planning against a tree it may still be writing
    is forbidden. Wait for it, or append an `agent_abandoned` event with its
-   tool_use_id to `events.jsonl` once it is known dead, then re-enter. If an
-   open gate now carries a response, stamp its hil-checkpoint resumed, consume the
-   response, and prepare to continue from the pending batch the paused cycle
-   recorded. If an open gate still has no response, stop and report that the run
-   is waiting on a human. Start and resume are the same path. Read the run brief
+   tool_use_id to `events.jsonl` once it is known dead, then re-enter. For each
+   gate in `answered_gates`, stamp its hil-checkpoint resumed, consume the
+   response (mark accepted defaults, open a fold-in for each overturned one),
+   and add its held batch to this tick. If the snapshot is blocked by a gate
+   that holds all work, stop and report that the run is waiting on a human. A
+   gate that holds only some work does not stop the run. Start and resume are
+   the same path. Read the run brief
    and the story briefs the pending batch names. Do not re-read the artifact
    corpus. On a new run only, run `scripts/preflight.py --profile <profile>`
    and record its table in the run brief, write the run brief with the profile
-   from the problem statement's `profile:` line, and
+   from the problem statement's `profile:` line and the autonomy level, and
    pin the advisory learnings set once with `scripts/pin-learnings.py` over the
    available prior run-retrospective artifacts, and record it in
    run-state.learnings_pinned so the run is reproducible. Whenever the run will
@@ -64,8 +68,13 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    `scripts/launch-dashboard.py on` or `off`, which persists the choice in
    runs/_dashboard/config.json.
 2. Plan. Pass the readiness snapshot and every open escalation to the
-   spgr-agent-orchestrator subagent. The snapshot carries the profile, and the
-   orchestrator holds any unit outside the profile's phase set. Receive a routed
+   spgr-agent-orchestrator subagent. The snapshot carries the profile, the
+   autonomy level, and the `held` list of what open gates hold. The
+   orchestrator holds any unit outside the profile's phase set and any unit an
+   open gate holds, and routes everything else. Each tick re-runs
+   `derive-ready-queue.py` first and consumes any gate newly in
+   `answered_gates` as step 1 does, because the human may answer while the
+   loop is still running. Receive a routed
    batch: each unit names the
    agent, its input artifact refs, and the expected outcome. Enforce the phase
    gate the orchestrator reports, do not route into a new phase while a prior
@@ -117,7 +126,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 5. Act. Append one pdca-cycle artifact with the plan, the dispatched batch, the
    check verdicts, and the act transition. Refresh the projection with
    `scripts/rebuild-projection.py <run-dir>`. Version or archive any superseded
-   artifact with spgr-version-artifact and spgr-archive-artifact. When
+   artifact with spgr-version-artifact and spgr-archive-artifact. Append each
+   default a unit report lists to `pending-defaults.md` as one DEF line, per the
+   defaults ledger in the reference. When
    `runs/_linear/config.json` exists with `backlog_provider` set to `linear`,
    also refresh the Linear board projection with
    `npx tsx scripts/linear-sync.ts sync-run <run-dir>`. A sync failure is
@@ -137,15 +148,24 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    on the same unit, stop retrying and escalate to the human rather than looping.
    Bound review the same way: one review pass and one re-review, then the open
    findings go to the human at the gate as a list.
-6. Pause at a gate. Write the hil-checkpoint with pipeline_status paused, set the
-   act transition to pause, record the pending batch in the cycle artifact, fire
-   spgr-notify-human, and terminate cleanly. Resuming is step 1 on the next entry.
-   Render `docs/` for the artifacts this gate reads, and only those, through a
-   haiku spgr-render-doc unit. A pr-merge gate fires once per batch or per page,
-   not per story. When the run brief sets `auto_merge_on_green` on a brochure
-   or small profile, a Code Reviewer APPROVE plus fully green required checks
-   merges the PR with `gh pr merge --squash` and the run advances without
-   pausing. Otherwise, for a pr-merge gate, first publish: once all automated sign-offs pass, commit
+6. Gate. Fire only the gates the autonomy level fires, per the autonomy table
+   in the reference. Under standard and autopilot, hold the PRD approval, the
+   intake questions, the architecture option, and the design direction for one
+   direction-review checkpoint once both option units return, and fire no
+   architecture-confirmation gate. Write the hil-checkpoint with pipeline_status
+   paused, its `holds` per the holds table in the reference, and the units it
+   holds as `held_batch`. Carry every intake question and every open line of
+   `pending-defaults.md` in its `decisions`. Fire spgr-notify-human. Then keep
+   looping on the work the gate does not hold. When the gate holds all work, or
+   the orchestrator returns an empty batch while a gate is open, set the act
+   transition to pause and terminate cleanly. Resuming is step 1 on the next
+   entry. Render `docs/` for the artifacts this gate reads, and only those,
+   through a haiku spgr-render-doc unit. A pr-merge gate fires once per batch
+   or per page, not per story. When the run brief sets `auto_merge_on_green`
+   on a brochure or small profile, or the run is on autopilot, a Code Reviewer
+   APPROVE plus fully green required checks merges the PR with
+   `gh pr merge --squash` and the run advances without a gate, unless the PR
+   carries a `TODO(DEF-<n>)` placeholder or an open blocking question. Otherwise, for a pr-merge gate, first publish: once all automated sign-offs pass, commit
    the change on its story branch, push to origin, and open the PR with
    spgr-create-pr against the protected base. Then wait for the remote CI checks
    on the PR head and confirm every required check passes BEFORE writing the
@@ -157,8 +177,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    then escalate), push, and re-verify, before pausing. Only on a fully green
    required-check set write the checkpoint carrying the PR URL and pause. Never
    pause or report the story ready while a required check is failing or pending.
-   The harness pushes and opens but never merges. The human merge is the gate and
-   is read as the checkpoint response on resume. A local-only unpushed branch is
+   Outside auto-merge the harness pushes and opens but never merges. The human
+   merge is the gate and is read as the checkpoint response on resume. While it
+   is open, the next file-disjoint batch builds on its own branch. A local-only unpushed branch is
    used only when a human explicitly asks for it. See the pr-merge gate rule in
    [../../references/pdca-harness.md](../../references/pdca-harness.md).
    When the Linear board is active, attach the PR to the story's issue with
@@ -169,10 +190,13 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 7. Complete. When the orchestrator reports no further work, write the
    run-retrospective summarizing the run's learnings, each tagged with its
    category, its evidence cycle refs, and a requires_human_promotion flag that is
-   true for any learning that would change a rule. Set the final cycle transition
-   to complete, and stop.
+   true for any learning that would change a rule. Under autopilot, send the
+   completion notice through spgr-notify-human with every open line of
+   `pending-defaults.md` as a numbered list. Set the final cycle transition to
+   complete, and stop.
 8. Loop control. In `run` mode repeat from step 2 until a pause or completion,
-   re-claiming the run at each tick so the lock heartbeat stays live. In
+   where a pause is a gate that holds all work or an empty batch while a gate
+   is open, re-claiming the run at each tick so the lock heartbeat stays live. In
    `tick` mode return after one Act. Release the run with
    `scripts/claim-run.py <run-dir> release <session-id>` before terminating at
    a gate, at completion, or on any exit. Never exceed a WIP limit to make
@@ -185,8 +209,10 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
   its own subagents. See ADR-002.
 - The pdca-cycle log is the source of truth. run-state is a rebuildable cache,
   never edited by hand, always regenerated by `rebuild-projection.py`. See ADR-001.
-- Pause only at the five enumerated checkpoint types. Inventing a sixth gate
-  violates minimal-human-in-the-loop.
+- Pause only at the checkpoint types the schema enumerates, and only at those
+  the autonomy level fires. Inventing a gate violates minimal-human-in-the-loop.
+  A deferrable decision is a defaults-ledger line under standard and autopilot,
+  never a pause.
 - Every open escalation is fed into Plan each tick, so no blocked item sits
   unrouted. A constraint conflict with approved architecture routes to escalation,
   never an auto-fix that edits an ADR.

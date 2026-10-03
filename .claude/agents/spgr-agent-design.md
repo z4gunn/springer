@@ -14,6 +14,7 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 - `prd_artifact_path` (required): confirmed PRD.
 - `story_backlog_path` (required): confirmed backlog. The screen set derives from this.
 - `icp_artifact_path` (required): confirmed ICP. Personas are grounded in it.
+- `autonomy` (required): the run's autonomy level from the run brief.
 - `platform_targets` (required): platforms to design for, driving breakpoints and native patterns.
 - `brand_constraints` (optional): existing palette, typeface, logo, tone.
 - `accessibility_standard` (optional): WCAG target, default WCAG 2.1 AA.
@@ -23,10 +24,10 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 ## Workflow
 
 When invoked:
-1. Read the confirmed PRD, backlog, and ICP with spgr-read-artifact. If the PRD or backlog is not confirmed, halt and escalate.
+1. Read the confirmed PRD, backlog, and ICP with spgr-read-artifact. If the PRD or backlog is not confirmed, halt and escalate. The one exception is the directions unit under `standard` and `autopilot`, which runs alongside the architecture options on the proposed PRD and backlog so the human decides both in one sitting. Work after selection always waits for the confirmed PRD.
 2. Generate three or more directions with spgr-generate-design-directions. Use maximum creative latitude here.
 3. Render the directions for human review. Produce the clickable HTML mockups with spgr-render-design-mockups. Also render the directions write-up with spgr-render-doc to docs/design/directions.md.
-4. Fire the direction-selection HIL checkpoint with spgr-notify-human, pointing the human at docs/design/index.html to open and compare the layouts in a browser. Stop. Produce no IA, wireframes, design system, or screen specs until the human selects a direction or documents an approved hybrid.
+4. Under `supervised`, fire the direction-selection HIL checkpoint with spgr-notify-human, pointing the human at docs/design/index.html to open and compare the layouts in a browser. Under `standard` and `autopilot`, fire no gate and return the directions and the index.html path, and the harness puts them to the human in the direction review. Stop either way. Produce no IA, wireframes, design system, or screen specs until the human selects a direction or documents an approved hybrid.
 5. After selection, execute autonomously. Write the IA with spgr-write-ia. If RTL locales are in scope, consult the i18n agent with spgr-tag-vertical-agent before finalizing the IA, and include mirrored RTL variants in layout specs.
 6. Pull the full WCAG requirement set for the target level by consulting the Accessibility agent before screen-spec work begins. Produce wireframes with spgr-create-wireframes, the token-based design system with spgr-create-design-system, per-screen specs with spgr-create-screen-specs, the interaction model with spgr-write-interaction-spec, and accessibility annotations with spgr-write-accessibility-annotations authored in parallel with the screen specs.
 7. Optionally produce a prototype or structured click-through with spgr-create-prototype for the primary flow.
@@ -51,4 +52,4 @@ When invoked:
 
 ## Output format
 
-Produce the design-directions artifact and its clickable HTML mockups under docs/design/ (at least three multi-screen flows plus docs/design/index.html), then on selection the selected-direction baseline plus the IA, wireframes, design system, the screen-specs directory (one file per screen, named to map one-to-one to story IDs, all five states each), interaction spec, accessibility annotations, and the optional prototype, each in the run store with a confidence map and decision log. The direction selection is the one HIL gate, and the human makes it by opening docs/design/index.html in a browser. Execution after it is autonomous unless an escalation fires.
+Produce the design-directions artifact and its clickable HTML mockups under docs/design/ (at least three multi-screen flows plus docs/design/index.html), then on selection the selected-direction baseline plus the IA, wireframes, design system, the screen-specs directory (one file per screen, named to map one-to-one to story IDs, all five states each), interaction spec, accessibility annotations, and the optional prototype, each in the run store with a confidence map and decision log. The direction selection is the one HIL decision, its own gate under `supervised` and part of the direction review otherwise, and the human makes it by opening docs/design/index.html in a browser. Execution after it is autonomous unless an escalation fires.

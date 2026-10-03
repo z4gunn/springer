@@ -20,6 +20,11 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 - Docs rendering policy
 - Pre-build vertical consultation
 - Human gates
+- Autonomy levels
+- Decision classes and the defaults ledger
+- Intake question sweep
+- Direction review
+- Gates hold only dependent work
 - Gate batching and auto-merge
 - Escalations
 - Self-improvement: advisory learnings
@@ -66,10 +71,13 @@ Rules the profile carries:
   backlog over the cap is merged or cut before the prd-approval gate.
 - Content sources are complete before the build. On brochure and small the
   requirements unit lists every fact the spec cites (figures, dates, names,
-  URLs, tag lists) with its in-repo source under `docs/inputs/`, and the
-  orchestrator holds the build unit while any source is missing. A fact that
-  lives only outside the repository is a question for the human at the
-  prd-approval gate, never a discovery a build unit makes. In the reference
+  URLs, tag lists) with its in-repo source under `docs/inputs/`. A fact that
+  lives only outside the repository is an intake question put to the human at
+  the first gate, never a discovery a build unit makes. Under supervised the
+  orchestrator holds the build unit while any source is missing. Under standard
+  and autopilot an unanswered fact is built as a visible placeholder under the
+  defaults ledger, and the placeholder blocks the merge. See Decision classes
+  and the defaults ledger. In the reference
   run the only findings left open after the page shipped were a date range, a
   LinkedIn URL, and a tag list, each referenced by the spec and held only in a
   private vault.
@@ -145,13 +153,18 @@ way, so crash recovery and resume share one path. See ADR-003.
 
 On entry:
 1. Run `derive-ready-queue.py` to read the current store.
-2. If an open gate now has a response, stamp that hil-checkpoint resumed, consume
-   the response, and continue from the pending batch the paused cycle recorded.
-3. If an open gate still has no response, exit immediately doing no work.
-4. Otherwise resume the loop at Plan from the latest cycle's next phase.
+2. If a gate in `answered_gates` has a response, stamp that hil-checkpoint
+   resumed, consume the response, and route its held batch.
+3. If the snapshot is blocked by a gate holding all work, exit immediately
+   doing no work. A gate that holds only some work does not stop the loop.
+   See Gates hold only dependent work.
+4. Otherwise resume the loop at Plan from the latest cycle's next phase. The
+   loop exits waiting on a human only when the orchestrator returns an empty
+   batch while a gate is open.
 
-The pending batch lives in the paused pdca-cycle artifact, not in checkpoint
-prose, so resume is deterministic.
+The held batch lives in the checkpoint's `held_batch` field, or in the paused
+pdca-cycle artifact for a gate that holds all work, never in checkpoint prose,
+so resume is deterministic.
 
 ## Parallel Do: the barrier and disjoint scheduling
 
@@ -277,7 +290,8 @@ the same four things. The prompt names the files to read in order, the rulings
 that bind, the check command that gates the work, and the report format. The
 report lists the files written with line counts, pastes the verification
 output rather than describing it, quotes verbatim every obligation it could
-not satisfy with the reason, and never fills a gap with an assumption. In the
+not satisfy with the reason, lists each default taken as one defaults-ledger
+line, and never fills a gap with an unrecorded assumption. In the
 reference run this contract produced honest gap lists from every unit, where
 the earlier cycles had produced overstated claims the harness then re-verified
 by hand. A report that describes a check instead of pasting it is treated as
@@ -351,12 +365,156 @@ a run retrospective through a human gate, per the self-improvement rules below.
 
 ## Human gates
 
-Pause only at the five enumerated checkpoint types: architecture-options
--selection, architecture-confirmation or prd-approval, design-direction
--selection, pr-merge, and security-compliance-flag, plus scope-change. Inventing
-an implicit sixth gate violates minimal-human-in-the-loop. At a gate the harness
-writes the hil-checkpoint with pipeline_status paused, fires spgr-notify-human,
-records the pending batch in the cycle artifact, and terminates.
+The gate types are fixed by the checkpoint schema: direction-review,
+architecture-options-selection, architecture-confirmation, prd-approval,
+design-direction-selection, pr-merge, security-compliance-flag, and
+scope-change. The run's autonomy level decides which of them fire and which
+are combined into one sitting. Inventing a gate outside this set violates
+minimal-human-in-the-loop. At a gate the harness writes the hil-checkpoint with
+pipeline_status paused, its `holds`, and its `held_batch`, fires
+spgr-notify-human, and keeps running any work the gate does not hold.
+
+Every gate that fires also carries the open lines of the defaults ledger as
+default-review decisions, so reviewing defaults never costs a sitting of its
+own.
+
+## Autonomy levels
+
+A run declares its autonomy in the run brief `flags.autonomy`. The level sets
+how many times the human is interrupted. It never changes who decides: the
+human always selects the architecture option and the design direction, and
+always rules on a security or compliance flag.
+
+| Gate | supervised | standard | autopilot |
+|------|------------|----------|-----------|
+| intake questions and PRD approval | prd-approval, its own sitting | inside direction-review | inside direction-review |
+| architecture option | architecture-options-selection | inside direction-review | inside direction-review |
+| architecture confirmation | architecture-confirmation | none, selection confirms | none, selection confirms |
+| design direction | design-direction-selection | inside direction-review | inside direction-review |
+| pr-merge | per PR unit | per PR unit, or auto-merge when `auto_merge_on_green` | auto-merge on approval plus green CI |
+| security-compliance-flag | blocks | blocks | blocks |
+| scope-change | blocks | blocks beyond the profile cap or on a profile change, a default within the cap | same as standard |
+| deferrable decisions | each ruled in-cycle by the specialist, a human-constraint change escalates | defaults ledger, reviewed at the next gate that fires | defaults ledger, reviewed in the completion notice |
+
+Defaults: standard on brochure and small, supervised on saas and mobile.
+autopilot is allowed on brochure and small only, and a brief that names it
+elsewhere runs at standard. Changing the level mid-run is a human instruction
+recorded as a pinned ruling, not a gate.
+
+Under standard and autopilot, the architecture downstream set is confirmed
+without a second sitting when it validates and every routed gate vertical
+(Auth, Security, Compliance) signs off. A vertical that cannot sign off fires
+the security-compliance-flag gate, which blocks at every level.
+
+## Decision classes and the defaults ledger
+
+Every decision a unit meets is one of two classes.
+
+Blocking, at every level:
+- the architecture option and the design direction
+- a Critical or High security or compliance finding
+- a change to a stated human constraint, to the profile, or to scope beyond
+  the profile's story cap
+- anything that spends money, creates an external account or credential, or
+  takes an irreversible external action (a store submission, a DNS change, a
+  data deletion, mail to real users)
+
+Deferrable: every other decision that is reversible within the profile and the
+approved architecture, for example copy wording, a heading or section owner,
+file layout, test-tier placement, a tooling choice inside the hard rules, and
+a content fact the human has not supplied.
+
+Under standard and autopilot a unit meets a deferrable decision by taking the
+recommended option, recording it, and continuing. It never raises an
+escalation for it and never pauses. The unit report lists each default taken
+as one line, and the harness appends it at Act to
+`runs/<run-id>/pending-defaults.md`:
+
+```
+- DEF-007 | decision | default taken | alternative | cost to reverse | artifact or file | open
+```
+
+A default is not an assumption filled in silently. It is named, visible,
+recorded, and reviewed. A missing fact is never invented. Its default is a
+visible placeholder marked `TODO(DEF-<n>)` in the built output, and a
+placeholder blocks auto-merge, so a PR carrying one goes to a human pr-merge
+gate that lists it.
+
+At the next gate that fires, spgr-notify-human puts every open line in front
+of the human as a numbered default-review list. The human accepts all or
+overturns by number. An accepted line is marked accepted. An overturned line
+becomes a fold-in carrying the human's words and is applied in the next cycle.
+Under autopilot the list goes out in the completion notice instead, and an
+overturn is a new run input.
+
+Under supervised a deferrable decision is ruled in-cycle by the routed
+specialist, as the Escalations section describes, and no ledger is kept.
+
+## Intake question sweep
+
+The human's facts, assets, and preferences are asked for once, at the first
+gate, not discovered one at a time across the run. When the PM unit writes the
+PRD it also sweeps the spec, the stories, and the downstream phases for
+everything the run will need from the human: content facts, brand assets,
+links, domain and deploy target, account access, tone, and any preference a
+later unit would otherwise escalate. Each goes into the PRD `open_questions`
+with a `recommended_default`, a `blocking` flag set per the decision classes,
+and the story or phase that consumes it. The gate renders them as question
+decisions, so "accept defaults" answers every non-blocking question in one
+line. A blocking question left unanswered holds only its consumer.
+
+In the reference run twenty-three human decisions landed across three days.
+Eight of them were facts and small picks (the tagline, a years figure, the
+photo, two links, an h2 owner, the script language twice) that a day-one sweep
+or a logged default settles without a sitting of its own.
+
+## Direction review
+
+Under standard and autopilot the PRD approval, the intake questions, the
+architecture option, and the design direction are one sitting. When the PM
+unit validates, the orchestrator routes the architecture-options unit and the
+design-directions unit in the same batch, both reading the PRD and backlog at
+proposed status. When both return, the harness fires one direction-review
+checkpoint whose decisions list carries every question, the PRD approval, the
+architecture options, the design directions, and any open defaults. It holds
+all work past requirements until answered.
+
+On the response, the PRD and backlog are confirmed with the human's edits, the
+selected option and direction are recorded, and both downstream sets start in
+one batch. When the response edits the PRD in a way that invalidates an
+option or a direction, the invalidated unit is re-routed once against the
+confirmed PRD and its choice comes back as a follow-up decision at the next
+gate that fires, not as a new sitting of its own.
+
+The reference run spent a separate sitting each on the PRD, the architecture
+options, the architecture confirmation, and the design direction. Under
+standard those four are one.
+
+## Gates hold only dependent work
+
+An open gate names what it holds in its `holds` field: phase names, story or
+artifact ids, or all. Everything outside the list keeps running while the
+human is away. `derive-ready-queue.py` sets blocked only for a gate that holds
+all, reports the rest in `held`, and the orchestrator routes around them.
+
+| Gate | holds |
+|------|-------|
+| direction-review, prd-approval | all phases past requirements |
+| architecture-options-selection | architecture, development |
+| architecture-confirmation | development |
+| design-direction-selection | design, and the development of UI stories |
+| pr-merge | the stories in the PR, and any unit that edits a file the PR edits |
+| security-compliance-flag | the flagged story or artifact |
+| scope-change | all |
+
+While a pr-merge gate is open the next file-disjoint batch builds on its own
+branch from the protected base, so the human merging one PR never idles the
+build of the next. Work that runs past an open gate never merges past it, and
+never consumes an artifact the gate may change.
+
+The loop exits waiting on a human only when the orchestrator returns an empty
+batch while a gate is open. In the reference run there was no agent activity
+for about 55 of the run's 70 hours, because every open gate stopped all work.
 
 ## Gate batching and auto-merge
 
@@ -370,7 +528,10 @@ brochure and small only, a Code Reviewer APPROVE plus a fully green
 required-check set merges the PR with `gh pr merge --squash`, and the human
 reviews the deployed result instead of each PR. The harness records the merge in
 the cycle artifact. The flag defaults to false, is a human decision recorded in
-the project CLAUDE.md, and never applies to saas or mobile.
+the project CLAUDE.md, and never applies to saas or mobile. Autonomy autopilot
+implies it. Under either, a PR that carries a `TODO(DEF-<n>)` placeholder or an
+open blocking question is never auto-merged and goes to a human pr-merge gate
+that lists them.
 
 ### pr-merge gate: publish before pausing
 
@@ -383,8 +544,8 @@ Only then does it write the pr-merge hil-checkpoint (pipeline_status paused,
 carrying the PR URL in the checkpoint) and fire spgr-notify-human. The run stays
 paused until a human merges the PR. On the next entry the harness reads the merge
 as the checkpoint response, stamps it resumed, and continues from the pending
-batch. The harness pushes and opens the PR but never merges it and never bypasses
-protection, because the human merge is the gate. This is the default for every
+batch. Outside auto-merge the harness pushes and opens the PR but never merges
+it, and it never bypasses protection, because the human merge is the gate. This is the default for every
 story PR. A local-only, unpushed branch is used only when a human explicitly
 requests it for a specific change.
 
@@ -420,6 +581,12 @@ routed specialist rules in-cycle, records in the artifact's decision log and
 the PR description, and the run moves on. In the reference case three of four
 escalations went to the human: a favicon file count, which story owns a
 heading, and TypeScript for a thirty-line script, the last ruled twice.
+
+Under standard and autopilot a deferrable decision is not escalated at all.
+The unit takes the recommended option and reports it for the defaults ledger.
+An escalation is raised only for a blocking decision, for missing or
+contradictory input that no default can cover, or for a conflict with approved
+architecture.
 
 ## Self-improvement: advisory learnings
 
@@ -525,4 +692,7 @@ the per-story brief, and the pre-build consultation rule are live. The Linear
 board projection is opt-in per project. Run profiles, the run brief, the
 mechanical Check, the fold-in and docs policies, the review bound, the
 un-joined dispatch barrier, and batch-level pr-merge with opt-in auto-merge
-were added after the brochure reference run.
+were added after the brochure reference run. Autonomy levels, the defaults
+ledger, the intake question sweep, the direction-review gate, and gates that
+hold only dependent work followed from the same run's timing: about 55 idle
+hours of 70 and nine gates for one page.
