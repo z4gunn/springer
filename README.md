@@ -264,6 +264,15 @@ cd ~/path/to/my-saas-app && claude
 
 The new directory is the application's own repository. It carries `.claude/skills/`, `.claude/agents/`, `.claude/references/`, `schemas/`, a project `CLAUDE.md` tailored to building an app (not to building Springer), and an empty `runs/`. Open it in Claude Code and drive it with the PDCA harness, the same `spgr-run-harness` skill described above, since it ships with every project copy. Typed artifacts (PRD, ADRs, ERD, test plans) accumulate under `runs/<run-id>/`, and the application source code is written into the project tree. The build-time pieces (`.claude/workflows/`, `templates/`) are left out of the new project.
 
+The copy is an owned set. `new-project.sh` writes `.claude/springer-manifest.json` in the instance, listing every runtime file with its content hash and the Springer commit it came from. When Springer moves on, bring the instance up to date from the Springer checkout:
+
+```bash
+python3 scripts/update-project.py status ~/path/to/my-saas-app   # what would change
+python3 scripts/update-project.py update ~/path/to/my-saas-app   # apply it
+```
+
+A runtime file the instance never edited is replaced, one it edited is kept and listed, one it added is left alone, and a template-rendered file (CLAUDE.md, the settings, the gitignore) that was edited gets its new rendering written under `.claude/springer-update/` for a hand merge. The update refuses to run while a harness holds a live lock on a run in the instance.
+
 One skill family needs a one-time setup, and it is optional. The diagram skills render Mermaid and PlantUML sources. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, and make the Mermaid CLI available through `npx`. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
 
 `spgr-render-diagram-excalidraw` is the one skill with an external dependency. It builds on the third-party `excalidraw-diagram` skill by Cole Medin, which is not bundled with Springer. Install it separately only if you want polished Excalidraw output:

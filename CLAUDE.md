@@ -39,7 +39,7 @@ springer/
     project-CLAUDE.md    the tailored CLAUDE.md a project instance receives
     project-settings.json the instance settings: harness permission allowlist plus the event hooks
   schemas/               artifact JSON Schemas, built first (see Build Order)
-  scripts/               repo tooling (new-project.sh instantiates a project instance, validate-repo.py enforces the hard rules below)
+  scripts/               repo tooling (new-project.sh instantiates a project instance, update-project.py brings one up to a newer runtime, validate-repo.py enforces the hard rules below)
   tests/                 unittest suite for the harness scripts, the hooks, and the validator, run by CI
   .github/workflows/     CI: the repo validator, the schema self-check, and the test suite on every push and PR
   runs/                  the run store where a project's artifacts accumulate (gitignored)
@@ -48,7 +48,7 @@ springer/
 
 A repo-level README.md is intentional. The no-README rule in Universal Rules below applies inside a skill or agent directory, not at the repository root.
 
-When Springer runs as a project instance, a copy instantiated for one application through `scripts/new-project.sh`, the repository root is that application. The file-writing tooling writes application source into the project tree and refuses to write outside the repository root, while typed artifacts accumulate in `runs/<run-id>/`. The instance receives the runtime (`.claude/skills`, `.claude/agents`, `.claude/references`, `schemas`) and a tailored `CLAUDE.md` from `templates/project-CLAUDE.md`, not this build ruleset.
+When Springer runs as a project instance, a copy instantiated for one application through `scripts/new-project.sh`, the repository root is that application. The file-writing tooling writes application source into the project tree and refuses to write outside the repository root, while typed artifacts accumulate in `runs/<run-id>/`. The instance receives the runtime (`.claude/skills`, `.claude/agents`, `.claude/references`, `.claude/hooks`, `schemas`) and a tailored `CLAUDE.md` from `templates/project-CLAUDE.md`, not this build ruleset. The instance records that runtime in `.claude/springer-manifest.json`, and `scripts/update-project.py` brings it up to a newer Springer, replacing what the instance never edited and keeping what it did.
 
 Spec source (read-only, private): Phase 1 specs live in a private vault as `skills/spgr-skill-*.md` and `agents/spgr-agent-*.md`, each with a "Phase 2 Build Notes" section that is the build brief for that artifact. The specs are build provenance, are not required to run Springer, and are never edited from this repository. Build scripts read them through the `SPGR_SPEC_DIR` and `SPGR_BUILD_STANDARDS` environment variables, which have no default pointing at any private location.
 
