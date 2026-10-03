@@ -164,6 +164,17 @@ def self_check():
     if not _validate_object(bad_retro, registry):
         failures.append("run-retrospective with bad run_outcome was accepted")
 
+    # 5. The reviewer's evidence gate: a blocking finding carries evidence, a
+    #    non-blocking one may omit it, and a blocking one without it fails.
+    review = _sample_code_review()
+    issues = _validate_object(review, registry)
+    if issues:
+        failures.append(f"valid code-review sample rejected: {issues}")
+    no_evidence = _sample_code_review()
+    del no_evidence["content"]["findings"][0]["evidence"]
+    if not _validate_object(no_evidence, registry):
+        failures.append("code-review with a P0 finding lacking evidence was accepted")
+
     if failures:
         print("SELF-CHECK FAILED:")
         for f in failures:
@@ -204,6 +215,38 @@ def _sample_escalation():
             "status": "open",
         },
     }
+
+
+def _sample_code_review():
+    obj = _harness_header("CR-0001", "code-review", "review")
+    obj["producing_agent"] = "spgr-agent-code-reviewer"
+    obj["content"] = {
+        "pr_ref": "PR-0001",
+        "story_ref": "S-1",
+        "axes_checked": {"architecture": True, "xp": True, "style": True, "docstring": True},
+        "findings": [
+            {
+                "file": "src/api/orders.ts",
+                "line": 42,
+                "severity": "P0",
+                "axis": "correctness",
+                "description": "A null customer id is passed through to the repository.",
+                "remediation": "Validate customer_id at the handler boundary and return 400.",
+                "evidence": "Ran the handler test with customer_id null: repository threw and the route returned 500.",
+            },
+            {
+                "file": "src/api/orders.ts",
+                "line": 10,
+                "severity": "P3",
+                "axis": "style",
+                "description": "Parameter name differs from the project idiom.",
+                "remediation": "Rename to match the idiom.",
+            },
+        ],
+        "summary": "One blocking correctness finding.",
+        "verdict": "REQUEST_CHANGES",
+    }
+    return obj
 
 
 def _harness_header(artifact_id, artifact_type, section):

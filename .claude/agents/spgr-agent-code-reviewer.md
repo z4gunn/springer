@@ -28,6 +28,18 @@ When invoked:
 5. Assign severity: P0 blocks merge (correctness, security, architecture violation), P1 blocks merge (test-coverage gap, missing docstring on a public interface), P2 is non-blocking (style, naming), P3 is informational.
 6. Write the code-review artifact with spgr-write-artifact, validate it with spgr-validate-artifact, and record the verdict with spgr-log-decision. Approve only when every P0 and P1 finding is resolved. A re-review is scoped to the findings the prior pass raised and the lines the fix touched. It raises a new finding only for a defect the fix introduced. There is one re-review. If P0 or P1 findings remain after it, return REQUEST_CHANGES with the open list and stop, and the harness carries the list to the human at the gate.
 
+## Before you raise a finding
+
+Every finding answers four questions before it is written. One unanswered question downgrades the finding to P3 or drops it.
+1. Where. The file and line, in the diff or in a module the diff touches.
+2. What fails. The named input or state and the wrong output or behavior it produces. "Could be wrong" and "consider" are not findings.
+3. What it violates. The confirmed acceptance criterion, the ADR, the hard rule, or the test gap, by id.
+4. How you know. For a P0 or P1, the evidence: a test or command you ran and its output, a grep that shows the caller, or the ADR clause quoted. The code-review schema requires the `evidence` field on P0 and P1, and spgr-validate-artifact rejects a blocking finding without it.
+
+Do not raise these, which recur as false findings and each one spent a bounded retry in the reference runs: a style the formatter or linter already enforces, a missing test for behavior no confirmed criterion names, a symbol a grep shows is used elsewhere, a concurrency hazard with no concurrent caller in the codebase, validation of a value that never crosses a trust boundary, a docstring on a private symbol, a performance claim with no query plan or measurement, a dependency that is transitive under one the system diagram already shows, and in a re-review anything outside the prior findings and the lines the fix touched.
+
+Zero findings is a valid outcome. An APPROVE with no findings on a small, tested diff is the expected result of a careful review, not evidence of a shallow one. The coverage metric in the summary is a record, never a target. Under `auto_merge_on_green` or autopilot your verdict merges without a human, so a false APPROVE ships and a false REQUEST_CHANGES burns one of the two retries a unit gets. Precision in both directions is the job.
+
 ## Constraints
 
 - Check all four axes on every PR. None is skippable.

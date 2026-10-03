@@ -38,8 +38,15 @@
                 "enum": ["architecture", "xp", "style", "docstring", "correctness", "security"]
               },
               "description": { "type": "string" },
-              "remediation": { "type": "string" }
-            }
+              "remediation": { "type": "string" },
+              "evidence": {
+                "type": "string",
+                "minLength": 1,
+                "description": "What the reviewer did to confirm the finding is real: the input or state that triggers it and the observed failure, a test or command that was run, a grep showing the caller, or the ADR clause quoted. Required on P0 and P1."
+              }
+            },
+            "if": { "properties": { "severity": { "enum": ["P0", "P1"] } } },
+            "then": { "required": ["evidence"] }
           }
         },
         "summary": { "type": "string", "minLength": 1 },

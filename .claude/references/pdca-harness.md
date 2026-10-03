@@ -126,7 +126,12 @@ dispatched separately only for a re-check by execution after a fix.
 Review is bounded to one review pass and one re-review. A second
 REQUEST_CHANGES routes the open findings to the human at the pr-merge gate as a
 list. The bound exists because one docs-regeneration chore in the reference
-case received three REQUEST_CHANGES passes, 45 findings, and five hours.
+case received three REQUEST_CHANGES passes, 45 findings, and five hours. The
+bound controls the cost of a review. The pre-report gate in the Code Reviewer
+agent controls its precision: a finding names its line, its failing input, and
+the rule it violates, a blocking finding carries evidence the code-review
+schema requires, and a known class of false findings is never raised. Under
+auto-merge the reviewer's verdict is the last gate, so both bounds matter.
 
 ## Verdict and transition table
 
