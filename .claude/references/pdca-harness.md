@@ -309,6 +309,20 @@ session issued 771 shell commands and 2.26M output tokens on opus, more than
 all 71 subagents combined, while the dispatch-tier table said it was kept
 minimal.
 
+The budget has a sensor. The `session-usage.py` hook, registered for
+PostToolUse and Stop in the instance settings, reads the session transcript
+incrementally and writes the main session's context size, cumulative tokens,
+and model to `runs/_dashboard/sessions/<session-id>.json`. The dashboard shows
+that line next to the subagent figures and prices both from
+`assets/model-pricing.json` in the run-harness skill. When the context passes
+60 percent of the window the hook injects one advisory telling the harness to
+end the loop at the next clean Act. At 80 percent it injects one instruction to
+finish the current Act, release the lock, and resume in a fresh session. Each
+tier fires once per session. The hook observes and never blocks. Every
+dispatch event also records the model the unit ran on, from the per-dispatch
+override or the agent's frontmatter, so the cost figures are priced per tier
+rather than guessed.
+
 The instance settings installed by `new-project.sh` from
 `templates/project-settings.json` carry a permission allowlist for the
 commands the harness runs itself (validate, the harness scripts, the project

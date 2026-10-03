@@ -218,7 +218,7 @@ The loop rules, the rehydration algorithm, the parallel barrier, and the advisor
 
 An opt-in terminal dashboard shows a run while it executes: the active phase and cycle count, open gates and escalations with how long each has waited, the WIP board, the agents in flight with elapsed time, recent completions with duration and token counts, a token rollup for the watched run, and project-to-date totals across every run. It is read-only and needs nothing beyond Python 3.
 
-Two pieces feed it. A hook registered in `.claude/settings.json` records every subagent dispatch and completion, with token metrics when available, to `runs/<run-id>/events.jsonl`. The hook loads when a Claude Code session starts, so it takes effect the first session after checkout. The dashboard polls that feed plus the run store once per second and redraws.
+Three pieces feed it. A hook registered in `.claude/settings.json` records every subagent dispatch and completion, with the model it ran on and token metrics when available, to `runs/<run-id>/events.jsonl`. A second hook reads the main session's own transcript and records its context size and cumulative tokens, and warns the harness once when the context passes 60 percent of the window and again at 80 percent, so a run ends at a clean cycle boundary instead of a session-limit death. The dashboard prices both feeds from a list-price table in the run-harness skill's assets and shows the cost per run, per session, and project to date. The hooks load when a Claude Code session starts, so they take effect the first session after checkout. The dashboard polls the feeds plus the run store once per second and redraws.
 
 The dashboard is off by default. Turn it on by asking in chat:
 

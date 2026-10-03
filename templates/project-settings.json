@@ -53,6 +53,15 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-agent-events.py\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-usage.py\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SubagentStop": [
@@ -61,6 +70,17 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-agent-events.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-usage.py\"",
+            "timeout": 10
           }
         ]
       }
