@@ -35,11 +35,12 @@ Write the PRD, the primary contract between the PM Agent and every downstream ag
 6. Write the out-of-scope list. Treat it as equal in weight to the scope list. Name what is not being built so dev agents have clear authority to reject features outside scope, and give each item a reason for exclusion.
 7. Apply scope drift prevention. If human vision inputs reference features not connected to any pain point in the taxonomy, surface them as open questions rather than adding them to scope silently.
 8. Write the NFR summary section covering performance, security, availability, scalability, and compliance.
-9. Write success metrics, the user-stories overview, and open questions, each open question carrying an owner and a deadline.
-10. Run inter-section consistency checks: every scope feature ties to a goal, every goal has a metric, every problem claim has evidence.
-11. After the NFR section is written, tag the Architect with spgr-tag-vertical-agent so architecture decisions are grounded in the PRD NFR, and tag Security, Compliance, and Accessibility as early vertical consultants. Fold any required amendment back into the relevant section.
-12. Write the artifact with spgr-write-artifact against the `prd` schema, set per-section confidence signals, and run spgr-validate-artifact inline before the write completes. Resolve every itemized issue before proceeding.
-13. Pause at the approval gate with spgr-notify-human. The PRD must receive human approval before routing to the architect or the backlog-building phase. Record the human response on return and version with spgr-version-artifact.
+9. Write the activation event on `saas` and `mobile`: the one user action that shows the product delivered its value, with a name, an observable definition, and the analytics event or query that counts it. It is the `activation_event` field of the `prd` schema. The scope-mvp step measures onboarding as the path to it, and the entitlement map forbids a paywall before it. Leave the field absent on `brochure`, where there is no product action to activate. A goal metric that reads like an activation event (first workflow completed, first report sent) is the candidate, and when the discovery evidence does not settle which action it is, record the field as needs-human-input rather than picking one.
+10. Write success metrics, the user-stories overview, and open questions, each open question carrying an owner and a deadline.
+11. Run inter-section consistency checks: every scope feature ties to a goal, every goal has a metric, every problem claim has evidence.
+12. After the NFR section is written, tag the Architect with spgr-tag-vertical-agent so architecture decisions are grounded in the PRD NFR, and tag Security, Compliance, and Accessibility as early vertical consultants. Fold any required amendment back into the relevant section.
+13. Write the artifact with spgr-write-artifact against the `prd` schema, set per-section confidence signals, and run spgr-validate-artifact inline before the write completes. Resolve every itemized issue before proceeding.
+14. Pause at the approval gate with spgr-notify-human. The PRD must receive human approval before routing to the architect or the backlog-building phase. Record the human response on return and version with spgr-version-artifact.
 
 ## Notes
 
