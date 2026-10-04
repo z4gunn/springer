@@ -198,3 +198,61 @@ class SessionUsageTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DesignDetectHookTest(unittest.TestCase):
+    """design-detect.py forwards the event to the impeccable launcher when one
+    is installed and is silent otherwise. HOME and PATH point at empty temp
+    dirs so the machine's own install never leaks into the test."""
+
+    LAUNCHER = "#!/bin/sh\nread -r payload\nprintf '{\"hookSpecificOutput\":{\"seen\":\"%s\"}}' \"$payload\"\nexit 0\n"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.project = Path(self.tmp.name) / "project"
+        self.project.mkdir()
+        self.home = Path(self.tmp.name) / "home"
+        self.home.mkdir()
+        self.env = {"HOME": str(self.home), "PATH": str(self.home), "IMPECCABLE_BIN": ""}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def install(self, root):
+        path = root / ".claude" / "skills" / "impeccable" / "scripts" / "impeccable"
+        path.parent.mkdir(parents=True)
+        path.write_text(self.LAUNCHER)
+        path.chmod(0o755)
+        return path
+
+    def payload(self):
+        return {"hook_event_name": "PostToolUse", "tool_name": "Write",
+                "tool_input": {"file_path": str(self.project / "page.html")}}
+
+    def test_silent_when_no_launcher(self):
+        rc, out, err = run_hook("design-detect.py", self.payload(), self.project, env=self.env)
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, "")
+
+    def test_project_install_is_forwarded(self):
+        self.install(self.project)
+        rc, out, _ = run_hook("design-detect.py", self.payload(), self.project, env=self.env)
+        self.assertEqual(rc, 0)
+        self.assertIn("hookSpecificOutput", out)
+        self.assertIn("PostToolUse", out)
+
+    def test_global_install_under_home_is_found(self):
+        self.install(self.home)
+        rc, out, _ = run_hook("design-detect.py", self.payload(), self.project, env=self.env)
+        self.assertEqual(rc, 0)
+        self.assertIn("hookSpecificOutput", out)
+
+    def test_env_override_wins_and_exit_code_passes_through(self):
+        override = self.home / "engine"
+        override.write_text("#!/bin/sh\necho override\nexit 3\n")
+        override.chmod(0o755)
+        self.install(self.project)
+        env = dict(self.env, IMPECCABLE_BIN=str(override))
+        rc, out, _ = run_hook("design-detect.py", self.payload(), self.project, env=env)
+        self.assertEqual(rc, 3)
+        self.assertEqual(out.strip(), "override")

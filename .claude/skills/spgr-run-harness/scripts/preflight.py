@@ -55,6 +55,32 @@ def check_browser():
     return "missing", "no Chromium-family binary launches headless; Lighthouse and axe cannot run"
 
 
+def find_impeccable():
+    """The impeccable launcher. A global `npx impeccable install` puts it
+    inside the skill folder, not on PATH. Same order as design-detect.py."""
+    env = os.environ.get("IMPECCABLE_BIN")
+    project = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    candidates = [
+        env,
+        shutil.which("impeccable"),
+        os.path.join(project, ".claude", "skills", "impeccable", "scripts", "impeccable"),
+        os.path.expanduser("~/.claude/skills/impeccable/scripts/impeccable"),
+        os.path.expanduser("~/.impeccable/bin/impeccable"),
+    ]
+    for c in candidates:
+        if c and os.path.isfile(c) and os.access(c, os.X_OK):
+            return c
+    return None
+
+
+def check_impeccable():
+    launcher = find_impeccable()
+    if not launcher:
+        return "missing", "not on PATH, in a skill install, or in IMPECCABLE_BIN"
+    rc, out = run([launcher, "--version"])
+    return ("ok" if rc == 0 else "broken"), f"{launcher} {out}"[:120]
+
+
 def check_venv():
     py = os.path.join(".venv", "bin", "python")
     if not os.path.exists(py):
@@ -91,7 +117,7 @@ def main(argv):
         ("npx", *check_binary("npx")),
         ("headless browser", *check_browser()),
         ("playwright-cli (optional)", *check_binary("playwright-cli")),
-        ("impeccable (optional)", *check_binary("impeccable")),
+        ("impeccable (optional)", *check_impeccable()),
     ]
     if profile in ("saas", "small", "mobile"):
         rows.append(("docker", *check_binary("docker")))

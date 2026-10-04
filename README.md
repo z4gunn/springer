@@ -282,14 +282,15 @@ git clone https://github.com/coleam00/excalidraw-diagram-skill.git ~/.claude/ski
 cd ~/.claude/skills/excalidraw-diagram/references && uv sync && uv run playwright install chromium
 ```
 
-The design skills can draw candidate styles, palettes, and font pairings from the `ui-ux-pro-max` catalog at `~/.claude/skills/ui-ux-pro-max/`, translating every value into a named token. The design comp, frontend, and review skills capture headless screenshots through the Playwright CLI and run the deterministic slop detector from the impeccable engine when those binaries are on the path:
+The design skills can draw candidate styles, palettes, and font pairings from the `ui-ux-pro-max` catalog at `~/.claude/skills/ui-ux-pro-max/`, translating every value into a named token. The design comp, frontend, and review skills capture headless screenshots through the Playwright CLI and run the deterministic slop detector from the impeccable engine when those tools are installed:
 
 ```bash
 npm install -g @playwright/cli
-npx impeccable install        # or install only its detect binary
+playwright-cli install-browser                       # once, if no Chromium is cached yet
+npx impeccable install --providers=claude --scope=global
 ```
 
-`scripts/preflight.py` reports both as optional rows at run open. Every agent and skill in Springer works without any of these installed, and the code-first Mermaid and PlantUML diagram skills cover diagramming on their own.
+The Playwright CLI lands on your PATH. The impeccable install puts its skill under `~/.claude/skills/impeccable/` with the launcher at `scripts/impeccable` inside that folder, not on PATH. Springer looks for it there, in a project-local install, in `~/.impeccable/bin`, and in the `IMPECCABLE_BIN` environment variable, so no PATH change is needed. A project instance also gets the live design hook from Springer itself: the instance settings register `.claude/hooks/design-detect.py` on every Edit and Write and on Stop, and that hook forwards the event to the detector when it is installed and is silent when it is not. You do not run `npx impeccable install` inside each project. `scripts/preflight.py` reports both tools as optional rows at run open. Every agent and skill in Springer works without any of these installed, and the code-first Mermaid and PlantUML diagram skills cover diagramming on their own.
 
 Every line of JavaScript-runtime code the build, test, and scaffold skills generate is governed by one shared reference, `.claude/references/typescript-standards.md`. TypeScript is mandatory for any JavaScript-runtime stack, plain JavaScript is not permitted, and the reference adopts Google gts as the tooling baseline (tsconfig, ESLint, Prettier) and records the strict compiler bar, the type-safety rules, and the naming conventions the developer agents and the code reviewer enforce.
 

@@ -41,6 +41,10 @@ node_modules/
 npm-debug.log*
 yarn-error.log*
 
+# --- Design tooling state (impeccable hook cache, Playwright CLI snapshots) ---
+.impeccable/
+.playwright-cli/
+
 # --- Build / packaging output ---
 dist/
 build/

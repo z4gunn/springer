@@ -52,7 +52,7 @@ The skill has two modes. In `direction` mode it renders one hero comp per direct
    python3 .claude/skills/spgr-render-design-comps/scripts/capture-comps.py docs/design/comps/<slug> --out docs/design/comps/<slug>/shots
    ```
 
-   It renders every page at phone, tablet, and desktop widths in light and dark, runs the detector on the directory when it is installed, and writes `capture-report.json`. When the report says the Playwright CLI is missing, read each page's markup and computed intent instead, state in the critique that no capture was possible, and still run the detector if present. Neither tool is required for the skill to complete.
+   It renders every page at phone, tablet, and desktop widths in light and dark, runs the detector on the directory when it is installed, and writes `capture-report.json`. The script opens local pages as file URLs with the CLI's file-access variable set, so the comps need no server. When the report says the Playwright CLI is missing, read each page's markup and computed intent instead, state in the critique that no capture was possible, and still run the detector if present. Neither tool is required for the skill to complete.
 
 8. Critique the captures by the procedure in the reference: first impression, cluster check, floor check, detector findings, motion, copy, verdict. Read the screenshots with the Read tool before reading any comp source. Write the round to `critique.md`.
 

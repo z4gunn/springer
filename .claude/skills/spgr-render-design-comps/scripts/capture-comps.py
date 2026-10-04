@@ -5,7 +5,10 @@ and run the slop detector when it is installed.
 Deterministic, no model. Drives the Playwright CLI (`playwright-cli`, the
 @playwright/cli package) to render each page headless at every width and
 scheme and write a PNG, then runs `impeccable detect --json` over a file or
-directory target when the binary is on PATH. Both tools are optional. When one
+directory target when the launcher is found (IMPECCABLE_BIN, PATH, the
+project or global skill install, or ~/.impeccable/bin). Local files are
+opened as file:// URLs, which the CLI blocks by default, so the CLI is run
+with PLAYWRIGHT_MCP_ALLOW_UNRESTRICTED_FILE_ACCESS set. Both tools are optional. When one
 is missing the report says so and the script still exits 0, so a missing tool
 never blocks a unit. The calling skill reads capture-report.json and decides
 what the critique can cover.
@@ -38,8 +41,10 @@ DETECTOR = "impeccable"
 
 def run(cmd, timeout=120, cwd=None):
     """Run a command and return (exit_code, combined_output). Never raises."""
+    env = dict(os.environ)
+    env.setdefault("PLAYWRIGHT_MCP_ALLOW_UNRESTRICTED_FILE_ACCESS", "1")
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=env)
         return p.returncode, (p.stdout or "") + (p.stderr or "")
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 127, str(exc)
@@ -47,6 +52,24 @@ def run(cmd, timeout=120, cwd=None):
 
 def tool_status(name):
     return "ok" if shutil.which(name) else "missing"
+
+
+def find_impeccable():
+    """The impeccable launcher. A global `npx impeccable install` puts it
+    inside the skill folder, not on PATH. Same order as design-detect.py."""
+    env = os.environ.get("IMPECCABLE_BIN")
+    project = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    candidates = [
+        env,
+        shutil.which("impeccable"),
+        os.path.join(project, ".claude", "skills", "impeccable", "scripts", "impeccable"),
+        os.path.expanduser("~/.claude/skills/impeccable/scripts/impeccable"),
+        os.path.expanduser("~/.impeccable/bin/impeccable"),
+    ]
+    for c in candidates:
+        if c and os.path.isfile(c) and os.access(c, os.X_OK):
+            return c
+    return None
 
 
 def resolve_pages(target):
@@ -119,8 +142,8 @@ def count_findings(parsed):
     return None
 
 
-def detect(target, out_dir, cwd):
-    rc, out = run([DETECTOR, "detect", target, "--json"], timeout=300, cwd=cwd)
+def detect(target, out_dir, cwd, launcher):
+    rc, out = run([launcher, "detect", target, "--json"], timeout=300, cwd=cwd)
     out_path = Path(out_dir) / "detect.json"
     parsed = None
     text = out.strip()
@@ -160,7 +183,8 @@ def main(argv):
         print(f"target not found: {args.target}", file=sys.stderr)
         return 2
 
-    tools = {CLI: tool_status(CLI), DETECTOR: tool_status(DETECTOR)}
+    launcher = find_impeccable()
+    tools = {CLI: tool_status(CLI), DETECTOR: "ok" if launcher else "missing"}
     report = {"target": args.target, "kind": kind, "tools": tools,
               "pages": [name for name, _ in pages], "widths": widths, "schemes": schemes,
               "reduced_motion": args.reduced_motion, "shots": [], "failures": [],
@@ -173,8 +197,8 @@ def main(argv):
         report["failures"].append({"step": "capture",
                                    "output": f"{CLI} not on PATH, no screenshots taken"})
 
-    if not args.no_detect and tools[DETECTOR] == "ok":
-        report["detect"] = detect(args.target, out_dir, cwd)
+    if not args.no_detect and launcher:
+        report["detect"] = detect(args.target, out_dir, cwd, launcher)
 
     report_path = out_dir / "capture-report.json"
     report_path.write_text(json.dumps(report, indent=2))

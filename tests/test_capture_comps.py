@@ -52,13 +52,18 @@ class CaptureCompsTest(unittest.TestCase):
         self.bin = self.root / "bin"
         self.bin.mkdir()
         self.old_path = os.environ.get("PATH", "")
+        self.old_home = os.environ.get("HOME", "")
         self.old_cwd = os.getcwd()
+        os.environ["HOME"] = str(self.root / "home")
+        (self.root / "home").mkdir()
+        os.environ.pop("IMPECCABLE_BIN", None)
         os.chdir(self.root)
         os.environ["FAKE_LOG"] = str(self.root / "cli.log")
 
     def tearDown(self):
         os.chdir(self.old_cwd)
         os.environ["PATH"] = self.old_path
+        os.environ["HOME"] = self.old_home
         os.environ.pop("FAKE_LOG", None)
         self.tmp.cleanup()
 
@@ -122,6 +127,17 @@ class CaptureCompsTest(unittest.TestCase):
         parsed = json.loads((self.root / "shots" / "detect.json").read_text())
         self.assertEqual(parsed["findings"][0]["rule"], "gradient-text")
         self.assertIn("findings 1", out)
+
+    def test_detector_is_found_in_the_global_skill_install(self):
+        launcher = self.root / "home" / ".claude" / "skills" / "impeccable" / "scripts" / "impeccable"
+        launcher.parent.mkdir(parents=True)
+        write_exec(launcher, FAKE_DETECTOR)
+        os.environ["PATH"] = str(self.bin)
+        rc, _ = self.run_script(str(self.comps), "--out", "shots")
+        self.assertEqual(rc, 0)
+        rep = self.report("shots")
+        self.assertEqual(rep["tools"]["impeccable"], "ok")
+        self.assertEqual(rep["detect"]["findings_count"], 1)
 
     def test_url_target_derives_a_page_name(self):
         os.environ["PATH"] = str(self.bin)
