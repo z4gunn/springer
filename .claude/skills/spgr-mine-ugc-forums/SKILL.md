@@ -36,7 +36,13 @@ This skill runs in Phase 1, where no code is written. It is a discovery research
 
 1. Expand the keyword set before searching. Add synonyms, related terms, and competitor brand names to maximize coverage. Record the expanded set so the search pass is reproducible.
 
-2. Run a per-platform search pass with spgr-search-web using `search_context: market`. Construct platform-specific queries with site operators: `site:reddit.com`, `site:news.ycombinator.com`, `site:stackoverflow.com`, `site:quora.com`, and the relevant niche-forum domains. Honor the `platforms` subset if one was given, otherwise search all five. Apply the date filter, defaulting to the last 24 months, since older posts may describe problems competitors have already solved.
+2. Run a per-platform search pass. For Hacker News run the bundled script, which queries the Algolia HN index with no key and returns each comment or story with its author, date, points or comment count, and permalink, so the quote contract is met mechanically:
+
+   ```bash
+   python3 .claude/skills/spgr-mine-ugc-forums/scripts/hn_search.py "<query>" --tags comment --since <YYYY-MM-DD> --limit 100
+   ```
+
+   Run it once per expanded keyword with `--tags comment` and once with `--tags story`. Exit 0 is a full result, 1 is partial with the errors listed, 2 is empty. For Reddit follow the path in [references/reddit-access.md](references/reddit-access.md), because Reddit has closed its free read endpoints on a published schedule and a thin Reddit yield is a platform-policy outcome, not a bug. For Stack Overflow, Quora, and the niche forums use spgr-search-web with `search_context: market` and site operators: `site:stackoverflow.com`, `site:quora.com`, and the relevant niche-forum domains. Honor the `platforms` subset if one was given, otherwise search all five. Apply the date filter, defaulting to the last 24 months, since older posts may describe problems competitors have already solved.
 
 3. Search across all selected platforms, not one. Different communities surface different pain. Reddit shows consumer-level frustration, Hacker News surfaces technical and founder perspectives, Stack Overflow reveals implementation-level friction, Quora surfaces questions from people who never found a solution. For B2B or vertical products, weight niche forums, which often yield higher-quality signals than general platforms.
 
@@ -52,7 +58,7 @@ This skill runs in Phase 1, where no code is written. It is a discovery research
 
 9. Write the analysis as an envelope artifact with spgr-write-artifact, carrying the header, confidence map, decision log, and version. Run spgr-validate-artifact inline. Record any consequential theming or weighting choice with spgr-log-decision.
 
-10. Escalate rather than fill gaps. If web access is unavailable, if a requested platform returns no usable results, or if the search yields too few sources to validate any pain point, stop and raise the gap to the Discovery Agent with spgr-escalate. Do not synthesize forum data from other sources, and do not present an unvalidated signal as confirmed.
+10. Escalate rather than fill gaps. If web access is unavailable, if a requested platform returns no usable results, or if the search yields too few sources to validate any pain point, stop and raise the gap to the Discovery Agent with spgr-escalate. When the thin platform is Reddit, the escalation names the closure stage in effect and which access path was tried, so the human reads a policy limit rather than a tooling fault. Do not synthesize forum data from other sources, and do not present an unvalidated signal as confirmed.
 
 ## Notes
 
@@ -61,3 +67,4 @@ This skill runs in Phase 1, where no code is written. It is a discovery research
 - The two-source rule is a hard validation gate, per step 7. A single-source pain point stays proposed in the confidence map.
 - Quotes are verbatim. Paraphrasing a quote is a defect, per step 4.
 - `user_vocabulary` and the verbatim quotes feed spgr-write-page-copy, which writes the page's headline, problem, and objection copy in these words.
+- The HN script is deterministic and runs with no model. Dispatch it at the deterministic tier. The two optional Reddit paths in the reference, last30days and the Apify CLI, are external tools in the same class as excalidraw: the skill runs without them and records which path produced each Reddit source.

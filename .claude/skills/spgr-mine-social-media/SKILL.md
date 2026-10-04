@@ -37,13 +37,26 @@ Social media is the most temporally current and emotionally expressive discovery
 
 2. Select platforms. Default to all four. Match platform to market when the domain is clear: LinkedIn for B2B problems, Twitter/X and Bluesky for technical and startup communities, Facebook Groups for consumer and SMB markets. Record platform selection rationale with spgr-log-decision.
 
-3. Run a per-platform keyword search pass. Use spgr-search-web with a platform-specific site filter (for example `site:twitter.com`, `site:linkedin.com`, `site:bsky.app`) for each platform, querying the `hashtag_keyword_set` and each entry in `product_names`. Apply `date_filter`. Use a platform search API directly where one is available rather than the site-filtered fallback.
+3. Run a per-platform keyword search pass. For Bluesky run the bundled script, which queries the public AppView search with no key and returns each post with its date, text, like, reply, repost, and quote counts, and URL:
+
+   ```bash
+   python3 .claude/skills/spgr-mine-social-media/scripts/bsky_search.py "<query>" --sort top --since <YYYY-MM-DD> --limit 100
+   ```
+
+   The public endpoint serves one page of at most 100 posts per query and refuses every cursor, so widen coverage by running it once per keyword, hashtag, and product name rather than by paging. For Twitter/X there is no free read path: the official API has no free tier and cookie-based clients risk the account. Mine X only through the Apify CLI when `APIFY_TOKEN` is set, with an input file of search terms and the date window:
+
+   ```bash
+   apify actors call apidojo/tweet-scraper --input-file x-input.json --json
+   apify datasets get-items <dataset-id> --format json
+   ```
+
+   When the token is absent, omit X, record `x omitted, no free path` with spgr-log-decision, and say so in `platform_breakdown`. For LinkedIn and Facebook Groups use spgr-search-web with a platform-specific site filter (`site:linkedin.com`, `site:facebook.com/groups`), querying the `hashtag_keyword_set` and each entry in `product_names`. Apply `date_filter`.
 
 4. Filter by engagement. Drop any post below `engagement_threshold` (likes plus replies). Capture each kept post as a source with URL, platform, date, likes, replies, and a short excerpt.
 
 5. Deduplicate. A retweet or share of the same post counts as one data point, not many. Fold the engagement of every share into the engagement score of the original post, so a widely reshared post scores higher without inflating the mention count.
 
-6. Strip personally identifiable information. Reference the post URL only. Do not record the author name, handle, or profile in any output field. Verify this on a sample before proceeding.
+6. Strip personally identifiable information. Reference the post URL only. Do not record the author name, handle, or profile in any output field. The Bluesky script emits the handle because the post URL is built from it, so drop the `author` field when carrying an item into the artifact. Verify this on a sample before proceeding.
 
 7. Run the clustering and tone pass. Cluster the kept posts into pain-point themes by semantic similarity. Classify the tone of each post into one of `frustrated`, `resigned`, `actively_switching`, `curious`, `satisfied` using a structured prompt. Aggregate to a theme-level tone by majority class.
 
@@ -61,4 +74,5 @@ Social media is the most temporally current and emotionally expressive discovery
 - Mark each pain-point theme as a proposed signal in the confidence map, not confirmed. Confirmation requires a second distinct source category, which is established outside this skill.
 - Tone is load-bearing, not decoration. A space full of `resigned` users has accepted the pain as normal. A space full of `actively_switching` users is already in market for an alternative.
 - No personally identifiable information from any post may appear in the output. Reference the URL, never the author.
+- The Bluesky script is deterministic and runs with no model. Dispatch it at the deterministic tier. The Apify CLI is an optional paid tool in the same class as excalidraw: the skill runs without it, and X is then omitted with a decision-log line rather than approximated.
 - Search payload schema per theme: `{theme, mention_count, tone, platforms: [string], posts: [{url, platform, date, likes, replies, excerpt}]}`, with top-level `switching_signals`, `platform_breakdown`, and `tone_distribution` per the spec output contract.

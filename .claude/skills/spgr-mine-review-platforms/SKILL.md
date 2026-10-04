@@ -35,9 +35,22 @@ Review platforms capture a different audience than UGC forums or social media. G
 
 1. Resolve the input. Require either `competitor_name` or `product_category`. If neither is present, stop and escalate through spgr-escalate with a precise list of what is missing. Do not guess a target. Apply the defaults for `platforms`, `date_filter`, and `review_count_target` when not supplied.
 
-2. Run a per-platform search and extraction pass over each platform in `platforms`. Use spgr-search-web with a site-scoped query per platform: `site:g2.com`, `site:capterra.com`, `site:trustpilot.com`, `site:producthunt.com`. Fetch individual review pages with WebFetch for the URLs the search returns. Honor `date_filter` and stop a platform pass at `review_count_target`.
+2. Run a per-platform search and extraction pass over each platform in `platforms`. Use spgr-search-web with a site-scoped query per platform: `site:g2.com`, `site:capterra.com`, `site:trustpilot.com`, `site:producthunt.com`. Then fetch review pages by the path each platform allows. G2 and Capterra answer every direct fetch and every reader proxy with 403 or a CAPTCHA, so without the Apify path below they are read from search snippets only. Trustpilot and Product Hunt pages fetch through WebFetch, and when a page blocks it, through Jina Reader with no install or key: `https://r.jina.ai/<page-url>` returns the page as Markdown. When `APIFY_TOKEN` is set, read G2, Capterra, and Trustpilot in full through the Apify CLI with an input file naming the product and the review count:
 
-3. Respect platform terms. Do not bulk-scrape review text in a way that violates a platform's terms of service. Where full page access is unavailable, work from public search result snippets and summarization rather than forcing a scrape. Record which platforms were summarized versus fully read in `sources`.
+   | Platform | Primary Actor | Fallback Actor |
+   |----------|---------------|----------------|
+   | G2 | `bedazzled_omen/reviews-scraper` | `zhorex/g2-reviews-scraper` |
+   | Capterra | `zen-studio/software-review-scraper` | none |
+   | Trustpilot | `bedazzled_omen/reviews-scraper` | `zen-studio/software-review-scraper` |
+
+   ```bash
+   apify actors call <actor> --input-file reviews-input.json --json
+   apify datasets get-items <dataset-id> --format json
+   ```
+
+   An Actor that is missing, deprecated, or returns an error is an escalation through spgr-escalate naming the Actor and the platform, never a silent substitution of another Actor or of snippets presented as full reads. Honor `date_filter` and stop a platform pass at `review_count_target`.
+
+3. Respect platform terms. Do not bulk-scrape review text in a way that violates a platform's terms of service, and do not route around a block with a logged-in session or cookies. Where full page access is unavailable, work from public search result snippets and summarization rather than forcing a scrape. Record which platforms were summarized versus fully read, and the path used (WebFetch, Jina Reader, Apify Actor, snippets), in `sources` and with spgr-log-decision.
 
 4. Extract per-platform content. Pull positive and negative attributes with a mention count and a small set of representative quotes each. Pull feature-comparison language, the wording of the form "compared to X, this does Y better or worse", and record the named competitor and the comparison direction. This language is direct competitive intelligence for the competitive matrix.
 
@@ -59,3 +72,4 @@ Review platforms capture a different audience than UGC forums or social media. G
 - Switching reasons are the priority extraction, per step 5. From-direction reasons reveal what would let a competing product win the customer.
 - Two distinct source categories are required before a pain signal or switching reason counts as validated, per step 9. A single-source signal is proposed, not confirmed.
 - Platform skew is a feature of the data, not noise. Buyer-level signal concentrates on G2 and Capterra, service-quality signal on Trustpilot, and early-adopter signal on Product Hunt.
+- The Apify CLI is an optional paid tool in the same class as excalidraw. The skill runs without it, and the G2 and Capterra passes are then snippet-only and marked so, which keeps their pain signals at proposed until a second platform corroborates them.
