@@ -63,7 +63,9 @@ Rules the profile carries:
   line in the requirements unit, not a consultation.
 - NFR consultations on brochure and small fold into the PM unit as a checklist.
   A vertical is dispatched only when a later diff touches its surface.
-- The definition of done on brochure is the CI check. No DoD artifact is written.
+- The definition of done on brochure is the CI check, which includes the SEO
+  baseline from spgr-check-seo-baseline run strict on every built page. No DoD
+  artifact is written.
 - The orchestrator reads the profile from the readiness snapshot and holds any
   unit outside the profile's phase set. Changing the profile mid-run is a
   scope-change gate.
