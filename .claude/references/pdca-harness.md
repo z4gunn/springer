@@ -189,6 +189,24 @@ Two rules keep a parallel batch safe.
 The read-only audit fan-out in Check parallelizes with zero contention and is the
 low-risk half of parallelism.
 
+Co-scheduled build units run in separate git worktrees. File-disjoint is not
+checkout-disjoint: two units in one working tree that each run `git checkout
+-b` on their own branch switch the tree out from under each other, and one
+unit's commit carries the other's half-written files. spgr-create-branch in
+worktree mode gives each unit `.worktrees/<branch>/`, a linked worktree on its
+own branch cut from the protected base, and the dispatch prompt names that
+path as the unit's working directory. Every command in the unit runs there.
+The run store stays in the main worktree. A unit writes its artifacts to the
+main worktree's `runs/<run-id>/` by the absolute path the prompt carries,
+never to the copy under its own worktree, so there is still one store and one
+writer. A linked worktree carries no ignored files (`node_modules`, `.venv`,
+build output), so the unit installs dependencies the way CI does and runs its
+scoped baseline tests before it writes code. At Act, after spgr-create-pr has
+opened the unit's PR, the harness removes the worktree with `git worktree
+remove .worktrees/<branch>` and keeps the branch. A removal git refuses is
+left in place and reported, never forced. A batch with a single build unit
+may still work in the main checkout.
+
 A cycle is not closed while a unit it dispatched is still running, and a new
 cycle is not planned while any dispatch from a prior cycle lacks a completion.
 A background agent outlives the turn that dispatched it, so the turn boundary
@@ -292,7 +310,9 @@ unit is fresh every time under rule 1 and never inherits a transcript.
 
 Every unit prompt carries the same four things, and every unit report answers
 the same four things. The prompt names the files to read in order, the rulings
-that bind, the check command that gates the work, and the report format. The
+that bind, the check command that gates the work, the working directory (the
+unit's worktree path, or the main checkout) with the absolute run-store path,
+and the report format. The
 report lists the files written with line counts, pastes the verification
 output rather than describing it, quotes verbatim every obligation it could
 not satisfy with the reason, lists each default taken as one defaults-ledger
@@ -527,7 +547,7 @@ all, reports the rest in `held`, and the orchestrator routes around them.
 | scope-change | all |
 
 While a pr-merge gate is open the next file-disjoint batch builds on its own
-branch from the protected base, so the human merging one PR never idles the
+branch, in its own worktree, from the protected base, so the human merging one PR never idles the
 build of the next. Work that runs past an open gate never merges past it, and
 never consumes an artifact the gate may change.
 

@@ -18,12 +18,14 @@ Branch naming and base selection are the first decision in every development tas
 | `version` | Target version for `hotfix` and `release` branches (for example `v1.4.2`). |
 | `description_slug` | Short description for the branch tail. Lowercased and hyphenated by this skill. |
 | `base_branch` | Base to cut from. Defaults to `main`. For a `hotfix` the base is the matching `release/` branch. |
+| `worktree` | Optional boolean. When true, create the branch as a linked worktree at `.worktrees/<name>/` instead of switching the current checkout. Set by the harness for every unit that runs beside another unit. |
 
 ## Outputs
 
 | Artifact | Description |
 |----------|-------------|
 | Named branch | A convention-compliant branch created locally from the up-to-date base and pushed to the remote with upstream tracking set. |
+| `worktree_path` | In worktree mode, the absolute path of the linked worktree the unit works in. |
 
 ## Procedure
 
@@ -36,10 +38,10 @@ Branch naming and base selection are the first decision in every development tas
    - `chore/<slug>`
 3. Normalize the name. Lowercase the slug, replace spaces and underscores with single hyphens, and strip every character that is not a lowercase letter, a digit, a hyphen, or the type prefix slash. The result must match `^(feature|fix|hotfix|release|chore)/[a-z0-9-]+$`.
 4. Confirm the required fields for the type are present. A `feature` or `fix` needs `story_or_issue_id`. A `hotfix` or `release` needs `version`. If a required field is missing or the normalized name fails the pattern, stop and call spgr-escalate with the specific field and the failing value. Do not invent an ID or a slug.
-5. Check out and refresh the base. Run `git fetch origin`, check out the base branch, and `git pull` so the branch is cut from an up-to-date local copy. If the working tree is dirty, stop and call spgr-escalate rather than discarding uncommitted work.
+5. Refresh the base. Run `git fetch origin`. Without `worktree`, check out the base branch and `git pull` so the branch is cut from an up-to-date local copy, and if the working tree is dirty, stop and call spgr-escalate rather than discarding uncommitted work. With `worktree`, do not check anything out in the current tree, because another unit may be working in it. The start point is `origin/<base>` after the fetch.
 6. Reject a name collision. If the branch already exists locally or on the remote, stop and call spgr-escalate instead of force-creating over it.
-7. Create the branch with `git checkout -b <name>` from the refreshed base, then push it with `git push -u origin <name>` to set upstream tracking.
-8. Return the created branch name and its base so the calling agent can proceed to spgr-implement-feature or the first commit.
+7. Create the branch. Without `worktree`, run `git checkout -b <name>` from the refreshed base, then `git push -u origin <name>` to set upstream tracking. With `worktree`, confirm `.worktrees/` is ignored with `git check-ignore -q .worktrees` (the instance `.gitignore` carries it, and when the check fails stop and call spgr-escalate rather than committing a worktree), then run `git worktree add -b <name> .worktrees/<name> origin/<base>`, push with `git push -u origin <name>` from inside the worktree, install dependencies the way CI does (the worktree carries no ignored files), and run the project's scoped baseline tests there so a failure that predates the unit is known before any code is written.
+8. Return the created branch name and its base, and in worktree mode the absolute `worktree_path`, so the calling agent can proceed to spgr-implement-feature or the first commit from the right directory.
 
 ## Notes
 
@@ -48,4 +50,5 @@ Branch naming and base selection are the first decision in every development tas
 - The naming convention is also enforced server-side by a push-time hook or branch-protection rule that rejects non-conforming names. This skill makes the local name conform so the push is accepted on the first attempt.
 - One branch carries one logical change. A task that spans two stories needs two branches.
 - The branching model these types serve (trunk-based, `main` always deployable) and the trigger for cutting a `release/<version>` branch are defined in `.claude/references/git-workflow.md`.
+- One working tree holds one branch. A unit in a linked worktree runs every command there and writes its artifacts to the run store in the main worktree by absolute path, never to the `runs/` under its own worktree. After the PR is open the harness removes the worktree with `git worktree remove .worktrees/<name>` and keeps the branch. A removal git refuses is reported, never forced, and `git worktree prune` clears entries whose directories are gone.
 - Use spgr-escalate for every stop condition in the procedure. Do not fill a missing ID, slug, or version with a guess, and do not overwrite an existing branch or a dirty tree.

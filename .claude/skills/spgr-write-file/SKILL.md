@@ -27,7 +27,7 @@ Give every agent one safe write interface so file production does not cause miss
 
 ## Procedure
 
-1. Resolve `file_path` and confirm it stays within the repository root. Refuse writes outside the repo boundary.
+1. Resolve `file_path` and confirm it stays within the repository root. The root is the main worktree's root, the parent of `git rev-parse --git-common-dir`, so a unit in a linked worktree under `.worktrees/` may write to the run store in the main worktree. Refuse writes outside that boundary.
 2. In `safe` mode, confirm the file was read this session with `spgr-read-file`. If it was not, escalate with `spgr-escalate` rather than writing blindly.
 3. In `create` mode, fail with a clear error if the file already exists. Do not silently overwrite.
 4. When overwriting an existing file, copy it to a `.bak` in a temp directory and record the path in `backup_path`.

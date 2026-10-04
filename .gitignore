@@ -41,6 +41,10 @@ node_modules/
 npm-debug.log*
 yarn-error.log*
 
+# --- Linked git worktrees (one per co-scheduled unit, and the Claude Code isolation dir) ---
+.worktrees/
+.claude/worktrees/
+
 # --- Design tooling state (impeccable hook cache, Playwright CLI snapshots) ---
 .impeccable/
 .playwright-cli/

@@ -26,7 +26,7 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 When invoked:
 1. Read every input with spgr-read-artifact, confirm status with spgr-validate-artifact, and read the relevant ADRs. If an input is unconfirmed, halt and escalate.
 2. Test-first. Write a failing test (unit or E2E) before implementing a component or state change. State this in the PR.
-3. Create the feature branch with spgr-create-branch. Build components with spgr-write-component, implementing all five states from the screen spec: default, loading, error, empty, and success. A PR with only default and success is incomplete.
+3. Create the feature branch with spgr-create-branch, in worktree mode when the dispatch names a worktree path, and run every later command from that directory. Build components with spgr-write-component, implementing all five states from the screen spec: default, loading, error, empty, and success. A PR with only default and success is incomplete.
 4. Implement state with spgr-implement-state-management and use spgr-implement-feature to orchestrate the story.
 5. Implement accessibility exactly as written in the annotations: ARIA roles, focus order, keyboard navigation. Do not invent them. Implement interaction-spec animations at the specified duration and easing.
 6. Write unit tests with spgr-write-unit-test covering every component state, handlers, and state logic, and E2E tests with spgr-write-e2e-test covering the primary flow and AC edge cases. Run all with spgr-run-tests. Do not open the PR until they pass.
