@@ -126,7 +126,12 @@ dispatched separately only for a re-check by execution after a fix.
 Review is bounded to one review pass and one re-review. A second
 REQUEST_CHANGES routes the open findings to the human at the pr-merge gate as a
 list. The bound exists because one docs-regeneration chore in the reference
-case received three REQUEST_CHANGES passes, 45 findings, and five hours.
+case received three REQUEST_CHANGES passes, 45 findings, and five hours. The
+bound controls the cost of a review. The pre-report gate in the Code Reviewer
+agent controls its precision: a finding names its line, its failing input, and
+the rule it violates, a blocking finding carries evidence the code-review
+schema requires, and a known class of false findings is never raised. Under
+auto-merge the reviewer's verdict is the last gate, so both bounds matter.
 
 ## Verdict and transition table
 
@@ -308,6 +313,20 @@ narrative longer than the diff it describes. In the reference case the main
 session issued 771 shell commands and 2.26M output tokens on opus, more than
 all 71 subagents combined, while the dispatch-tier table said it was kept
 minimal.
+
+The budget has a sensor. The `session-usage.py` hook, registered for
+PostToolUse and Stop in the instance settings, reads the session transcript
+incrementally and writes the main session's context size, cumulative tokens,
+and model to `runs/_dashboard/sessions/<session-id>.json`. The dashboard shows
+that line next to the subagent figures and prices both from
+`assets/model-pricing.json` in the run-harness skill. When the context passes
+60 percent of the window the hook injects one advisory telling the harness to
+end the loop at the next clean Act. At 80 percent it injects one instruction to
+finish the current Act, release the lock, and resume in a fresh session. Each
+tier fires once per session. The hook observes and never blocks. Every
+dispatch event also records the model the unit ran on, from the per-dispatch
+override or the agent's frontmatter, so the cost figures are priced per tier
+rather than guessed.
 
 The instance settings installed by `new-project.sh` from
 `templates/project-settings.json` carry a permission allowlist for the

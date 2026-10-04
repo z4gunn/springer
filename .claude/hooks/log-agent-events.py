@@ -51,6 +51,35 @@ def find_metrics(node, out):
             find_metrics(item, out)
 
 
+def resolve_model(tool_input, project_dir):
+    """The model a dispatch runs on: the per-dispatch override when the
+    harness passed one (a mechanical unit sent to haiku), else the model the
+    agent declares in its frontmatter, else None. The dashboard prices tokens
+    by this value, so an unknown model is left unknown rather than guessed."""
+    if tool_input.get("model"):
+        return tool_input["model"]
+    agent = tool_input.get("subagent_type")
+    if not agent:
+        return None
+    path = os.path.join(project_dir, ".claude", "agents", f"{agent}.md")
+    try:
+        with open(path) as fh:
+            lines = fh.read().split("\n", 40)
+    except OSError:
+        return None
+    # Frontmatter is the block between the first two "---" lines.
+    fences = 0
+    for line in lines:
+        if line.strip() == "---":
+            fences += 1
+            if fences == 2:
+                break
+            continue
+        if fences == 1 and line.startswith("model:"):
+            return line.split(":", 1)[1].strip()
+    return None
+
+
 def detect_run_id(payload, project_dir):
     """Best-effort run attribution: look for a runs/<id>/ path or a run_id
     field in the dispatch prompt, then fall back to the single most recently
@@ -101,6 +130,8 @@ def main():
         "description": tool_input.get("description") or "",
         "background": background,
     }
+    if hook != "SubagentStop":
+        event["model"] = resolve_model(tool_input, project_dir)
     if hook == "SubagentStop":
         event["agent_id"] = payload.get("agent_id")
         event["description"] = payload.get("agent_transcript_path") or ""

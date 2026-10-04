@@ -176,6 +176,8 @@ springer/
     skills/<name>/SKILL.md    the 197 skills, auto-loaded in this repo
     references/<name>.md      shared cross-skill references (for example diagram-standards, typescript-standards)
   schemas/               JSON Schemas for the typed artifacts that flow between agents
+  scripts/               repo tooling: new-project.sh and the repo validator
+  tests/                 unittest suite for the harness scripts, hooks, and validator, run by CI
   templates/             golden starters for authoring a new skill or agent
   brand/                 logo, social-preview, and favicon assets
   runs/                  the run store where a project's artifacts accumulate
@@ -218,7 +220,7 @@ The loop rules, the rehydration algorithm, the parallel barrier, and the advisor
 
 An opt-in terminal dashboard shows a run while it executes: the active phase and cycle count, open gates and escalations with how long each has waited, the WIP board, the agents in flight with elapsed time, recent completions with duration and token counts, a token rollup for the watched run, and project-to-date totals across every run. It is read-only and needs nothing beyond Python 3.
 
-Two pieces feed it. A hook registered in `.claude/settings.json` records every subagent dispatch and completion, with token metrics when available, to `runs/<run-id>/events.jsonl`. The hook loads when a Claude Code session starts, so it takes effect the first session after checkout. The dashboard polls that feed plus the run store once per second and redraws.
+Three pieces feed it. A hook registered in `.claude/settings.json` records every subagent dispatch and completion, with the model it ran on and token metrics when available, to `runs/<run-id>/events.jsonl`. A second hook reads the main session's own transcript and records its context size and cumulative tokens, and warns the harness once when the context passes 60 percent of the window and again at 80 percent, so a run ends at a clean cycle boundary instead of a session-limit death. The dashboard prices both feeds from a list-price table in the run-harness skill's assets and shows the cost per run, per session, and project to date. The hooks load when a Claude Code session starts, so they take effect the first session after checkout. The dashboard polls the feeds plus the run store once per second and redraws.
 
 The dashboard is off by default. Turn it on by asking in chat:
 
@@ -261,6 +263,15 @@ cd ~/path/to/my-saas-app && claude
 ```
 
 The new directory is the application's own repository. It carries `.claude/skills/`, `.claude/agents/`, `.claude/references/`, `schemas/`, a project `CLAUDE.md` tailored to building an app (not to building Springer), and an empty `runs/`. Open it in Claude Code and drive it with the PDCA harness, the same `spgr-run-harness` skill described above, since it ships with every project copy. Typed artifacts (PRD, ADRs, ERD, test plans) accumulate under `runs/<run-id>/`, and the application source code is written into the project tree. The build-time pieces (`.claude/workflows/`, `templates/`) are left out of the new project.
+
+The copy is an owned set. `new-project.sh` writes `.claude/springer-manifest.json` in the instance, listing every runtime file with its content hash and the Springer commit it came from. When Springer moves on, bring the instance up to date from the Springer checkout:
+
+```bash
+python3 scripts/update-project.py status ~/path/to/my-saas-app   # what would change
+python3 scripts/update-project.py update ~/path/to/my-saas-app   # apply it
+```
+
+A runtime file the instance never edited is replaced, one it edited is kept and listed, one it added is left alone, and a template-rendered file (CLAUDE.md, the settings, the gitignore) that was edited gets its new rendering written under `.claude/springer-update/` for a hand merge. The update refuses to run while a harness holds a live lock on a run in the instance.
 
 One skill family needs a one-time setup, and it is optional. The diagram skills render Mermaid and PlantUML sources. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, and make the Mermaid CLI available through `npx`. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
 

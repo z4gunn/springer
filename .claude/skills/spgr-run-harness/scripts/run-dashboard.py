@@ -126,6 +126,69 @@ def load_json(path):
         return None
 
 
+PRICING_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "assets", "model-pricing.json"
+)
+
+
+def load_pricing():
+    """The list-price table the skill ships. Missing or unreadable means every
+    cost line reads 'no pricing table' rather than a wrong number."""
+    return load_json(PRICING_PATH) or {}
+
+
+def price_model(pricing, model):
+    """Resolve a model name or alias to its price row, or None."""
+    if not model or not pricing:
+        return None
+    name = pricing.get("aliases", {}).get(model, model)
+    rows = pricing.get("models", {})
+    if name in rows:
+        return rows[name]
+    # A dated or provider-prefixed id still names the model family.
+    for key, row in rows.items():
+        if key in name:
+            return row
+    return None
+
+
+def cost_usd(pricing, model, tokens):
+    """USD for one metrics dict. total_tokens alone is priced as input when the
+    split is not recorded. Returns (usd, estimated) where estimated is True
+    when the model was unknown and the default model's price was used."""
+    row = price_model(pricing, model)
+    estimated = row is None
+    if estimated:
+        row = price_model(pricing, pricing.get("default_model"))
+    if not row:
+        return 0.0, True
+    inp = tokens.get("input_tokens")
+    out = tokens.get("output_tokens", 0)
+    read = tokens.get("cache_read_tokens", 0)
+    write = tokens.get("cache_creation_tokens", 0)
+    if inp is None and out == 0 and read == 0 and write == 0:
+        inp = tokens.get("total_tokens", 0)
+    usd = (
+        (inp or 0) * row["input"]
+        + out * row["output"]
+        + read * row["cache_read"]
+        + write * row["cache_write"]
+    ) / 1_000_000
+    return usd, estimated
+
+
+def fmt_usd(value):
+    return f"${value:,.2f}"
+
+
+def load_sessions(project_root):
+    """Main-session usage files the session-usage hook writes, newest first."""
+    pattern = os.path.join(project_root, "runs", "_dashboard", "sessions", "*.json")
+    sessions = [s for s in (load_json(p) for p in glob.glob(pattern)) if s]
+    sessions.sort(key=lambda s: s.get("updated_at") or "", reverse=True)
+    return sessions
+
+
 def find_artifact(run_dir, artifact_id):
     """A gate or escalation id resolves to <id>.json in artifacts/ or in its
     dedicated subdirectory, depending on harness version."""
@@ -157,6 +220,7 @@ def aggregate_project(project_root):
     """Roll up every run's event feed, plus the unrouted feed, into project
     lifetime totals. Only activity since the event hook was installed is
     counted, earlier runs left no metrics."""
+    pricing = load_pricing()
     stats = {
         "runs": set(),
         "dispatches": 0,
@@ -164,6 +228,8 @@ def aggregate_project(project_root):
         "tokens": {},
         "duration_ms": 0,
         "by_run": {},
+        "usd": 0.0,
+        "usd_estimated": False,
     }
     pattern = os.path.join(project_root, "runs", "*", "events.jsonl")
     for path in sorted(glob.glob(pattern)):
@@ -186,6 +252,10 @@ def aggregate_project(project_root):
                     stats["by_run"][label] = (
                         stats["by_run"].get(label, 0) + metrics["total_tokens"]
                     )
+                if metrics:
+                    usd, est = cost_usd(pricing, ev.get("model"), metrics)
+                    stats["usd"] += usd
+                    stats["usd_estimated"] = stats["usd_estimated"] or est
     return stats
 
 
@@ -381,9 +451,11 @@ def render(run_dir, project_root, width):
         lines.append(f"  {DIM}… {hidden} earlier completions{RESET}")
     lines.append(hrule(width))
 
-    # Token rollup across all completions.
+    # Token and cost rollup across all completions.
+    pricing = load_pricing()
     totals = {}
     by_agent = {}
+    run_usd, run_estimated = 0.0, False
     for row in finished:
         metrics = (row["end"].get("metrics") or {})
         for key, value in metrics.items():
@@ -392,9 +464,13 @@ def render(run_dir, project_root, width):
         if metrics.get("total_tokens"):
             agent = row["end"].get("agent", "?")
             by_agent[agent] = by_agent.get(agent, 0) + metrics["total_tokens"]
-    lines.append(section("TOKENS", width))
+        if metrics:
+            usd, est = cost_usd(pricing, row["end"].get("model"), metrics)
+            run_usd += usd
+            run_estimated = run_estimated or est
+    lines.append(section("TOKENS AND COST", width))
     if totals:
-        parts = [f"total {BOLD}{fmt_tokens(totals.get('total_tokens', 0))}{RESET}"]
+        parts = [f"subagents {BOLD}{fmt_tokens(totals.get('total_tokens', 0))}{RESET} tok"]
         for key, label in (
             ("input_tokens", "in"),
             ("output_tokens", "out"),
@@ -402,13 +478,50 @@ def render(run_dir, project_root, width):
         ):
             if key in totals:
                 parts.append(f"{label} {fmt_tokens(totals[key])}")
+        if pricing:
+            mark = "~" if run_estimated else ""
+            parts.append(f"cost {BOLD}{mark}{fmt_usd(run_usd)}{RESET}")
         lines.append(clip("  " + "   ".join(parts), width))
         top = sorted(by_agent.items(), key=lambda kv: -kv[1])[:4]
         if top:
             breakdown = ", ".join(f"{a} {fmt_tokens(t)}" for a, t in top)
             lines.append(clip(f"  {DIM}by agent: {breakdown}{RESET}", width))
     else:
-        lines.append(f"  {DIM}no token metrics recorded yet{RESET}")
+        lines.append(f"  {DIM}no subagent token metrics recorded yet{RESET}")
+
+    # The main session, from the session-usage hook. The reference run spent
+    # more output tokens here than in every subagent combined.
+    sessions = load_sessions(project_root)
+    if sessions:
+        s = sessions[0]
+        window = s.get("window") or 1
+        ctx = s.get("context_tokens", 0)
+        pct = 100 * ctx / window
+        color = RED if pct >= 80 else YELLOW if pct >= 60 else GREEN
+        session_usd, session_est = cost_usd(pricing, s.get("model"), {
+            "input_tokens": s.get("input_tokens", 0),
+            "output_tokens": s.get("output_tokens", 0),
+            "cache_read_tokens": s.get("cache_read_tokens", 0),
+            "cache_creation_tokens": s.get("cache_creation_tokens", 0),
+        })
+        line = (
+            f"  main session   context {color}{fmt_tokens(ctx)}/{fmt_tokens(window)}"
+            f" ({pct:.0f}%){RESET}   out {fmt_tokens(s.get('output_tokens', 0))}"
+            f"   turns {s.get('turns', 0)}"
+        )
+        if pricing:
+            mark = "~" if session_est else ""
+            line += f"   cost {BOLD}{mark}{fmt_usd(session_usd)}{RESET}"
+        if s.get("model"):
+            line += f"   {DIM}{s['model']}{RESET}"
+        lines.append(clip(line, width))
+    else:
+        lines.append(f"  {DIM}main session: no usage recorded yet (session-usage hook){RESET}")
+    if not pricing:
+        lines.append(f"  {DIM}no pricing table at assets/model-pricing.json{RESET}")
+    elif run_estimated:
+        lines.append(f"  {DIM}~ marks a cost priced at the default model because the"
+                     f" dispatch recorded no model{RESET}")
     lines.append(hrule(width))
 
     # Project lifetime rollup across every run's event feed.
@@ -422,6 +535,9 @@ def render(run_dir, project_root, width):
         )
         if stats["duration_ms"]:
             summary += f"   agent time {fmt_elapsed(stats['duration_ms'] / 1000)}"
+        if pricing and stats["usd"]:
+            mark = "~" if stats["usd_estimated"] else ""
+            summary += f"   subagent cost {BOLD}{mark}{fmt_usd(stats['usd'])}{RESET}"
         lines.append(clip(summary, width))
         split = [
             f"{label} {fmt_tokens(stats['tokens'][key])}"

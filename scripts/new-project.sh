@@ -72,7 +72,9 @@ cp -R "$SRC/schemas"            "$TARGET/schemas"
 
 # 2. Install the downstream ruleset as the project's CLAUDE.md, stamping the
 #    default run profile.
-sed "s/^Default profile for this project: \`saas\`\./Default profile for this project: \`$PROFILE\`./" \
+#    The profile sentence sits mid-paragraph in the template, so the match is
+#    not anchored to the start of a line.
+sed "s/Default profile for this project: \`saas\`\./Default profile for this project: \`$PROFILE\`./" \
   "$SRC/templates/project-CLAUDE.md" > "$TARGET/CLAUDE.md"
 
 # 3. Derive a .gitignore from Springer's, minus the rule that ignores the run
@@ -84,7 +86,12 @@ grep -v -e '^/runs/$' -e '^# --- Generated POC artifacts' "$SRC/.gitignore" > "$
 mkdir -p "$TARGET/runs"
 touch "$TARGET/runs/.gitkeep"
 
-# 5. Initialize the project repository with one commit.
+# 5. Record the runtime the instance now owns, file by file with content
+#    hashes, so scripts/update-project.py can later bring it up to a newer
+#    Springer without clobbering anything the instance edited.
+python3 "$SRC/scripts/update-project.py" manifest "$TARGET" --profile "$PROFILE"
+
+# 6. Initialize the project repository with one commit.
 git -C "$TARGET" init -q
 git -C "$TARGET" add -A
 git -C "$TARGET" -c user.name='Springer' -c user.email='springer@local' \
@@ -106,4 +113,9 @@ and a scope change.
 
 Artifacts accumulate under runs/<run-id>/. Application source code is written into
 the project tree.
+
+To bring this instance up to a newer Springer later, from the Springer checkout:
+
+  python3 scripts/update-project.py status $TARGET    # what would change
+  python3 scripts/update-project.py update $TARGET    # apply it
 EOF
