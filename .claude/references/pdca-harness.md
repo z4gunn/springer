@@ -111,7 +111,11 @@ named, and reads CI on the PR head. The main session never re-runs an agent's
 verification by hand, never re-derives a finding an agent reported, and never
 opens an artifact to re-read a claim the check script already covers. A claim
 that no script or CI job can check is recorded as unverified. It is not
-verified by the harness reading files.
+verified by the harness reading files. When a code-review artifact carries a
+`cannot_verify` list, Check runs each named command and folds the result into
+the verdict, so a check the reviewer could not run from the package is
+answered by execution rather than by the implementer's word. The reviewer's
+`declined_to_judge` list is carried into the cycle record unchanged.
 
 A model-based audit is dispatched only when the diff touches a vertical's
 declared surface: UI markup or styles for Accessibility, dependencies, headers,
@@ -345,6 +349,9 @@ so neither the task text nor the diff transits the main session.
   list, the stat, and the diff with ten lines of context under a header that
   records both SHAs and whether the tree was dirty. The reviewer reads the
   brief, the report, and the package. The main session never reads the diff.
+  The reviewer prompt never caps a severity, excludes an area, or says what
+  not to flag. Pre-judging a finding is the harness grading the work itself,
+  and the reviewer is told to ignore such a sentence and note it.
 
 The `dispatch/` directory is run-store history like the cycle log. The
 store-reading scripts do not scan it, and it is never an artifact.

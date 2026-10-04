@@ -50,6 +50,31 @@
             "then": { "required": ["evidence"] }
           }
         },
+        "declined_to_judge": {
+          "type": "array",
+          "description": "Every behavior in the diff the reviewer looked at and set aside, so nothing leaves the review silently.",
+          "items": {
+            "type": "object",
+            "required": ["behavior", "reason"],
+            "properties": {
+              "behavior": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "cannot_verify": {
+          "type": "array",
+          "description": "Checks the review package could not answer. The harness runs each command in Check. Never a finding on suspicion, never dropped.",
+          "items": {
+            "type": "object",
+            "required": ["check", "command"],
+            "properties": {
+              "check": { "type": "string", "minLength": 1 },
+              "command": { "type": "string", "minLength": 1 },
+              "why": { "type": "string" }
+            }
+          }
+        },
         "summary": { "type": "string", "minLength": 1 },
         "verdict": { "type": "string", "enum": ["APPROVE", "REQUEST_CHANGES", "COMMENT"] }
       }

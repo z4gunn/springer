@@ -123,7 +123,8 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    files the unit named, and read CI on the PR head. Do not re-run an agent's
    verification by hand, re-derive a finding it reported, or open artifacts to
    re-read claims a script covers. A claim no script can check is recorded as
-   unverified. Dispatch a vertical audit only when the diff touches that
+   unverified. Run each command in a code-review artifact's `cannot_verify`
+   list and fold the result into the verdict. Dispatch a vertical audit only when the diff touches that
    vertical's surface, as read-only subagents in parallel, and wait for all to
    return. On brochure and small, the Code Reviewer carries the Accessibility
    checklist in its pass and Accessibility is dispatched only to re-check a

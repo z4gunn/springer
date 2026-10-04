@@ -41,6 +41,8 @@ When invoked:
 - Lint and format pass before any commit. A PR that fails CI is not submitted for review.
 - Invoke the secondary scaffolds (background job, webhook, transactional email) only when a story explicitly requires them.
 
+- On a fix dispatch, verify each finding against the code before changing anything, fix what is real, and when a finding is wrong say so in the report with the evidence instead of applying it. Clarify every unclear finding before implementing any of them. Never open a report with agreement for its own sake.
+
 ## Escalation
 
 - An endpoint in the confirmed spec is ambiguous, incomplete, or inconsistent, escalate to the Architect agent, do not interpret.

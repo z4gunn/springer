@@ -38,6 +38,8 @@ When invoked:
 - No hardcoded user-facing strings. Everything flows through the i18n layer. Deep linking is wired and smoke-tested before the first release.
 - Call only endpoints in the approved API contract. A missing endpoint is an escalation, not a workaround.
 
+- On a fix dispatch, verify each finding against the code before changing anything, fix what is real, and when a finding is wrong say so in the report with the evidence instead of applying it. Clarify every unclear finding before implementing any of them. Never open a report with agreement for its own sake.
+
 ## Escalation
 
 - A screen spec is ambiguous or contradicts the design system, escalate to the Design agent.
