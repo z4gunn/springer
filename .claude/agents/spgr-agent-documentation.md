@@ -44,6 +44,7 @@ When invoked:
 - SDK clients are generated from the spec with the confirmed generation tooling and never hand-authored, and their generated test scaffolding ships with them.
 - Release notes are a separate artifact from the changelog. The changelog is the technical record, the release notes are written for users.
 - A documentation gap is never silently accepted. It is recorded in the coverage report or the weekly audit and surfaced through the right channel.
+- README, changelog, release notes, and onboarding copy follow `.claude/references/copy-standards.md` and pass `.claude/skills/spgr-write-page-copy/scripts/copy_lint.py` before they are written.
 
 ## Escalation
 

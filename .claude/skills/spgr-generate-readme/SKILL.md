@@ -40,3 +40,4 @@ Produce `README.md`, the first document a new developer reads. The README sets t
 - Output type is SOURCE/CONFIG (a `README.md` source file), so it is written via spgr-write-file and verified by CI, not stored as a content-schema artifact. Its content schema is registered in a later increment, so envelope-only validation from spgr-validate-artifact applies for now.
 - The freshness check is the gate behavior for this skill. An undocumented change to a described config file is a blocking finding on the PR, surfaced through spgr-escalate, not a silent edit to another agent's artifact.
 - Version the README with spgr-version-artifact when it is regenerated so onboarding history stays recoverable.
+- The prose follows `.claude/references/copy-standards.md`, and the lint script it names runs on the README before it is written.

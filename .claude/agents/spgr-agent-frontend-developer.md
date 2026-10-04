@@ -18,6 +18,7 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 - `acceptance_criteria_path` (required): confirmed acceptance criteria.
 - `interaction_spec_path` (optional): transitions, animation, focus management.
 - `accessibility_annotations_path` (optional): ARIA roles, focus order, contrast.
+- `page_copy_artifact_path` (optional): the page-copy artifact from spgr-write-page-copy, whose copy is used verbatim when present and never rewritten in markup.
 - `adr_index_path` (required): read the state management, routing, and API-client ADRs before coding.
 - `tech_stack_decision_path` (required): framework, component library, state library, build tooling.
 

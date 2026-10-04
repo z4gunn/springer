@@ -61,3 +61,4 @@ This skill is owned by the Documentation Agent operating as a consultant to the 
 - The benefit-language rewrite is a judgment call. Record the kept-versus-dropped decision and the channel-prioritization rationale with spgr-log-decision so a reviewer can see why an internal change was excluded.
 - This skill advises the release flow as a consultant. It does not edit the changelog or the PRD. Where a feature in the PRD lacks a corresponding changelog entry, route the gap back through spgr-tag-vertical-agent or spgr-escalate rather than describing a feature the changelog does not confirm shipped.
 - Localization scope follows the product UI locales, not a fixed list. A new UI locale added after a release changes the scope of the next release's notes.
+- The benefit language follows `.claude/references/copy-standards.md`, including its banned phrases and its fact rule, and the lint script it names runs on every channel file before it is written.
