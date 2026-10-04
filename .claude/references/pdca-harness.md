@@ -301,26 +301,77 @@ unit is fresh every time under rule 1 and never inherits a transcript.
 
 | Tier | Runs as | Units |
 |------|---------|-------|
-| Deterministic | Bash, no model | `schemas/validate.py`, `rebuild-projection.py`, `derive-ready-queue.py`, `pin-learnings.py`, `linear-sync.ts`, `capture-comps.py` (the comp and PR screenshot matrix plus the slop detector) |
+| Deterministic | Bash, no model | `schemas/validate.py`, `rebuild-projection.py`, `derive-ready-queue.py`, `pin-learnings.py`, `linear-sync.ts`, `capture-comps.py` (the comp and PR screenshot matrix plus the slop detector), `review-package.py` |
 | Mechanical | haiku subagent, fresh each time | spgr-version-artifact, spgr-archive-artifact, spgr-render-doc, story-brief refresh, spgr-write-bug-report from a captured failure, spgr-create-pr from a finished branch, chore commits, artifact transcription |
 | Pinned agent | the agent's own `model` | every domain-agent unit at full effort: design including the comp critique, implementation, adversarial review, vertical sign-off |
 | Inline main session | the session model, kept minimal | orchestrator dispatch, the Check comparison of expected versus actual, the verdict and transition, spgr-notify-human, run-state writes |
 
 ## Dispatch contract
 
-Every unit prompt carries the same four things, and every unit report answers
-the same four things. The prompt names the files to read in order, the rulings
+Every unit prompt carries the same things, and every unit report answers the
+same things. The prompt names the files to read in order, the rulings
 that bind, the check command that gates the work, the working directory (the
 unit's worktree path, or the main checkout) with the absolute run-store path,
-and the report format. The
-report lists the files written with line counts, pastes the verification
-output rather than describing it, quotes verbatim every obligation it could
-not satisfy with the reason, lists each default taken as one defaults-ledger
-line, and never fills a gap with an unrecorded assumption. In the
-reference run this contract produced honest gap lists from every unit, where
-the earlier cycles had produced overstated claims the harness then re-verified
-by hand. A report that describes a check instead of pasting it is treated as
-unverified.
+and the report format. The report lists the files written with line counts,
+pastes the verification output rather than describing it, quotes verbatim
+every obligation it could not satisfy with the reason, lists each default
+taken as one defaults-ledger line, and never fills a gap with an unrecorded
+assumption. In the reference run this contract produced honest gap lists from
+every unit, where the earlier cycles had produced overstated claims the
+harness then re-verified by hand. A report that describes a check instead of
+pasting it is treated as unverified.
+
+The contract travels in files, not in the prompt and not in the return value,
+so neither the task text nor the diff transits the main session.
+
+- The brief. For each routed unit the harness writes
+  `runs/<run-id>/dispatch/<cycle-id>/<unit-id>/brief.md`: one line of
+  context, the files to read in order (the story brief first), the rulings
+  that bind, the interfaces the unit consumes from earlier units and produces
+  for later ones with exact names and signatures, the check command, the
+  working directory and run-store path, and the report path. The dispatch
+  prompt is a few lines that name the brief as the unit's requirements. A
+  unit reads its brief, never the whole plan or the whole corpus.
+- The report. The unit writes `report.md` beside its brief with the full
+  contract above, and returns under fifteen lines: a status, the commits, a
+  one-line test summary, and concerns. The status is one of `DONE`,
+  `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`. The harness reads the
+  return, and opens the report only for the section Check needs, which is the
+  pasted verification output. A `BLOCKED` or `NEEDS_CONTEXT` return names
+  what is missing, and routes as an escalation.
+- The review package. Before a review unit the harness runs
+  `scripts/review-package.py <base> <head> --out <dir>/review.md`, which
+  refuses a head that does not descend from the base and writes the commit
+  list, the stat, and the diff with ten lines of context under a header that
+  records both SHAs and whether the tree was dirty. The reviewer reads the
+  brief, the report, and the package. The main session never reads the diff.
+
+The `dispatch/` directory is run-store history like the cycle log. The
+store-reading scripts do not scan it, and it is never an artifact.
+
+### Bounded fix loop
+
+Review is one pass and one re-review, and a unit gets two bounded retries.
+Those counts stay. The loop inside them has a fixed shape.
+
+1. A fix dispatch carries the finding text verbatim, the lines it names, and
+   the brief. The first retry goes to a fresh agent at the unit's tier. The
+   second retry goes to a fresh agent one tier up (sonnet to opus) with the
+   statement that a prior implementer attempted the fix once and the new
+   agent owns it now. A heavy-transcript agent is never resumed for a fix.
+2. The re-review is scoped. It receives the prior findings and a review
+   package cut from the fix commit, verdicts each prior finding `ADDRESSED`
+   or `NOT ADDRESSED`, and raises a new finding only for breakage the fix
+   diff introduced. It never re-reviews the whole PR.
+3. At the bound the harness adjudicates each open finding rather than looping
+   again. A P0 or P1 goes to the human at the gate as a list, as before. A P2
+   or P3 under standard or autopilot is parked as one defaults-ledger line
+   carrying the finding, the ruling, and the cost if the ruling is wrong, and
+   is reviewed at the next gate with the other defaults. Under supervised
+   every open finding goes to the human.
+4. A finding the reviewer could not verify from the package (`cannot verify
+   from diff`) is the harness's to resolve by running the named check, never
+   the implementer's to argue away and never silently dropped.
 
 ## Main-session budget
 
@@ -699,6 +750,9 @@ These scripts keep the deterministic work out of the model.
   intake, and never treats Linear as the database.
 - `scripts/claim-run.py <run-dir> claim|release|status [<session-id>]` holds
   the single-writer lock on a run with a heartbeat.
+- `scripts/review-package.py <base> <head> --out <file>` writes the commit
+  list, stat, and diff a reviewer reads, and refuses a range whose head does
+  not descend from its base. The diff never enters the main session.
 - `scripts/preflight.py [--profile <profile>]` checks once at run open that
   the interpreter, the venv, git identity, gh auth, node, npx, and a headless
   Chromium-family browser actually work, and prints the table the harness

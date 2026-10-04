@@ -11,7 +11,7 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 
 ## Inputs you receive
 
-- The pull request diff.
+- The review package written by `review-package.py` (commits, stat, diff with context, the base and head SHAs), the unit brief, and the unit report. Read the package, never the live tree, for what changed.
 - The linked user story.
 - Confirmed acceptance criteria.
 - The approved ADRs relevant to the changed code.
