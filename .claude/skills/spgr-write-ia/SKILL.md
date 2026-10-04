@@ -28,11 +28,12 @@ Make the full scope of the product's screens and navigation explicit before any 
 2. Build the site map as the hierarchical structure of all screens, grouped to reflect how a user understands the product rather than how the data is stored.
 3. Write the screen inventory. List every screen with its name, purpose, entry points, and exit points. Entry points define how a user can reach the screen, and multiple entry points are common, so list all of them. Exit points define what a user can do from the screen, including navigate to, trigger, and dismiss.
 4. Define the navigation model: primary navigation, secondary navigation, and contextual navigation patterns. Match the navigation model to the selected design direction's interaction model. If the requirements demand a navigation pattern the selected direction cannot support, call spgr-escalate rather than diverging from the direction.
-5. Record the content hierarchy for the product: what content is prominent, what is secondary, and what is on-demand.
-6. Add the screen-count metric to the artifact so the screen scope is a concrete number for sizing design and development effort.
-7. Cross-reference the screen inventory against the user stories. Confirm every story maps to at least one screen. List any story with no associated screen and any screen that traces to no story. If a story has no screen, call spgr-escalate, because the inventory is incomplete or the story is out of design scope.
-8. Set the confidence signal on each section (confirmed, proposed, or needs-human-input). Mark a section needs-human-input where the requirements or direction did not settle it.
-9. Write the artifact with spgr-write-artifact and run spgr-validate-artifact inline. On a validation failure, fix the artifact and revalidate before returning. Log the IA decisions with spgr-log-decision.
+5. On a `brochure` run, a docs site, or any public marketing surface, hold the site map and navigation to the site-architecture rules. Every important page is reachable within three clicks of the home page, and the hierarchy is two or three levels deep, never more. Slugs are lowercase and hyphenated and mirror the breadcrumb path, so the URL and the breadcrumb say the same thing. The header carries four to seven items with the primary call to action last. The footer groups links under Product, Resources, Company, and Legal. Every page below the home page shows breadcrumbs. No page is an orphan: each one has at least one inbound link from the navigation or from another page in the inventory, and the cross-reference in step 8 reports any page with none.
+6. Record the content hierarchy for the product: what content is prominent, what is secondary, and what is on-demand.
+7. Add the screen-count metric to the artifact so the screen scope is a concrete number for sizing design and development effort.
+8. Cross-reference the screen inventory against the user stories. Confirm every story maps to at least one screen. List any story with no associated screen and any screen that traces to no story. If a story has no screen, call spgr-escalate, because the inventory is incomplete or the story is out of design scope.
+9. Set the confidence signal on each section (confirmed, proposed, or needs-human-input). Mark a section needs-human-input where the requirements or direction did not settle it.
+10. Write the artifact with spgr-write-artifact and run spgr-validate-artifact inline. On a validation failure, fix the artifact and revalidate before returning. Log the IA decisions with spgr-log-decision.
 
 ## Notes
 
