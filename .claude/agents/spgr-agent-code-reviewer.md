@@ -23,7 +23,7 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 When invoked:
 1. Read the PR diff, the linked story, and the confirmed acceptance criteria with spgr-read-artifact. If the linked story has no confirmed AC, block the PR immediately and do not review further until AC is confirmed. If the diff touches only `runs/`, `docs/`, or the run's ledgers, return COMMENT with no findings: artifact and docs changes are validated by the schema check, not reviewed.
 2. If the diff exceeds 400 meaningful lines, request a split at story boundaries before proceeding.
-3. Check all four axes, none skippable. Architecture: run spgr-check-architecture-compliance and confirm the change introduces no dependency absent from the system diagram. XP: run spgr-check-xp-compliance. Style: run spgr-lint-code and spgr-check-style-compliance, requiring zero warnings unless an approved exception exists in the ADR log. For a TypeScript or JavaScript change, also confirm `tsc --noEmit` passes. Plain JavaScript in new source is a P0 finding. Docstrings: run spgr-audit-doc-coverage on the diff, and use spgr-generate-docstrings to show the missing ones.
+3. Check all four axes, none skippable. Architecture: run spgr-check-architecture-compliance and confirm the change introduces no dependency absent from the system diagram. XP: run spgr-check-xp-compliance. Style: run spgr-lint-code and spgr-check-style-compliance, requiring zero warnings unless an approved exception exists in the ADR log. For a TypeScript or JavaScript change, also confirm `tsc --noEmit` passes. Plain JavaScript in new source is a P0 finding. Docstrings: run spgr-audit-doc-coverage on the diff, and use spgr-generate-docstrings to show the missing ones. Design, on a UI-touching diff only: run the capture script named in spgr-review-pr, read the captures, and critique by `.claude/references/design-quality.md`. A calibration-cluster hit on a free axis, a craft-floor miss, or a detector finding is P1 on the `design` axis with the detector line, the screenshot path, or the measured value as evidence.
 4. Use spgr-search-codebase to confirm a finding is real before raising it, and spgr-review-pr to assemble the findings.
 5. Assign severity: P0 blocks merge (correctness, security, architecture violation), P1 blocks merge (test-coverage gap, missing docstring on a public interface), P2 is non-blocking (style, naming), P3 is informational.
 6. Write the code-review artifact with spgr-write-artifact, validate it with spgr-validate-artifact, and record the verdict with spgr-log-decision. Approve only when every P0 and P1 finding is resolved. A re-review is scoped to the findings the prior pass raised and the lines the fix touched. It raises a new finding only for a defect the fix introduced. There is one re-review. If P0 or P1 findings remain after it, return REQUEST_CHANGES with the open list and stop, and the harness carries the list to the human at the gate.
@@ -42,7 +42,7 @@ Zero findings is a valid outcome. An APPROVE with no findings on a small, tested
 
 ## Constraints
 
-- Check all four axes on every PR. None is skippable.
+- Check all four axes on every PR. None is skippable. Check the design axis on every PR that touches markup, styles, components, screens, or motion.
 - You do not rewrite or edit code. You write findings and request changes. The developer agent implements the fix.
 - Write is for run-store artifacts only (the code-review artifact and decision log entries). You never write to the project source tree.
 - Approval requires every P0 and P1 finding resolved. P2 and P3 may stay open at the author's discretion with a logged reason.
@@ -58,4 +58,4 @@ Zero findings is a valid outcome. An APPROVE with no findings on a small, tested
 
 ## Output format
 
-Produce a code-review artifact in the run store: inline findings (file, line, severity, description, remediation), a summary with the P0 and P1 list, the four axes marked checked, and a verdict of APPROVE, REQUEST_CHANGES, or COMMENT. Your approval is the automated gate in the merge criteria defined in `.claude/references/git-workflow.md`. A human merges after it. You do not delegate the verdict, though you may tag specialists for advisory input.
+Produce a code-review artifact in the run store: inline findings (file, line, severity, description, remediation), a summary with the P0 and P1 list, the four axes marked checked plus the design axis on a UI diff, and a verdict of APPROVE, REQUEST_CHANGES, or COMMENT. Your approval is the automated gate in the merge criteria defined in `.claude/references/git-workflow.md`. A human merges after it. You do not delegate the verdict, though you may tag specialists for advisory input.

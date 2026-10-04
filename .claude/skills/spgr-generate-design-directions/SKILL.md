@@ -32,7 +32,7 @@ Generate three or more meaningfully distinct creative directions so a human choo
 
 2. Map the design space. Name the structural axes that can vary: navigation model, density, interaction paradigm, content hierarchy. Pick distinct positions on these axes so the directions cannot collapse into one. A direction that varies only in color or typography from another is not a separate direction.
 
-3. Draft at least three directions. For each, write the visual language, the interaction model, the information-architecture rationale, the emotional tone, and one or two key screen mockups that illustrate the direction concretely. Express all visual values as tokens, with no hardcoded hex codes, pixel sizes, or font names baked into the mockup descriptions. When the ui-ux-pro-max catalog is installed, visual-language candidates may be sourced from it by named selection (a style, palette, or pairing identifier), still expressed as tokens, never as raw hex or font names.
+3. Run the choice test in `.claude/references/design-quality.md` on each direction's visual language before drafting it: write the plan, produce the generic version in your head, revise every part that survives the substitution, and check the result against the calibration list. A direction that lands in a calibration cluster on an axis the brief left free is a default, not a direction. Then draft at least three directions. For each, write the visual language, the interaction model, the information-architecture rationale, the emotional tone, and one or two key screen mockups that illustrate the direction concretely. Express all visual values as tokens, with no hardcoded hex codes, pixel sizes, or font names baked into the mockup descriptions. When the ui-ux-pro-max catalog is installed, visual-language candidates may be sourced from it by named selection (a style, palette, or pairing identifier), still expressed as tokens, never as raw hex or font names.
 
 4. Tie each direction to evidence. State why this direction serves the personas and the user flows. A direction without a defensible rationale anchored to a persona or a flow is rejected, not shipped.
 
@@ -40,7 +40,7 @@ Generate three or more meaningfully distinct creative directions so a human choo
 
 6. Add an optional lightweight mood board per direction as supporting material when it clarifies the emotional tone. Keep it as a token-based reference, not a finished comp. The mood board may cite ui-ux-pro-max catalog entries as token-based references.
 
-7. Run a distinctness check across the full set. Confirm each pair of directions differs on at least one structural axis. If two directions differ only in surface styling, merge or replace one so the set holds three or more genuinely distinct directions.
+7. Run a distinctness check across the full set. Confirm each pair of directions differs on at least one structural axis. If two directions differ only in surface styling, merge or replace one so the set holds three or more genuinely distinct directions. Then render one hero comp per direction with spgr-render-design-comps in `direction` mode, so the human compares identity at the gate and not only structure.
 
 8. Confirm every direction satisfies the accessibility requirements at the target level. Tag the Accessibility vertical via spgr-tag-vertical-agent when a direction's density, contrast intent, or interaction paradigm raises an accessibility question before the human selects.
 
@@ -54,4 +54,5 @@ Generate three or more meaningfully distinct creative directions so a human choo
 - All visual values are token-based. No hardcoded style values appear in any direction or mockup.
 - Mark each direction's status in the confidence map as proposed. The full set carries needs-human-input until a direction is selected at the HIL checkpoint.
 - Three or more directions is a hard floor. Stop and escalate rather than ship two.
+- The hero comps from spgr-render-design-comps sit beside the structural mockups from spgr-render-design-mockups, both linked from `docs/design/index.html`. The mockups stay gray so structure is compared on its own. The comps carry the proposed identity. The design bar both are held to is `.claude/references/design-quality.md`.
 - The ui-ux-pro-max catalog is an optional external skill. It is source material translated to tokens, not a values shortcut, and its selections never count toward structural distinctness. This skill runs fully without it.

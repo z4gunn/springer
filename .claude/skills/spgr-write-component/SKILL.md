@@ -38,12 +38,12 @@ Produce one UI component that is visually identical to the approved design spec,
 6. Implement the accessibility annotations exactly as written: ARIA roles, focus behavior, keyboard interactions, and screen reader announcements. Do not paraphrase or omit an annotation.
 7. Apply YAGNI. Build only the states and props the spec and contract specify. Do not add states, variants, or props the spec does not list.
 8. Write one Storybook story per state so design QA can review every state in isolation.
-9. Run the component and visual regression suite via spgr-run-tests. Confirm every state renders as the spec describes and every regression case passes.
+9. Run the component and visual regression suite via spgr-run-tests. Confirm every state renders as the spec describes and every regression case passes. Then capture the stories or the screen with `.claude/skills/spgr-render-design-comps/scripts/capture-comps.py` when the Playwright CLI is installed, read the captures, and self-critique against the craft floor, the motion standards, and the interface rules in `.claude/references/design-quality.md`. Fix a calibration-cluster hit or a floor miss before the PR opens.
 10. Lint and format the component, stories, and contract clean before commit. For TypeScript or JavaScript, conform to `.claude/references/typescript-standards.md` and pass `tsc --noEmit`. Keep the component to one logical change per commit.
 11. Write the files via spgr-write-file. Record any consequential implementation choice, such as a token chosen where the spec was ambiguous, via spgr-log-decision.
 
 ## Notes
 
-- This skill produces source code. Verification is by spgr-run-tests, the visual regression suite, and CI, not by an envelope schema. For full accessibility conformance against a WCAG target, the component is later audited by spgr-run-accessibility-audit.
+- This skill produces source code. Verification is by spgr-run-tests, the visual regression suite, CI, and the self-critique in step 9, not by an envelope schema. The design bar the Code Reviewer holds the PR to is `.claude/references/design-quality.md`, so clear it here first. For full accessibility conformance against a WCAG target, the component is later audited by spgr-run-accessibility-audit.
 - Escalate via spgr-escalate when the spec does not define a required state's appearance or behavior, when a style value the spec calls for has no matching design token, when the accessibility annotations are missing or contradict the component contract, or when the spec and the component contract disagree on props or events. Return the precise list of what is missing rather than guessing.
 - When the component touches a vertical concern such as accessibility conformance or an auth-gated state, consult the specialist via spgr-tag-vertical-agent before finalizing.

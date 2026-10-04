@@ -25,19 +25,21 @@ Define the complete design system that becomes the shared contract between the D
 ## Procedure
 
 1. Read the approved design direction with spgr-read-artifact. If no direction is approved, or more than one is marked selected, or the direction lacks the brand palette and type personality this system depends on, stop and raise spgr-escalate with the precise list of what is missing. Do not fill gaps with assumptions.
-2. Define color tokens as names, not values. Cover brand, semantic (success, warning, error, info), surface, text, and border. Every token is a named reference, no raw hex appears in any component spec. When the approved direction references a ui-ux-pro-max palette, translate its raw values into this named token set rather than carrying the hex through.
+2. Define color tokens as names, not values, chosen against the craft floor and the defaults-to-refuse list in `.claude/references/design-quality.md`: one accent, hue-tinted neutrals, no cluster from the calibration list on an axis the brief left free. Cover brand, semantic (success, warning, error, info), surface, text, and border. Every token is a named reference, no raw hex appears in any component spec. When the approved direction references a ui-ux-pro-max palette, translate its raw values into this named token set rather than carrying the hex through.
 3. Define a dark mode token layer in the same pass. Each light token has a dark counterpart so the two layers stay one-to-one. Do not defer dark mode, retrofitting it later is expensive.
 4. Define the typography scale as named levels (heading-1 through body-sm), each fixing font family, weight, size, and line height. Define the spacing scale as named values (space-1 through space-16 or equivalent). When the approved direction references a ui-ux-pro-max font pairing, translate it into the named typography levels here. The token names stay the integration surface and no raw font name appears in any component spec.
-5. Build the component library. Every component documents all eight states: default, hover, focus, active, disabled, loading, error, and empty. A component that omits a state is incomplete, because unspecified states get implemented inconsistently and often incorrectly.
-6. Build the pattern library covering form patterns, list patterns, modal patterns, and navigation patterns.
-7. Write the accessibility guidelines: minimum contrast ratios, focus indicator requirements, and touch target sizes. Tag spgr-tag-vertical-agent for the accessibility vertical so the contrast and focus rules are reviewed against the token set before tokens are treated as locked.
-8. Document the process for adding new components, since the design system grows over time rather than being a one-time artifact.
-9. Record each token-set and component decision in the artifact decision log via spgr-log-decision, and mark every section with its confidence signal (confirmed, proposed, needs-human-input).
-10. Validate the artifact inline with spgr-validate-artifact, then write it with spgr-write-artifact. Version it with spgr-version-artifact when revising an existing design system.
+5. Render the key screens with spgr-render-design-comps in `system` mode and iterate the token set until the comps pass the critique in `.claude/references/design-quality.md`. A token the loop changes is revised here, before the component library is built on it. Write the direction's Do and Don't list from the defaults-to-refuse section of that reference, naming which defaults the brief earns and which it refuses. Tokens are not locked until the comps pass.
+6. Build the component library. Every component documents all eight states: default, hover, focus, active, disabled, loading, error, and empty. A component that omits a state is incomplete, because unspecified states get implemented inconsistently and often incorrectly.
+7. Build the pattern library covering form patterns, list patterns, modal patterns, and navigation patterns.
+8. Write the accessibility guidelines: minimum contrast ratios, focus indicator requirements, and touch target sizes. Tag spgr-tag-vertical-agent for the accessibility vertical so the contrast and focus rules are reviewed against the token set before tokens are treated as locked.
+9. Document the process for adding new components, since the design system grows over time rather than being a one-time artifact.
+10. Record each token-set and component decision in the artifact decision log via spgr-log-decision, and mark every section with its confidence signal (confirmed, proposed, needs-human-input).
+11. Validate the artifact inline with spgr-validate-artifact, then write it with spgr-write-artifact. Version it with spgr-version-artifact when revising an existing design system.
 
 ## Notes
 
 - Output type is an envelope artifact (design-system). The design-system content type is not in the schema registry yet, so spgr-validate-artifact applies envelope-only validation (header, confidence map, decision log, version) until a content schema is registered.
+- The design bar is `.claude/references/design-quality.md`. The comps are the proof the token set clears it before anything is built on the tokens.
 - No raw style values anywhere. Color, typography, and spacing in component and pattern specs reference tokens by name only. This is the rule that makes the artifact a usable contract for developer agents.
 - Evaluate Storybook or an equivalent living-documentation tool so the design system stays in sync with the implementation rather than drifting. Record the choice in the decision log.
 - Do not duplicate per-screen layout here. This artifact defines the shared language. Screen-level composition belongs to the per-screen design specs that consume these tokens.

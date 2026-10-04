@@ -283,9 +283,9 @@ unit is fresh every time under rule 1 and never inherits a transcript.
 
 | Tier | Runs as | Units |
 |------|---------|-------|
-| Deterministic | Bash, no model | `schemas/validate.py`, `rebuild-projection.py`, `derive-ready-queue.py`, `pin-learnings.py`, `linear-sync.ts` |
+| Deterministic | Bash, no model | `schemas/validate.py`, `rebuild-projection.py`, `derive-ready-queue.py`, `pin-learnings.py`, `linear-sync.ts`, `capture-comps.py` (the comp and PR screenshot matrix plus the slop detector) |
 | Mechanical | haiku subagent, fresh each time | spgr-version-artifact, spgr-archive-artifact, spgr-render-doc, story-brief refresh, spgr-write-bug-report from a captured failure, spgr-create-pr from a finished branch, chore commits, artifact transcription |
-| Pinned agent | the agent's own `model` | every domain-agent unit at full effort: design, implementation, adversarial review, vertical sign-off |
+| Pinned agent | the agent's own `model` | every domain-agent unit at full effort: design including the comp critique, implementation, adversarial review, vertical sign-off |
 | Inline main session | the session model, kept minimal | orchestrator dispatch, the Check comparison of expected versus actual, the verdict and transition, spgr-notify-human, run-state writes |
 
 ## Dispatch contract

@@ -11,7 +11,9 @@ Usage:
 
 Prints one line per tool: name, status (ok, missing, broken), detail. Exit 0
 always, so a missing optional tool never blocks the run. The harness decides
-what to do with a missing required tool.
+what to do with a missing required tool. The two design-check tools, the
+Playwright CLI for captures and the impeccable detector, are optional: without
+them spgr-render-design-comps and the design review axis run on markup alone.
 """
 
 import glob
@@ -88,6 +90,8 @@ def main(argv):
         ("node", *check_binary("node")),
         ("npx", *check_binary("npx")),
         ("headless browser", *check_browser()),
+        ("playwright-cli (optional)", *check_binary("playwright-cli")),
+        ("impeccable (optional)", *check_binary("impeccable")),
     ]
     if profile in ("saas", "small", "mobile"):
         rows.append(("docker", *check_binary("docker")))
