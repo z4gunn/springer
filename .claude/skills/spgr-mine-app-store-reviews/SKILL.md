@@ -34,9 +34,21 @@ This is a Phase 1 discovery research output. No code is written. Every factual c
 
 ## Procedure
 
-1. Resolve the app to a canonical store listing. If `app_name` is a name rather than a URL, use spgr-search-web to find the App Store and Google Play listing URLs for each requested platform. Confirm the listing matches the intended app before retrieving reviews, since same-name apps are common.
+1. Resolve the app to a canonical store listing. If `app_name` is a name rather than a URL, use spgr-search-web to find the App Store and Google Play listing URLs for each requested platform. Confirm the listing matches the intended app before retrieving reviews, since same-name apps are common. The App Store id is the digits after `id` in the listing URL. The Google Play id is the package name in the `id=` query parameter, and because the Play scraper returns an empty list for a mistyped package rather than an error, the script below verifies it against a store search first.
 
-2. Retrieve reviews with web access, preferring a dedicated app store review API and falling back to fetching review pages. Honor `date_filter`, defaulting to the last 12 months. Pull toward `review_count_target`, defaulting to 200. If the available review volume is too low to support thematic grouping, for example fewer than 30 usable reviews, stop and record this as a discovery-coverage gap, then escalate with spgr-escalate. Do not synthesize reviews or infer themes from listing copy.
+2. Retrieve reviews with the bundled scripts, which return every review with its date, rating, author, text, and a URL in one JSON shape, so the quote contract is met mechanically. For iOS:
+
+   ```bash
+   python3 .claude/skills/spgr-mine-app-store-reviews/scripts/apple_reviews.py <app-id> --country us --sort mostRecent --limit 200
+   ```
+
+   The script reads the customer-reviews RSS feed first, which carries the app version and the helpful-vote counts and caps at 500 reviews per country per sort, then continues through the catalog endpoint by cursor when the target is higher or the feed is empty. Items say which endpoint produced them, and catalog items carry no version or vote fields. Run it once per country and sort the brief names. For Android:
+
+   ```bash
+   node .claude/skills/spgr-mine-app-store-reviews/scripts/google_play_reviews.mjs <package> --country us --sort newest --limit 200 --verify
+   ```
+
+   The script drives the google-play-scraper package, an optional dependency installed with `npm install google-play-scraper` in the project. When it is absent the script exits 2 with the install hint, and the Android pass falls back to spgr-search-web over the listing's review pages, recorded as degraded in the decision log. Both scripts exit 0 on a full result, 1 on a partial result with errors listed, and 2 on nothing. Honor `date_filter`, defaulting to the last 12 months, by dropping items outside the window after retrieval. Pull toward `review_count_target`, defaulting to 200. If the available review volume is too low to support thematic grouping, for example fewer than 30 usable reviews, stop and record this as a discovery-coverage gap, then escalate with spgr-escalate. Do not synthesize reviews or infer themes from listing copy.
 
 3. Apply `focus`. Under `pain-points` weight retrieval and analysis toward 1-3 star reviews. Under `retention-drivers` weight toward 4-5 star. Under `balanced` sample across the star scale. Treat 3-star reviews as high-value in every mode, since they come from users who want to like the product but hit specific friction.
 
@@ -62,3 +74,4 @@ This is a Phase 1 discovery research output. No code is written. Every factual c
 - Every factual claim carries a source. A pain signal needs two distinct source categories before it is treated as validated, per step 8. Single-source themes ship as proposed.
 - Group by theme, not by rating. The star count is a filter, not the unit of analysis.
 - Low review volume is a discovery-coverage gap to escalate, not a silent skip. Escalate rather than inferring themes from too few reviews or from listing copy.
+- Both scripts are deterministic and run with no model. Dispatch them at the deterministic tier. The Apple RSS feed has gone empty for stretches, which is why the catalog fallback exists, and the Google Play package is optional, so the skill completes without either and says which path each platform used.
