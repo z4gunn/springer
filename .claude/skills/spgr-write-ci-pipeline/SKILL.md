@@ -39,6 +39,7 @@ Write the CI pipeline configuration that gives every push the same automated qua
    - Stage 3 Unit tests: run the fast unit suite, generate the coverage report, fail if coverage drops below the floor. Budget under 3 minutes.
    - Stage 4 Integration tests: run against the pinned test database. Budget under 7 minutes.
    - Stage 5 SAST and dependency audit: run Semgrep and the dependency scanner. Fail on Critical or High findings per the Security Agent thresholds.
+   - On `brochure`, and on any project with public pages, add an SEO baseline step after the build stage that runs `python3 .claude/skills/spgr-check-seo-baseline/scripts/seo_baseline.py <built output>` (with `--strict` on brochure) and fails on GATE.
 
 4. Split into two runs. A fast run (build, lint, unit tests, under 3 minutes) triggers on every push to a feature branch. A full run (all five stages, under 10 minutes) triggers on PR and on merge to main.
 

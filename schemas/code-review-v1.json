@@ -36,7 +36,7 @@
               "severity": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
               "axis": {
                 "type": "string",
-                "enum": ["architecture", "xp", "style", "docstring", "correctness", "security", "design"]
+                "enum": ["architecture", "xp", "style", "docstring", "correctness", "security", "design", "seo"]
               },
               "description": { "type": "string" },
               "remediation": { "type": "string" },
