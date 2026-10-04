@@ -36,3 +36,4 @@ Give every agent one consistent read interface that returns accurate 1-indexed l
 
 - Treat reads as the read side of the read-before-write contract. `spgr-write-file` and the artifact-write skills refuse to operate on a file not read in the current session.
 - Reading a file is a precondition for editing it, never a substitute for the agent's own analysis.
+- A binary document the human supplied (PDF, DOCX, PPTX, XLSX) is not read here. Route it through spgr-ingest-document, which writes its Markdown source under `docs/inputs/`, and read that.

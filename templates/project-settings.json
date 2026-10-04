@@ -32,7 +32,10 @@
       "Bash(gh pr merge:*)",
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
-      "Bash(python3 .claude/skills/spgr-check-seo-baseline/scripts/:*)"
+      "Bash(python3 .claude/skills/spgr-check-seo-baseline/scripts/:*)",
+      "Bash(python3 .claude/skills/spgr-ingest-document/scripts/:*)",
+      "Bash(markitdown:*)",
+      "Bash(docling:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",

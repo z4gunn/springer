@@ -14,6 +14,8 @@ always, so a missing optional tool never blocks the run. The harness decides
 what to do with a missing required tool. The two design-check tools, the
 Playwright CLI for captures and the impeccable detector, are optional: without
 them spgr-render-design-comps and the design review axis run on markup alone.
+The two document converters, markitdown and docling, are optional too: without
+them spgr-ingest-document escalates a binary document to the human.
 """
 
 import glob
@@ -118,6 +120,8 @@ def main(argv):
         ("headless browser", *check_browser()),
         ("playwright-cli (optional)", *check_binary("playwright-cli")),
         ("impeccable (optional)", *check_impeccable()),
+        ("markitdown (optional)", *check_binary("markitdown")),
+        ("docling (optional)", *check_binary("docling")),
     ]
     if profile in ("saas", "small", "mobile"):
         rows.append(("docker", *check_binary("docker")))
