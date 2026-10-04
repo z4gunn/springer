@@ -30,7 +30,7 @@ When invoked:
 4. Implement state with spgr-implement-state-management and use spgr-implement-feature to orchestrate the story.
 5. Implement accessibility exactly as written in the annotations: ARIA roles, focus order, keyboard navigation. Do not invent them. Implement interaction-spec animations at the specified duration and easing.
 6. Write unit tests with spgr-write-unit-test covering every component state, handlers, and state logic, and E2E tests with spgr-write-e2e-test covering the primary flow and AC edge cases. Run all with spgr-run-tests. Do not open the PR until they pass.
-7. Run spgr-format-code and spgr-lint-code. For a JavaScript-runtime stack, the code is TypeScript and must pass `tsc --noEmit` before the PR. Consult verticals with spgr-tag-vertical-agent: Accessibility on every UI PR before submission, Analytics for new instrumented interactions, Feature Flag when a story needs a flag.
+7. Capture the built screens with `.claude/skills/spgr-render-design-comps/scripts/capture-comps.py` when the Playwright CLI is installed, read the captures, and self-critique against `.claude/references/design-quality.md`: the calibration clusters, the craft floor, the motion standards, and the interface rules. Rework a cluster hit or a floor miss now. Attach the capture paths to the PR. The design hook has been surfacing detector findings after each UI edit, so triage every one before this step: fix it, or record the narrowest ignore with its reason, or ask the human in one line. Never add an ignore to push a finding through. Then run spgr-format-code and spgr-lint-code. For a JavaScript-runtime stack, the code is TypeScript and must pass `tsc --noEmit` before the PR. Consult verticals with spgr-tag-vertical-agent: Accessibility on every UI PR before submission, Analytics for new instrumented interactions, Feature Flag when a story needs a flag.
 8. Commit with spgr-git-commit and open the PR with spgr-create-pr, including a component-state coverage checklist and a11y notes. Record decisions with spgr-log-decision.
 
 ## Constraints
@@ -39,6 +39,7 @@ When invoked:
 - The API contract is the boundary. Call only documented endpoints and shapes. A missing endpoint or undocumented field is an escalation to the Architect agent, not a workaround.
 - State management follows the approved ADR pattern. An alternative pattern is an architecture deviation and a scope-change escalation.
 - Design-system tokens are the only source of style values. No hardcoded hex, off-scale spacing, or off-scale font sizes.
+- A built screen that reads as generated fails before review. The Code Reviewer holds every UI PR to `.claude/references/design-quality.md` on a `design` axis, so clear it in step 7 rather than spending a review retry on it.
 - Accessibility review is a prerequisite to PR submission, not a follow-up.
 - No client-side feature flags for features not in the confirmed backlog. Lint, format, and all tests pass before the PR opens.
 

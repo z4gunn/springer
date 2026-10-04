@@ -14,7 +14,7 @@ An architecture-first AI software development team, from idea to production.
 
 Springer is an AI software development team, built as a library of Claude Code agents and skills. Each agent models a role from a traditional product and engineering organization, from discovery and product management through architecture, design, development, QA, and DevOps, plus the cross-cutting specialties that span those roles. Together they carry a greenfield SaaS or mobile application across the full software lifecycle, from a raw problem statement to production, with a human entering only at deliberate checkpoints.
 
-This repository is the working build of that team: 27 agents and 197 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
+This repository is the working build of that team: 27 agents and 198 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
 
 ## Contents
 
@@ -51,7 +51,7 @@ Escalation is a feature, not a failure. An agent that refuses to proceed on inco
 
 Always-on verticals. Cross-cutting concerns such as auth, security, compliance, observability, performance, and accessibility are not bound to a single phase. A vertical agent acts as a consultant when tagged for a question, as an auditor on a scheduled sweep, and as a gate whose sign-off is required before certain artifacts can be marked confirmed.
 
-Creative latitude for design. Design agents receive the problem and the personas, not wireframes, and produce several distinct directions. A human selects one direction, and the agent then executes it with precision.
+Creative latitude for design, held to a bar. Design agents receive the problem and the personas, not wireframes, and produce several distinct directions, each rendered as a structural mockup and a high-fidelity hero comp. A human selects one direction, and the agent then executes it with precision. Every direction, token set, and UI pull request is held to the design-quality reference, which names the defaults a generated interface converges on and refuses them on any axis the brief left free, so the output reads as designed for this product rather than assembled from the usual kit.
 
 ## Methodology
 
@@ -114,7 +114,7 @@ Twenty-seven agents in three groups. Horizontal agents own a lifecycle phase. Un
 
 ## The skills
 
-A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Each one carries its own triggering information, so the right skill activates when an agent needs it. The 197 skills group as follows.
+A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Each one carries its own triggering information, so the right skill activates when an agent needs it. The 198 skills group as follows.
 
 ### Shared and product
 
@@ -132,7 +132,7 @@ A skill is a single-responsibility capability that an agent invokes, such as wri
 |-------|-------|----------|
 | Architecture | 9 | generate-architecture-options, write-adr, generate-erd, write-api-spec, write-tech-stack-decision |
 | Diagramming (UML and patterns) | 6 | generate-uml-class-diagram, generate-sequence-diagram, generate-state-diagram, generate-activity-diagram, generate-design-pattern-diagram, render-diagram-excalidraw |
-| Design | 9 | generate-design-directions, write-ia, create-wireframes, create-design-system, create-screen-specs, create-prototype, render-design-mockups |
+| Design | 10 | generate-design-directions, write-ia, create-wireframes, create-design-system, create-screen-specs, create-prototype, render-design-mockups, render-design-comps |
 
 ### Build and ship
 
@@ -173,7 +173,7 @@ springer/
   CLAUDE.md              the operative ruleset for AI agents, loaded every session
   .claude/
     agents/<name>.md         the 27 agents, auto-loaded in this repo
-    skills/<name>/SKILL.md    the 197 skills, auto-loaded in this repo
+    skills/<name>/SKILL.md    the 198 skills, auto-loaded in this repo
     references/<name>.md      shared cross-skill references (for example diagram-standards, typescript-standards)
   schemas/               JSON Schemas for the typed artifacts that flow between agents
   scripts/               repo tooling: new-project.sh and the repo validator
@@ -275,14 +275,22 @@ A runtime file the instance never edited is replaced, one it edited is kept and 
 
 One skill family needs a one-time setup, and it is optional. The diagram skills render Mermaid and PlantUML sources. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, and make the Mermaid CLI available through `npx`. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
 
-`spgr-render-diagram-excalidraw` is the one skill with an external dependency. It builds on the third-party `excalidraw-diagram` skill by Cole Medin, which is not bundled with Springer. Install it separately only if you want polished Excalidraw output:
+A few skills have optional external dependencies, none bundled with Springer. `spgr-render-diagram-excalidraw` builds on the third-party `excalidraw-diagram` skill by Cole Medin. Install it separately only if you want polished Excalidraw output:
 
 ```bash
 git clone https://github.com/coleam00/excalidraw-diagram-skill.git ~/.claude/skills/excalidraw-diagram
 cd ~/.claude/skills/excalidraw-diagram/references && uv sync && uv run playwright install chromium
 ```
 
-Every other agent and skill in Springer works without it, and the code-first Mermaid and PlantUML diagram skills cover diagramming on their own.
+The design skills can draw candidate styles, palettes, and font pairings from the `ui-ux-pro-max` catalog at `~/.claude/skills/ui-ux-pro-max/`, translating every value into a named token. The design comp, frontend, and review skills capture headless screenshots through the Playwright CLI and run the deterministic slop detector from the impeccable engine when those tools are installed:
+
+```bash
+npm install -g @playwright/cli
+playwright-cli install-browser                       # once, if no Chromium is cached yet
+npx impeccable install --providers=claude --scope=global
+```
+
+The Playwright CLI lands on your PATH. The impeccable install puts its skill under `~/.claude/skills/impeccable/` with the launcher at `scripts/impeccable` inside that folder, not on PATH. Springer looks for it there, in a project-local install, in `~/.impeccable/bin`, and in the `IMPECCABLE_BIN` environment variable, so no PATH change is needed. A project instance also gets the live design hook from Springer itself: the instance settings register `.claude/hooks/design-detect.py` on every Edit and Write and on Stop, and that hook forwards the event to the detector when it is installed and is silent when it is not. You do not run `npx impeccable install` inside each project. `scripts/preflight.py` reports both tools as optional rows at run open. Every agent and skill in Springer works without any of these installed, and the code-first Mermaid and PlantUML diagram skills cover diagramming on their own.
 
 Every line of JavaScript-runtime code the build, test, and scaffold skills generate is governed by one shared reference, `.claude/references/typescript-standards.md`. TypeScript is mandatory for any JavaScript-runtime stack, plain JavaScript is not permitted, and the reference adopts Google gts as the tooling baseline (tsconfig, ESLint, Prettier) and records the strict compiler bar, the type-safety rules, and the naming conventions the developer agents and the code reviewer enforce.
 
@@ -291,7 +299,7 @@ Every line of JavaScript-runtime code the build, test, and scaffold skills gener
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1. Spec | One spec file per agent and skill, the source of truth for the build | Complete |
-| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 197 skills |
+| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 198 skills |
 | 3. Harness | Autonomous orchestration with feedback loops, self-improvement, and parallel execution | Available, the spgr-run-harness PDCA driver |
 
 ## Conventions and contributing

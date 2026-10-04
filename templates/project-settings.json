@@ -4,6 +4,9 @@
       "Bash(python3 schemas/validate.py:*)",
       "Bash(.venv/bin/python schemas/validate.py:*)",
       "Bash(python3 .claude/skills/spgr-run-harness/scripts/:*)",
+      "Bash(python3 .claude/skills/spgr-render-design-comps/scripts/:*)",
+      "Bash(playwright-cli:*)",
+      "Bash(impeccable detect:*)",
       "Bash(python3 verification/:*)",
       "Bash(bash verification/:*)",
       "Bash(npx tsx .claude/skills/spgr-run-harness/scripts/linear-sync.ts:*)",
@@ -62,6 +65,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/design-detect.py\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SubagentStop": [
@@ -81,6 +94,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-usage.py\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/design-detect.py\"",
+            "timeout": 30
           }
         ]
       }

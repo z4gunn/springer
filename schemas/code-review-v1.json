@@ -21,7 +21,8 @@
             "architecture": { "type": "boolean" },
             "xp": { "type": "boolean" },
             "style": { "type": "boolean" },
-            "docstring": { "type": "boolean" }
+            "docstring": { "type": "boolean" },
+            "design": { "type": "boolean", "description": "Checked on a UI-touching diff, false otherwise." }
           }
         },
         "findings": {
@@ -35,7 +36,7 @@
               "severity": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
               "axis": {
                 "type": "string",
-                "enum": ["architecture", "xp", "style", "docstring", "correctness", "security"]
+                "enum": ["architecture", "xp", "style", "docstring", "correctness", "security", "design"]
               },
               "description": { "type": "string" },
               "remediation": { "type": "string" },
