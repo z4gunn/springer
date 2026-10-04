@@ -23,15 +23,21 @@ Rules checked (the guidance rules that need judgment are not here):
   agent model         one of haiku, sonnet, opus
   agent skill path    the body states how a skill name resolves to its file
   voice               no em-dash in any authored markdown
+  skill routing       no two skill descriptions closer than the overlap cap
+                      (TF-IDF cosine), because the router picks by description
   references          a shared reference over 100 lines opens with a Contents
                       section
 """
 
+import itertools
+import math
 import re
 import sys
 from pathlib import Path
 
 DESCRIPTION_CAP = 350
+OVERLAP_CAP = 0.75
+STOP_WORDS = set("a an the and or of to for in on with by from as at is are be use when it its that this every each per into than then so not no any all one produce artifact agent report".split())
 BODY_CAP = 500
 TOC_THRESHOLD = 100
 MODELS = {"haiku", "sonnet", "opus"}
@@ -129,6 +135,47 @@ def check_skills(root, report):
                                     f"{lines} lines without a Contents section")
 
 
+def description_tokens(text):
+    return [w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOP_WORDS and len(w) > 2]
+
+
+def check_routing(root, report):
+    """Two skills whose descriptions read almost the same route the same
+    request to either one. Cosine similarity over TF-IDF of the descriptions,
+    failing a pair at OVERLAP_CAP or above. The IDF is smoothed so a corpus of
+    two still scores identical text at one. The repo's closest pair sits well
+    under the cap, so a new skill fails only when it restates an existing one."""
+    docs = {}
+    for skill_dir in sorted(p for p in (root / ".claude" / "skills").iterdir() if p.is_dir()):
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.exists():
+            continue
+        _, values, _ = frontmatter(skill_md.read_text())
+        if values and values.get("description"):
+            docs[skill_dir.name] = description_tokens(values["description"])
+    if len(docs) < 2:
+        return
+    df = {}
+    for toks in docs.values():
+        for w in set(toks):
+            df[w] = df.get(w, 0) + 1
+    n = len(docs)
+    vectors = {}
+    for name, toks in docs.items():
+        tf = {}
+        for w in toks:
+            tf[w] = tf.get(w, 0) + 1
+        vec = {w: c * (math.log((n + 1) / (df[w] + 1)) + 1.0) for w, c in tf.items()}
+        norm = math.sqrt(sum(x * x for x in vec.values())) or 1.0
+        vectors[name] = {w: x / norm for w, x in vec.items()}
+    for a, b in itertools.combinations(sorted(vectors), 2):
+        va, vb = vectors[a], vectors[b]
+        score = sum(x * vb.get(w, 0.0) for w, x in va.items())
+        if score >= OVERLAP_CAP:
+            report.fail("skill-routing", f".claude/skills/{a}",
+                        f"description overlaps {b} at {score:.2f}, cap is {OVERLAP_CAP:.2f}")
+
+
 def check_agents(root, report):
     agents_dir = root / ".claude" / "agents"
     for agent_md in sorted(agents_dir.glob("*.md")):
@@ -180,6 +227,7 @@ def main(argv):
         return 1
     report = Report()
     check_skills(root, report)
+    check_routing(root, report)
     check_agents(root, report)
     check_references(root, report)
     check_voice(root, report)

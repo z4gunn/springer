@@ -62,6 +62,15 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-agent-events.py\""
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-no-verify.py\""
+          }
+        ]
       }
     ],
     "PostToolUse": [

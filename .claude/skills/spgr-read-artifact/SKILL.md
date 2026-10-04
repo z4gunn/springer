@@ -15,6 +15,7 @@ Give agents a parse-and-validate read path so no agent acts on an artifact it ha
 |-------|-------------|
 | `artifact_path` | Path to the artifact JSON in the store |
 | `sections` | Optional list of content sections to return. Defaults to all |
+| `index` | Optional boolean. When true, return only the header line per artifact: id, type, version, status, the confidence map summary, and the first sentence of the content, for a path or a directory of artifacts. The caller then fetches by id |
 | `expected_type` | Optional type the caller expects. A mismatch is an error |
 
 ## Outputs
@@ -28,7 +29,7 @@ Give agents a parse-and-validate read path so no agent acts on an artifact it ha
 1. Read the file with `spgr-read-file` and parse it as JSON.
 2. Validate with `spgr-validate-artifact`. If the schema version does not match the registry, set `version_match` false and report it in `read_errors`. Do not return fields as trustworthy when validation fails.
 3. If `expected_type` is given and differs from the artifact's `artifact_type`, return an error rather than guessing.
-4. When `sections` is given, return and validate only those sections. This keeps reads cheap when an agent needs a subset of a large artifact.
+4. When `sections` is given, return and validate only those sections. This keeps reads cheap when an agent needs a subset of a large artifact. When `index` is true, read only the envelope header and the first sentence of each artifact under the path and return one line each, no content fields. A unit that does not yet know which artifact it needs opens the index first and a full artifact second, never the corpus.
 5. Return the structured `read_result`, including the `confidence_map` so the caller can tell which sections are `confirmed`, `proposed`, or `needs-human-input`.
 
 ## Notes

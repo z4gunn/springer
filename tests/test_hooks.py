@@ -3,11 +3,13 @@ Code sends. log-agent-events.py feeds the dashboard and the un-joined
 dispatch barrier. session-usage.py is the main-session sensor."""
 
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from helpers import REPO, RunStore, read_events, run_hook
+from helpers import HOOKS, REPO, RunStore, read_events, run_hook
 
 REVIEWER = REPO / ".claude" / "agents" / "spgr-agent-code-reviewer.md"
 
@@ -256,3 +258,40 @@ class DesignDetectHookTest(unittest.TestCase):
         rc, out, _ = run_hook("design-detect.py", self.payload(), self.project, env=env)
         self.assertEqual(rc, 3)
         self.assertEqual(out.strip(), "override")
+
+
+class BlockNoVerifyTest(unittest.TestCase):
+    """block-no-verify.py refuses a git command that skips the hook chain and
+    passes everything else, including a malformed payload."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.project = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def bash(self, command):
+        return run_hook("block-no-verify.py",
+                        {"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                         "tool_input": {"command": command}}, self.project)
+
+    def test_no_verify_is_blocked_with_a_reason(self):
+        for cmd in ("git commit -m x --no-verify", "git push --no-verify origin main",
+                    "git commit --no-gpg-sign -m x", "cd app && git commit -n -m x"):
+            rc, _, err = self.bash(cmd)
+            self.assertEqual(rc, 2, cmd)
+            self.assertIn("git-workflow.md", err)
+
+    def test_ordinary_commands_pass(self):
+        for cmd in ("git commit -m 'feat: x'", "git push -u origin feature/s-1", "npm test -- --no-verify-nothing",
+                    "grep -n no-verify README.md", "ls -n"):
+            rc, _, _ = self.bash(cmd)
+            self.assertEqual(rc, 0, cmd)
+
+    def test_other_tools_and_bad_payloads_pass(self):
+        rc, _, _ = run_hook("block-no-verify.py", {"tool_name": "Edit", "tool_input": {"file_path": "x"}}, self.project)
+        self.assertEqual(rc, 0)
+        proc = subprocess.run([sys.executable, str(HOOKS / "block-no-verify.py")], input="not json",
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0)

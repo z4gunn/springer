@@ -43,6 +43,7 @@ Any JavaScript-runtime stack this project selects MUST be TypeScript. Plain Java
 This project follows a trunk-based workflow: `main` is always deployable, every change lands through a short-lived branch and a reviewed pull request, and `main` is protected against direct pushes. The full model, including branch naming, the merge bar, and the release and hotfix flow, is defined in `.claude/references/git-workflow.md`.
 
 - Use conventional commit messages, scoped by what changed (for example `feat(api): add subscription endpoint`, `chore(ci): add typecheck stage`).
-- One logical change per commit. Lint, format, and the type checker pass before every commit.
+- One logical change per commit. Lint, format, and the type checker pass before every commit. The hook chain is never bypassed, and a PreToolUse hook refuses `--no-verify`.
+- Every changed line traces to the story or the finding that asked for it. Adjacent code, comments, and formatting are left alone, and pre-existing dead code is reported, not deleted.
 - Never commit secrets or `.env`.
 - At a `pr-merge` gate the harness publishes automatically: once all automated sign-offs pass it commits, pushes the branch to origin, and opens a PR via `spgr-create-pr`, then pauses at the human merge checkpoint carrying the PR URL. It merges the PR itself only under auto-merge on a brochure or small run, and it uses a local-only unpushed branch only when a human explicitly asks. See the pr-merge gate rule in `.claude/references/pdca-harness.md`.
