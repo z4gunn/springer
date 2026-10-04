@@ -30,7 +30,7 @@ Review one pull request and record the result as a code-review artifact the auth
 
 2. Check the PR size first. If the change exceeds 400 meaningful lines it cannot be reviewed coherently. Stop, set the verdict to REQUEST_CHANGES with a single finding that requests a split at a story boundary, and do not review the rest. Record the size check with spgr-log-decision.
 
-3. Confirm the automated gates ran. Confirm tests pass via spgr-run-tests output and lint is clean. Style and formatting are the automated tools' job, so do not raise style nits the formatter already enforces. Treat a failing test gate or a dirty lint as a blocking finding rather than re-doing the tools' work by hand.
+3. Confirm the automated gates ran. Confirm tests pass via spgr-run-tests output and lint is clean. Style and formatting are the automated tools' job, so do not raise style nits the formatter already enforces. Treat a failing test gate or a dirty lint as a blocking finding rather than re-doing the tools' work by hand. Run spgr-check-quality-floor on the diff next to those gates, carry each violation as a P1 on the `xp` axis, and record an exit 2 as unverified in the summary.
 
 4. Review correctness. Read the diff for bugs, broken edge cases, incorrect error handling, and logic that does not match the story. Each correctness defect is a blocking finding.
 

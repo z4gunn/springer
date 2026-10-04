@@ -5,6 +5,7 @@
       "Bash(.venv/bin/python schemas/validate.py:*)",
       "Bash(python3 .claude/skills/spgr-run-harness/scripts/:*)",
       "Bash(python3 .claude/skills/spgr-render-design-comps/scripts/:*)",
+      "Bash(python3 .claude/skills/spgr-check-quality-floor/scripts/:*)",
       "Bash(playwright-cli:*)",
       "Bash(impeccable detect:*)",
       "Bash(python3 verification/:*)",
