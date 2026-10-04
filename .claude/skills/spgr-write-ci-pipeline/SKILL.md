@@ -53,7 +53,9 @@ Write the CI pipeline configuration that gives every push the same automated qua
 
 9. Emit a coverage report artifact and a test results artifact on every run, retained at least 7 days, linked from the PR status check.
 
-10. Verify the budget. Trigger the pipeline (or run spgr-run-tests against the config) and measure actual fast-run and full-run duration on the first run. If the fast run exceeds 3 minutes or the full run exceeds 10 minutes, optimize caching and stage parallelism before declaring the work done. If the budget cannot be met within the approved architecture, call spgr-escalate. Log the platform and timing decisions with spgr-log-decision.
+10. Enable GitHub's own scanning when the platform is GitHub, so spgr-run-dependency-audit and spgr-run-sast have their second source from the first push. Run three calls once against the project repository: `gh api -X PUT repos/<owner>/<repo>/vulnerability-alerts` for Dependabot alerts, `gh api -X PATCH repos/<owner>/<repo> -f 'security_and_analysis[secret_scanning][status]=enabled' -f 'security_and_analysis[secret_scanning_push_protection][status]=enabled'` for secret scanning with push protection, and `gh api -X PATCH repos/<owner>/<repo>/code-scanning/default-setup -f state=configured` for CodeQL default setup. These are write calls outside the instance allowlist, so they prompt the human once at provisioning, which is the intended checkpoint. When a call is refused because the plan, the repository visibility, or the language set does not support the feature, record the refusal and the feature it leaves off with spgr-log-decision and continue. It is a limitation to surface, not a pipeline failure.
+
+11. Verify the budget. Trigger the pipeline (or run spgr-run-tests against the config) and measure actual fast-run and full-run duration on the first run. If the fast run exceeds 3 minutes or the full run exceeds 10 minutes, optimize caching and stage parallelism before declaring the work done. If the budget cannot be met within the approved architecture, call spgr-escalate. Log the platform and timing decisions with spgr-log-decision.
 
 ## Notes
 

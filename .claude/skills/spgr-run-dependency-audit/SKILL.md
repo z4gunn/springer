@@ -28,17 +28,19 @@ Scan the project's locked dependency tree for known vulnerabilities and produce 
 
 2. Run the scanner that matches each ecosystem. Use `npm audit` for npm, `pip-audit` for Python, `govulncheck` for Go, or Snyk across all ecosystems for one consistent CVSS-scored output with upgrade paths. Resolve findings against both direct and transitive dependencies.
 
-3. Record each CVE with its CVSS score, severity (Critical, High, Medium, Low), whether the affected package is a direct or transitive dependency, and a remediation path: upgrade to version X, switch to alternative package Y, or no fix available.
+3. Read GitHub's Dependabot alerts as a second source when the project is hosted on GitHub. Run `gh api repos/<owner>/<repo>/dependabot/alerts --paginate -q '.[] | select(.state=="open")'` and merge each open alert with the scanner findings by package name and advisory id (GHSA or CVE), so one vulnerability appears once with both sources named. Dependabot sees the repository's manifests and lockfiles on the default branch and surfaces advisories the local scanner's database may lag on. When the API answers that Dependabot alerts are disabled for the repository, record one Medium finding whose remediation is to enable them (the enable call lives in spgr-write-ci-pipeline), never a silent skip. The read needs the `security_events` scope, which the `repo` scope includes.
 
-4. Reconcile accepted exceptions. For each prior exception, check its expiry. An exception is time-limited: 30 days maximum for Critical, 90 days maximum for High. An expired exception is no longer valid and its CVE returns to the open findings until re-accepted or remediated.
+4. Record each CVE with its CVSS score, severity (Critical, High, Medium, Low), whether the affected package is a direct or transitive dependency, and a remediation path: upgrade to version X, switch to alternative package Y, or no fix available.
 
-5. Compute the dependency-freshness metric. Track the average age of the dependency tree and flag the project when the tree has not been updated in more than 90 days.
+5. Reconcile accepted exceptions. For each prior exception, check its expiry. An exception is time-limited: 30 days maximum for Critical, 90 days maximum for High. An expired exception is no longer valid and its CVE returns to the open findings until re-accepted or remediated.
 
-6. Tally severity counts by category (Critical, High, Medium, Low, split by direct and transitive) so the trend is visible across audits.
+6. Compute the dependency-freshness metric. Track the average age of the dependency tree and flag the project when the tree has not been updated in more than 90 days.
 
-7. Decide the verdict. Return GATE if any Critical or High CVE in a direct dependency is neither remediated nor covered by a current valid exception. Critical and High CVEs in transitive dependencies are addressed when a remediation path exists, and an unaddressed transitive Critical or High with a known fix also gates. Otherwise return PASS.
+7. Tally severity counts by category (Critical, High, Medium, Low, split by direct and transitive) so the trend is visible across audits.
 
-8. Write the report via spgr-write-artifact with inline spgr-validate-artifact. Log the verdict and any exception decisions via spgr-log-decision. On a GATE verdict, call spgr-escalate so the blocking findings reach the release owner before the release proceeds.
+8. Decide the verdict. Return GATE if any Critical or High CVE in a direct dependency is neither remediated nor covered by a current valid exception. Critical and High CVEs in transitive dependencies are addressed when a remediation path exists, and an unaddressed transitive Critical or High with a known fix also gates. Otherwise return PASS.
+
+9. Write the report via spgr-write-artifact with inline spgr-validate-artifact. Log the verdict and any exception decisions via spgr-log-decision. On a GATE verdict, call spgr-escalate so the blocking findings reach the release owner before the release proceeds.
 
 ## Notes
 

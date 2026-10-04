@@ -94,6 +94,13 @@ class PreflightTest(unittest.TestCase):
         self.assertIn("ok", line)
         self.assertIn("4.0.0", line)
 
+    def test_gh_scope_detail_reads_the_scopes_line(self):
+        classic = "github.com\n  - Token scopes: 'gist', 'read:org', 'repo'\n"
+        self.assertIn("security alerts readable", pf.scope_detail(classic))
+        narrow = "github.com\n  - Token scopes: 'gist', 'read:org'\n"
+        self.assertIn("unreadable", pf.scope_detail(narrow))
+        self.assertIn("no scopes line", pf.scope_detail("github.com\n  - Active account: true\n"))
+
     def test_broken_tool_reports_broken(self):
         fake = self.bin / "impeccable"
         fake.write_text("#!/bin/sh\nexit 1\n")

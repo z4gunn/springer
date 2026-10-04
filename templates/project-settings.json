@@ -39,7 +39,10 @@
       "Bash(python3 .claude/skills/spgr-mine-ugc-forums/scripts/:*)",
       "Bash(python3 .claude/skills/spgr-mine-app-store-reviews/scripts/:*)",
       "Bash(node .claude/skills/spgr-mine-app-store-reviews/scripts/:*)",
-      "Bash(python3 .claude/skills/spgr-mine-social-media/scripts/:*)"
+      "Bash(python3 .claude/skills/spgr-mine-social-media/scripts/:*)",
+      "Bash(gh api repos/*/dependabot/alerts:*)",
+      "Bash(gh api repos/*/code-scanning/alerts:*)",
+      "Bash(gh api repos/*/secret-scanning/alerts:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",

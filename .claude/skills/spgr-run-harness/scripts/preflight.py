@@ -20,6 +20,7 @@ them spgr-ingest-document escalates a binary document to the human.
 
 import glob
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -91,11 +92,32 @@ def check_venv():
     return ("ok" if rc == 0 else "broken"), py
 
 
+def scope_detail(status_text):
+    """One phrase on whether the gh token can read the repository's security
+    alerts. The Dependabot, code-scanning, and secret-scanning reads need the
+    security_events scope, which the repo scope includes. A fine-grained token
+    prints no scopes line, so its detail says so rather than guessing."""
+    for line in status_text.splitlines():
+        if "Token scopes:" in line:
+            scopes = re.findall(r"'([^']+)'", line)
+            if "repo" in scopes or "security_events" in scopes:
+                return "scopes include repo, security alerts readable"
+            return "scopes lack repo and security_events, security alerts unreadable"
+    return "no scopes line, fine-grained token or older gh"
+
+
 def check_gh():
     if not shutil.which("gh"):
         return "missing", ""
-    rc, out = run(["gh", "auth", "status"])
-    return ("ok" if rc == 0 else "broken"), out[:100]
+    try:
+        p = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return "broken", str(exc)[:100]
+    text = (p.stdout or "") + (p.stderr or "")
+    first = text.strip().splitlines()[0] if text.strip() else ""
+    if p.returncode != 0:
+        return "broken", first[:100]
+    return "ok", f"{first[:60]}, {scope_detail(text)}"
 
 
 def check_git_identity():
