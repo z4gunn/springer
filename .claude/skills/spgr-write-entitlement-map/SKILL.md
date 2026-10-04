@@ -23,7 +23,7 @@ The Feature Flag Agent owns this artifact as a vertical specialist. The map advi
 
 | Artifact | Description |
 |----------|-------------|
-| `entitlement-map` | Envelope artifact written via spgr-write-artifact, holding the plan definitions table, the feature-by-plan matrix with per-plan usage limits, the add-on entitlement list, the enforcement-point specification per entitlement, and the graceful-degradation behavior per gate |
+| `entitlement-map` | Envelope artifact written via spgr-write-artifact, holding the plan definitions table, the feature-by-plan matrix with per-plan usage limits, the add-on entitlement list, the enforcement-point specification per entitlement, the graceful-degradation behavior per gate, and the pricing-page spec section |
 
 ## Procedure
 
@@ -33,13 +33,15 @@ The Feature Flag Agent owns this artifact as a vertical specialist. The map advi
 4. List add-on entitlements. Record each feature that is available as a paid add-on regardless of plan, with its add-on price and the plans it can attach to.
 5. Specify the enforcement point for each entitlement. Name where the check runs: API middleware, service layer, or UI gate. Require a service-layer check on every entitlement, since a UI that hides an upgrade-gated control is UX and the service-layer check is the security boundary. State that checks route through one centralized `hasEntitlement(user, feature)` function that consults the entitlement service, not per-feature ad-hoc checks scattered across controllers.
 6. Specify graceful-degradation behavior per gate. Record what a non-entitled user sees: paywall, upgrade prompt, or hidden feature. For every usage limit, specify both a hard enforcement gate that errors when the limit is reached and a soft warning that fires when the user approaches the limit.
-7. Derive the enforcement test list. For each feature-by-plan cell, list the tests that an implementer must generate: an entitled user can access the feature, and a non-entitled user receives the gate response specified in step 6. Carry this list in the artifact so the Billing or Feature Flag implementer builds tests from the matrix.
-8. Record consequential choices with spgr-log-decision: the rationale for each enforcement point, each usage limit, and each degradation behavior, with alternatives considered.
-9. Validate and version. Run spgr-validate-artifact inline before marking the artifact confirmed, then version it with spgr-version-artifact. If the feature inventory has features no plan covers, the billing model contradicts the plan definitions, or a required input is missing, stop and raise spgr-escalate with the precise list of what is missing or contradictory rather than assigning a default. Do not fill gaps with assumptions.
+7. Write the pricing-page spec section as a projection of the plan table and the matrix, so the page that sells the plans cannot drift from the limits the service layer enforces. Read [references/pricing-page.md](references/pricing-page.md) for the rules: three or four tiers with one recommended and anchored, a monthly and annual toggle with the discount stated, limits in words, prices as visible text, Product and Offer JSON-LD in the server response, the FAQ questions, the paywall timing rules, the dark-pattern ban list, and the paste test that accepts the built page. The paywall rules reference the PRD `activation_event` where the profile requires one, since a paywall never shows before it.
+8. Derive the enforcement test list. For each feature-by-plan cell, list the tests that an implementer must generate: an entitled user can access the feature, and a non-entitled user receives the gate response specified in step 6. Carry this list in the artifact so the Billing or Feature Flag implementer builds tests from the matrix.
+9. Record consequential choices with spgr-log-decision: the rationale for each enforcement point, each usage limit, and each degradation behavior, with alternatives considered.
+10. Validate and version. Run spgr-validate-artifact inline before marking the artifact confirmed, then version it with spgr-version-artifact. If the feature inventory has features no plan covers, the billing model contradicts the plan definitions, or a required input is missing, stop and raise spgr-escalate with the precise list of what is missing or contradictory rather than assigning a default. Do not fill gaps with assumptions.
 
 ## Notes
 
 - Output type is an envelope spec artifact (`entitlement-map`). Call spgr-validate-artifact regardless. The `entitlement-map` content schema is not registered yet, so envelope-only validation applies for now (header, confidence map, decision log, and version are checked). Its content schema is registered in a later increment.
 - The registered content-schema artifact types are listed in the schema registry. Reference the registry rather than restating field lists here.
+- The pricing-page section is re-derived whenever the plan table or the matrix changes, and the paste test in the reference is re-run against the built page after every pricing change.
 - A pricing change is a scope change in billing terms. When the map is revised under a pricing change, route the human gate through spgr-notify-human and surface the diff so downstream billing configuration is re-derived.
 - A recommendation to the Billing Agent flows through spgr-tag-vertical-agent as a registered consultation, not as a direct edit of the billing artifact.

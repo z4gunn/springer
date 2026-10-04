@@ -100,6 +100,24 @@
             }
           }
         },
+        "activation_event": {
+          "type": "object",
+          "description": "The one user action that shows the product delivered its value. Required by spgr-write-prd on saas and mobile, absent on brochure. Onboarding is scoped to the shortest path to it, and no paywall shows before it.",
+          "required": ["name", "definition", "measured_by"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "definition": {
+              "type": "string",
+              "minLength": 1,
+              "description": "What the user has done when the event fires, in observable terms."
+            },
+            "measured_by": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The analytics event or query that counts it, named so the event taxonomy can carry it."
+            }
+          }
+        },
         "open_questions": {
           "type": "array",
           "description": "The intake question sweep: every fact, asset, preference, and constraint the run will need from the human, asked once at the first gate.",

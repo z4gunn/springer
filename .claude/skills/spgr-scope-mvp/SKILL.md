@@ -17,12 +17,13 @@ Define the minimum viable product scope by cutting everything that is not requir
 | `value-proposition` | One-line statement of the core value the product delivers. |
 | `target-icp` | Ideal Customer Profile the MVP must serve. |
 | `capacity-estimate` | Available development capacity for the MVP window. |
+| `activation-event` | The PRD `activation_event` on `saas` and `mobile`, the action that proves the value proposition reached the user. Read from the PRD via spgr-read-artifact. |
 
 ## Outputs
 
 | Artifact | Description |
 |----------|-------------|
-| `mvp-scope` | MVP definition statement (one paragraph on what the MVP is and is not), in-scope feature list with a rationale per inclusion, out-of-scope feature list with a rationale and a planned deferral phase per item, the end-to-end core user journey the MVP must support, and success criteria stating the user behavior or metric that confirms the value proposition is validated. |
+| `mvp-scope` | MVP definition statement (one paragraph on what the MVP is and is not), in-scope feature list with a rationale per inclusion, out-of-scope feature list with a rationale and a planned deferral phase per item, the end-to-end core user journey the MVP must support, the minimum path to value from signup to the activation event, and success criteria stating the user behavior or metric that confirms the value proposition is validated. |
 
 ## Procedure
 
@@ -32,9 +33,10 @@ Define the minimum viable product scope by cutting everything that is not requir
 4. Test each backlog item against the journey. Ask: if we remove this, does the core user journey break? If yes, mark it in-scope and write the rationale. If no, mark it a deferral candidate.
 5. Apply the standing priors. Authentication is almost always in scope, since users need an identity. Billing is frequently out of scope, since you validate before monetizing. Record any departure from these priors as a decision with spgr-log-decision.
 6. Assign each out-of-scope item a planned deferral phase and a rationale. Defer, do not reject. A user who definitely wants a feature will still want it in a later sprint.
-7. Write the success criteria. State the observable user behavior or metric that confirms the core value proposition is validated.
-8. When a deferral or inclusion touches a vertical domain (for example deferring billing, or scoping auth), consult the owning vertical with spgr-tag-vertical-agent and fold the recommendation in before finalizing.
-9. Write the mvp-scope artifact with spgr-write-artifact. If a downstream go/no-go gate or scope change requires human judgment, route it with spgr-notify-human.
+7. Write the minimum path to value on `saas` and `mobile`. Inventory every step between signup and the activation event, including each screen, each form field, each confirmation, and each wait, because teams undercount their own steps. Mark each step essential or removable, where essential means the activation event cannot fire without it. Remove or defer the removable steps, reorder what remains so the user reaches value before any setup that can wait, and move deferred setup behind the activation event with progressive disclosure. Name the analytics event each remaining step emits, so the funnel from signup to activation is measurable from the first release. The step list is a section of the artifact, and the step count before and after is recorded with spgr-log-decision.
+8. Write the success criteria. State the observable user behavior or metric that confirms the core value proposition is validated.
+9. When a deferral or inclusion touches a vertical domain (for example deferring billing, or scoping auth), consult the owning vertical with spgr-tag-vertical-agent and fold the recommendation in before finalizing.
+10. Write the mvp-scope artifact with spgr-write-artifact. If a downstream go/no-go gate or scope change requires human judgment, route it with spgr-notify-human.
 
 ## Notes
 
