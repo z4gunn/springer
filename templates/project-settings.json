@@ -35,7 +35,11 @@
       "Bash(python3 .claude/skills/spgr-check-seo-baseline/scripts/:*)",
       "Bash(python3 .claude/skills/spgr-ingest-document/scripts/:*)",
       "Bash(markitdown:*)",
-      "Bash(docling:*)"
+      "Bash(docling:*)",
+      "Bash(python3 .claude/skills/spgr-mine-ugc-forums/scripts/:*)",
+      "Bash(python3 .claude/skills/spgr-mine-app-store-reviews/scripts/:*)",
+      "Bash(node .claude/skills/spgr-mine-app-store-reviews/scripts/:*)",
+      "Bash(python3 .claude/skills/spgr-mine-social-media/scripts/:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",
