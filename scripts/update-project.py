@@ -125,11 +125,14 @@ def build_manifest(target, source, profile, previous=None):
         "runtime": {rel: sha256(path) for rel, path in runtime_files(target).items()},
         "templates": {},
     }
+    # A template-rendered file is measured against the pristine render at this
+    # source, never against whatever the instance holds. Recording the current
+    # file as owned would let a later update replace an instance's own
+    # gitignore or settings additions. A file that differs from the render at
+    # adoption is therefore treated as edited until an update rewrites it.
     for rel, (from_rel, rendered) in template_renders(source, profile).items():
-        path = target / rel
         manifest["templates"][rel] = {
             "from": from_rel,
-            "hash": sha256(path) if path.exists() else None,
             "rendered_hash": sha256_text(rendered),
         }
     return manifest
@@ -204,7 +207,7 @@ def plan_update(target, source, manifest):
         current = sha256(path) if path.exists() else None
         if current == new_hash:
             plan["template_unchanged"].append(rel)
-        elif current is None or current == record.get("hash"):
+        elif current is None or current == record.get("rendered_hash"):
             plan["template_replace"].append(rel)
         else:
             plan["template_merge"].append(rel)
@@ -277,6 +280,15 @@ def cmd_manifest(target, profile):
               "owned as they stand. The next update replaces them. Review before updating "
               "if any carries a local edit:")
         for rel in differing:
+            print(f"  {rel}")
+    edited_templates = sorted(
+        rel for rel, (_, rendered) in template_renders(SOURCE, profile).items()
+        if (target / rel).exists() and sha256(target / rel) != sha256_text(rendered))
+    if edited_templates:
+        print(f"{len(edited_templates)} template-rendered file(s) differ from the render and are "
+              "treated as edited. An update writes the new render beside them under "
+              f"{UPDATE_DIR_REL}/ for a hand merge:")
+        for rel in edited_templates:
             print(f"  {rel}")
     return 0
 

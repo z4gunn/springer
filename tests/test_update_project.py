@@ -98,7 +98,9 @@ class UpdateProjectTest(unittest.TestCase):
             ".claude/skills/spgr-two/SKILL.md", "schemas/x-v1.json"])
         self.assertTrue(all(v.startswith("sha256:") for v in m["runtime"].values()))
         self.assertEqual(m["templates"]["CLAUDE.md"]["from"], "templates/project-CLAUDE.md")
-        self.assertEqual(m["templates"]["CLAUDE.md"]["hash"], m["templates"]["CLAUDE.md"]["rendered_hash"])
+        self.assertEqual(m["templates"]["CLAUDE.md"]["rendered_hash"],
+                         up.sha256_text(up.render_claude_md(self.source, "small")))
+        self.assertNotIn("hash", m["templates"]["CLAUDE.md"])
         self.assertIn("Default profile for this project: `small`.", (self.target / "CLAUDE.md").read_text())
         self.assertNotIn("/runs/", (self.target / ".gitignore").read_text())
 
@@ -196,6 +198,20 @@ class UpdateProjectTest(unittest.TestCase):
         code, _, err = run_main("update", str(self.target))
         self.assertEqual(code, 1)
         self.assertIn("springer-manifest", err)
+
+    def test_adopted_template_edits_are_merged_aside_not_replaced(self):
+        # An instance that added its own gitignore lines before adoption. The
+        # manifest is rewritten at adoption, and an update must not clobber it.
+        (self.target / ".gitignore").write_text(up.render_gitignore(self.source) + "coverage/\n")
+        (self.target / up.MANIFEST_REL).unlink()
+        code, out, _ = run_main("manifest", str(self.target), "--profile", "small")
+        self.assertIn("1 template-rendered file(s) differ from the render", out)
+        self.assertIn(".gitignore", out)
+        code, out, _ = run_main("update", str(self.target))
+        self.assertEqual(code, 0)
+        self.assertIn("template changed and the file was edited", out)
+        self.assertIn("coverage/", (self.target / ".gitignore").read_text())
+        self.assertTrue((self.target / up.UPDATE_DIR_REL / ".gitignore").exists())
 
     def test_adopting_a_hand_synced_instance_names_what_already_differs(self):
         (self.target / up.MANIFEST_REL).unlink()
