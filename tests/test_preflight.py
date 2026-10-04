@@ -54,6 +54,23 @@ class PreflightTest(unittest.TestCase):
         self.assertIn("impeccable (optional)", rows)
         self.assertIn("missing", rows["playwright-cli (optional)"])
         self.assertIn("missing", rows["impeccable (optional)"])
+        self.assertIn("markitdown (optional)", rows)
+        self.assertIn("docling (optional)", rows)
+        self.assertIn("missing", rows["markitdown (optional)"])
+        self.assertIn("missing", rows["docling (optional)"])
+
+    def test_installed_converter_reports_ok(self):
+        for name, version in (("markitdown", "0.1.3"), ("docling", "2.70.0")):
+            fake = self.bin / name
+            fake.write_text(f"#!/bin/sh\necho {version}\n")
+            fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+        os.environ["PATH"] = str(self.bin)
+        rc, out = self.table()
+        self.assertEqual(rc, 0)
+        for name, version in (("markitdown", "0.1.3"), ("docling", "2.70.0")):
+            line = next(l for l in out.splitlines() if l.startswith(f"{name} (optional)"))
+            self.assertIn("ok", line)
+            self.assertIn(version, line)
 
     def test_installed_design_tool_reports_ok(self):
         fake = self.bin / "playwright-cli"

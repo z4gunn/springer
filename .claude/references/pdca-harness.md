@@ -73,7 +73,10 @@ Rules the profile carries:
   backlog over the cap is merged or cut before the prd-approval gate.
 - Content sources are complete before the build. On brochure and small the
   requirements unit lists every fact the spec cites (figures, dates, names,
-  URLs, tag lists) with its in-repo source under `docs/inputs/`. A fact that
+  URLs, tag lists) with its in-repo source under `docs/inputs/`. A document
+  the human supplies as a file becomes that source through
+  spgr-ingest-document, which records its provenance and extraction
+  confidence. A fact that
   lives only outside the repository is an intake question put to the human at
   the first gate, never a discovery a build unit makes. Under supervised the
   orchestrator holds the build unit while any source is missing. Under standard
