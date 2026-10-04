@@ -9,7 +9,9 @@ which Claude Code reads as a block, and the reason is printed so the agent
 fixes the failing hook instead of skipping it. Everything else passes.
 
 Registered in templates/project-settings.json and .claude/settings.json under
-PreToolUse with the Bash matcher. Reads the hook payload on stdin. Never
+PreToolUse with the Bash matcher, behind a file-exists guard, so a checkout
+that predates this file (an older branch, an instance mid-update) fails open
+instead of refusing every shell command. Reads the hook payload on stdin. Never
 raises, and a malformed payload passes through, because a hook that fails
 closed on its own bug would stop every shell command.
 """

@@ -68,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-no-verify.py\""
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-no-verify.py\" ]; then python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-no-verify.py\"; fi"
           }
         ]
       }
