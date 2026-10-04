@@ -98,7 +98,14 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    and the report format, and every report pastes its
    verification output and quotes any unmet obligation verbatim, per the
    dispatch contract in the reference. A report that describes a check rather
-   than pasting it counts as unverified. The turn boundary is the fork-join barrier, and because all run-state
+   than pasting it counts as unverified. Write the brief to
+   `runs/<run-id>/dispatch/<cycle-id>/<unit-id>/brief.md` and point the
+   prompt at it, require the full report in `report.md` beside the brief and
+   a return under fifteen lines carrying a status of DONE,
+   DONE_WITH_CONCERNS, BLOCKED, or NEEDS_CONTEXT, and before any review unit
+   cut the diff with `scripts/review-package.py <base> <head> --out
+   <unit-dir>/review.md` so the reviewer reads the package and this session
+   never reads the diff. The turn boundary is the fork-join barrier, and because all run-state
    writes happen here in the main session after the barrier, there is a single
    writer. Collect the artifacts each agent wrote. Agents never write run state.
    Dispatch under the token-economy rules and the dispatch-tier table in
@@ -151,8 +158,13 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    spgr-write-bug-report and a regression test, then routing the fix to the
    developer agent that owns the artifact. Bound retries: after two failed retries
    on the same unit, stop retrying and escalate to the human rather than looping.
-   Bound review the same way: one review pass and one re-review, then the open
-   findings go to the human at the gate as a list.
+   The first retry is a fresh agent at the unit's tier, the second a fresh
+   agent one tier up that is told a prior implementer attempted the fix.
+   Bound review the same way: one review pass and one scoped re-review that
+   verdicts each prior finding ADDRESSED or NOT ADDRESSED, then adjudicate per
+   the bounded fix loop in the reference: P0 and P1 go to the human at the
+   gate as a list, and under standard or autopilot a P2 or P3 is parked as a
+   defaults-ledger line with its cost if wrong.
 6. Gate. Fire only the gates the autonomy level fires, per the autonomy table
    in the reference. Under standard and autopilot, hold the PRD approval, the
    intake questions, the architecture option, and the design direction for one
