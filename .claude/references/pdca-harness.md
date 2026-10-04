@@ -266,7 +266,9 @@ began. These rules keep a run inside its window without lowering the quality bar
    `runs/<run-id>/artifacts/story-brief-<story-id>.json`: operative artifact
    refs, pinned strings and rulings, open conditions, and merge-bar state, held
    to a few thousand tokens. Dispatched units read the brief first and open a
-   full artifact only for a section the brief cites. The brief is a projection
+   full artifact only for a section the brief cites. A unit that must find
+   an artifact the brief does not cite opens spgr-read-artifact in `index`
+   mode (one header line per artifact) and fetches by id, never the corpus. The brief is a projection
    like run-state: derived, regenerable, never the source of truth. Its
    contract is `schemas/story-brief-v1.json`.
 3. Scoped verification inside units. A unit runs the named test files its work
@@ -322,13 +324,18 @@ same things. The prompt names the files to read in order, the rulings
 that bind, the check command that gates the work, the working directory (the
 unit's worktree path, or the main checkout) with the absolute run-store path,
 and the report format. The report lists the files written with line counts,
-pastes the verification output rather than describing it, quotes verbatim
+pastes the verification output rather than describing it, stamps that
+output with the commit it ran on (`git rev-parse HEAD`) and a working-tree
+fingerprint (`git status --porcelain | shasum`) taken right after the run, quotes verbatim
 every obligation it could not satisfy with the reason, lists each default
 taken as one defaults-ledger line, and never fills a gap with an unrecorded
 assumption. In the reference run this contract produced honest gap lists from
 every unit, where the earlier cycles had produced overstated claims the
 harness then re-verified by hand. A report that describes a check instead of
-pasting it is treated as unverified.
+pasting it is treated as unverified. So is a paste whose commit is not the
+PR head or whose fingerprint no longer matches the tree, because the tree
+moved after the check ran. Check re-derives both and marks the paste stale
+rather than trusting it.
 
 The contract travels in files, not in the prompt and not in the return value,
 so neither the task text nor the diff transits the main session.
@@ -702,6 +709,11 @@ consult it, under three rules that prevent silent drift. See ADR-004.
 - Human-promoted rules. A learning that would change a rule (a WIP limit, the gate
   set, a routing policy) carries requires_human_promotion true and is applied only
   through a human gate, never by the loop.
+- Provenance travels with the learning. Each one records its `source`
+  (observed, user-stated, inferred) and the `files` it concerns. A run cites
+  a learning from another project only when its source is user-stated, and
+  a learning whose files no longer exist is dropped at pin time rather than
+  cited.
 
 ## Linear board projection
 

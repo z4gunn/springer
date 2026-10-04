@@ -42,7 +42,17 @@
                 "type": "string",
                 "enum": ["confirmed", "proposed"]
               },
-              "requires_human_promotion": {
+              "source": {
+            "type": "string",
+            "enum": ["observed", "user-stated", "inferred"],
+            "description": "How the learning was obtained. Only a user-stated learning may be cited by a run in another project."
+          },
+          "files": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Repo paths the learning concerns, so a later prune can drop a learning whose files are gone."
+          },
+          "requires_human_promotion": {
                 "type": "boolean",
                 "description": "True when applying this learning would change a rule (WIP limit, gate set, routing policy). Such learnings are applied only through a human gate."
               }

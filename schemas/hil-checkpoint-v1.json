@@ -44,7 +44,9 @@
             "required": ["option", "consequence"],
             "properties": {
               "option": { "type": "string" },
-              "consequence": { "type": "string" }
+              "consequence": { "type": "string" },
+              "cost_if_wrong": { "type": "string", "description": "What reversing this choice later takes." },
+              "recommended_because": { "type": "string", "description": "Set on exactly one option: the one-sentence reason it is recommended." }
             }
           }
         },
@@ -92,7 +94,9 @@
                   "required": ["option", "consequence"],
                   "properties": {
                     "option": { "type": "string" },
-                    "consequence": { "type": "string" }
+                    "consequence": { "type": "string" },
+                    "cost_if_wrong": { "type": "string", "description": "What reversing this choice later takes." },
+                    "recommended_because": { "type": "string", "description": "Set on exactly one option: the one-sentence reason it is recommended." }
                   }
                 }
               },

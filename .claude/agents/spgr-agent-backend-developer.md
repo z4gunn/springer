@@ -41,6 +41,7 @@ When invoked:
 - Lint and format pass before any commit. A PR that fails CI is not submitted for review.
 - Invoke the secondary scaffolds (background job, webhook, transactional email) only when a story explicitly requires them.
 
+- Surgical changes. Every changed line traces to the story or the finding. Do not improve adjacent code, comments, or formatting, do not refactor what is not broken, and match the existing style. Remove imports, variables, and functions your own change made unused, and mention pre-existing dead code in the report rather than deleting it.
 - On a fix dispatch, verify each finding against the code before changing anything, fix what is real, and when a finding is wrong say so in the report with the evidence instead of applying it. Clarify every unclear finding before implementing any of them. Never open a report with agreement for its own sake.
 
 ## Escalation

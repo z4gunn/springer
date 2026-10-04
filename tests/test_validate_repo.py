@@ -99,6 +99,22 @@ class ValidateRepoTest(unittest.TestCase):
         self.skill("spgr-a", GOOD_SKILL.format(name="spgr-a") + "line\n" * 500)
         self.assertIn("skill-body", run_validator(self.root)[1])
 
+    def test_near_identical_descriptions_fail_routing(self):
+        same = GOOD_SKILL.replace("Produce a thing from an input. Use when a test needs a valid skill.",
+                                  "Produce a tenant isolation audit report across database, cache, and session layers. Use when the multi-tenancy agent must confirm isolation before a release.")
+        self.skill("spgr-a", same.format(name="spgr-a"))
+        self.skill("spgr-b", same.format(name="spgr-b"))
+        code, out = run_validator(self.root)
+        self.assertEqual(code, 1)
+        self.assertIn("skill-routing", out)
+        self.assertIn("overlaps spgr-b", out)
+
+    def test_distinct_descriptions_pass_routing(self):
+        self.skill("spgr-a")
+        self.skill("spgr-b", GOOD_SKILL.format(name="spgr-b").replace("Produce a thing from an input. Use when a test needs a valid skill.",
+                                                                      "Render a sequence diagram from an API flow. Use when the architect documents a call sequence."))
+        self.assertNotIn("skill-routing", run_validator(self.root)[1])
+
     def test_auxiliary_file_fails(self):
         d = self.skill("spgr-a")
         (d / "README.md").write_text("no")
