@@ -6,7 +6,7 @@ This file is the operative ruleset for AI agents working in this repository. It 
 
 Springer is an AI software development team built as a library of Claude Code skills and agents. Each agent models a traditional dev-team role (product manager, architect, developer, QA, DevOps) or a vertical specialty that spans those roles. The team executes the full lifecycle on a greenfield SaaS or mobile application, from idea to production, and the human enters only at deliberate checkpoints.
 
-This repository holds the build: 27 agents and 198 skills, almost all mapped from Phase 1 specs that live in a private vault (see Spec Source below). When adding or changing an artifact that has a spec, map from the spec rather than inventing. spgr-render-doc, spgr-render-design-mockups, spgr-render-design-comps, and spgr-run-harness are net-new capabilities with no Phase 1 spec, authored directly to these build standards.
+This repository holds the build: 27 agents and 199 skills, almost all mapped from Phase 1 specs that live in a private vault (see Spec Source below). When adding or changing an artifact that has a spec, map from the spec rather than inventing. spgr-render-doc, spgr-render-design-mockups, spgr-render-design-comps, spgr-run-harness, and spgr-check-quality-floor are net-new capabilities with no Phase 1 spec, authored directly to these build standards.
 
 ## Core Design Principles
 
