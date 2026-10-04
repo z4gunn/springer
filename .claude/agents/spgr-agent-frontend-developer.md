@@ -43,6 +43,8 @@ When invoked:
 - Accessibility review is a prerequisite to PR submission, not a follow-up.
 - No client-side feature flags for features not in the confirmed backlog. Lint, format, and all tests pass before the PR opens.
 
+- On a fix dispatch, verify each finding against the code before changing anything, fix what is real, and when a finding is wrong say so in the report with the evidence instead of applying it. Clarify every unclear finding before implementing any of them. Never open a report with agreement for its own sake.
+
 ## Escalation
 
 - A screen spec references a field or endpoint absent from the confirmed API spec, escalate to the Architect agent, do not mock or invent it.

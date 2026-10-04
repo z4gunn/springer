@@ -22,7 +22,7 @@ Review one pull request and record the result as a code-review artifact the auth
 
 | Artifact | Description |
 |----------|-------------|
-| `code-review` | Envelope artifact validated against the registered `code-review` schema, carrying pr_ref, story_ref, axes_checked, findings with per-finding file, line, severity, axis, description, and remediation, a summary, and the verdict |
+| `code-review` | Envelope artifact validated against the registered `code-review` schema, carrying pr_ref, story_ref, axes_checked, findings with per-finding file, line, severity, axis, description, and remediation, a `declined_to_judge` list, a `cannot_verify` list, a summary, and the verdict |
 
 ## Procedure
 
@@ -48,16 +48,19 @@ Review one pull request and record the result as a code-review artifact the auth
 
 11. Compute the review coverage metric and record it in the summary: the percentage of changed lines that received a finding or comment. Very low coverage signals the diff was glossed over and warrants a second pass. Very high coverage signals the PR is too large, which step 2 should already have caught.
 
-12. Set the verdict. REQUEST_CHANGES if any P0 or P1 finding exists. APPROVE if only P2 or P3 findings remain and every acceptance criterion is tested, including an APPROVE with no findings at all, which is the expected result on a small, tested diff. COMMENT when the review raises only questions that may or may not lead to a change. Set each axes_checked boolean from the work actually done, not from intent.
+12. Fill the two lists that keep the review honest. `declined_to_judge` names every behavior in the diff that was looked at and set aside, with the reason. `cannot_verify` names every check the package could not answer (execution, a live service, a file outside the diff) with the command that would answer it, and the harness runs those in Check. Neither list is optional when it has members.
 
-13. Write the artifact with spgr-write-artifact, which runs inline spgr-validate-artifact against the registered `code-review` schema. Record the verdict rationale, the coverage figure, and any vertical tags with spgr-log-decision.
+13. Set the verdict. REQUEST_CHANGES if any P0 or P1 finding exists. APPROVE if only P2 or P3 findings remain and every acceptance criterion is tested, including an APPROVE with no findings at all, which is the expected result on a small, tested diff. COMMENT when the review raises only questions that may or may not lead to a change. Set each axes_checked boolean from the work actually done, not from intent.
 
-14. Escalate rather than guess. If the inputs are missing or contradictory, the diff is unreadable, the linked story or its acceptance criteria are absent, or an ADR conflicts with what the change requires, stop and raise spgr-escalate with the precise list of what is missing or in conflict rather than approving on incomplete input.
+14. Write the artifact with spgr-write-artifact, which runs inline spgr-validate-artifact against the registered `code-review` schema. Record the verdict rationale, the coverage figure, and any vertical tags with spgr-log-decision.
+
+15. Escalate rather than guess. If the inputs are missing or contradictory, the diff is unreadable, the linked story or its acceptance criteria are absent, or an ADR conflicts with what the change requires, stop and raise spgr-escalate with the precise list of what is missing or in conflict rather than approving on incomplete input.
 
 ## Notes
 
 - Validate via spgr-validate-artifact against the registered `code-review` schema in schemas/. Do not inline the field list.
 - The `design` axis applies to UI-touching diffs only. Its bar is `.claude/references/design-quality.md` and its deterministic half is the detector output the capture script records.
+- The implementer's report is read as the implementer grading itself. Its pasted output is evidence of the command it shows, its rationale never downgrades a finding, and a test it evidences is not re-run for reassurance. The Code Reviewer agent carries the full reading rules.
 - Severity maps the spec's categories onto the schema enum: blocking is P0 or P1, non-blocking is P2 or P3, and questions are findings whose verdict is COMMENT when no blocker exists. The schema requires per-finding file, line, severity, description, and remediation, an axis from architecture, xp, style, docstring, correctness, security, or design, and on P0 and P1 an `evidence` field. A blocking finding without evidence fails validation and is never written.
 - Bugs, missing tests for new behavior, and ADR deviations are always blocking. Style nits the formatter enforces are never findings, and other style preferences are never blocking.
 - Do not refactor or edit the PR code in this skill. Request the change from the author through the findings. The merge decision is a human-in-the-loop gate handled by spgr-notify-human, not by this skill. This verdict is the automated gate in the merge criteria defined in `.claude/references/git-workflow.md`, an APPROVE with no open P0 or P1 is a precondition for merge.
