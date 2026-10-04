@@ -60,3 +60,4 @@ This skill runs in Phase 1, where no code is written. It is a discovery research
 - Engagement weighting sets frequency, not raw post count, per step 6.
 - The two-source rule is a hard validation gate, per step 7. A single-source pain point stays proposed in the confidence map.
 - Quotes are verbatim. Paraphrasing a quote is a defect, per step 4.
+- `user_vocabulary` and the verbatim quotes feed spgr-write-page-copy, which writes the page's headline, problem, and objection copy in these words.

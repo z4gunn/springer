@@ -46,3 +46,4 @@ Write the store-facing listing content for both iOS App Store and Google Play as
 - Hold every field to its store character limit. A field over the limit is a hard failure, not a warning, since the store truncates or rejects it.
 - Mark each field's confidence in the artifact: confirmed where the input supports it, proposed where a keyword or copy choice is a judgment call, needs-human-input where a market or legal claim needs human sign-off before submission.
 - Submission-readiness verification belongs to spgr-run-submission-checklist, not this skill. This skill produces the content. The checklist gates the submission.
+- Listing prose follows `.claude/references/copy-standards.md` within each store's character limits, and an unsourced claim is a needs-human-input field, never a filled one.

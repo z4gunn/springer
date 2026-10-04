@@ -176,7 +176,7 @@ The subset of interface mechanics that the accessibility skills do not already o
 
 ## Copy in the interface
 
-Words in an interface exist to make it easier to understand and use. They are design material, not decoration.
+Words in an interface exist to make it easier to understand and use. They are design material, not decoration. This section covers the strings rendered inside the interface, and everything outside it (page copy, README, docs, release notes, listing copy) follows `.claude/references/copy-standards.md`.
 
 - Name things by what the person understands, not by how the system is built. Notifications, not webhook configuration.
 - Active voice. A call to action says exactly what happens: Save changes, not Submit, not Continue. An action keeps its name through the flow, so Publish produces Published.
