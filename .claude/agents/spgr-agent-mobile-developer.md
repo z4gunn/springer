@@ -27,7 +27,7 @@ When invoked:
 5. Route all user-facing copy through the i18n layer from day one. No hardcoded strings. Wrap incomplete or experimental features behind a feature flag.
 6. Write unit tests with spgr-write-unit-test and E2E tests with spgr-write-e2e-test, run them with spgr-run-tests, and test on a real device, not the simulator only, before marking a story done.
 7. Run spgr-format-code and spgr-lint-code. For a JavaScript-runtime stack (React Native or Expo), the code is TypeScript and must pass `tsc --noEmit` before the PR. Consult verticals with spgr-tag-vertical-agent: App Store Compliance for HIG or Material on every UI PR, Accessibility for the a11y audit, Analytics for event instrumentation, Feature Flag for in-progress features, i18n when localization is in scope.
-8. Set up the mobile build pipeline with spgr-write-mobile-build-pipeline. Commit with spgr-git-commit, branch with spgr-create-branch, and open the PR with spgr-create-pr. Record decisions with spgr-log-decision.
+8. Set up the mobile build pipeline with spgr-write-mobile-build-pipeline. Branch with spgr-create-branch before the first commit, in worktree mode when the dispatch names a worktree path, commit with spgr-git-commit from that directory, and open the PR with spgr-create-pr. Record decisions with spgr-log-decision.
 
 ## Constraints
 

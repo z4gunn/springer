@@ -92,7 +92,10 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    event with its tool_use_id to `events.jsonl` when its task notification
    arrives, because the hook cannot see a background agent finish. Every unit
    prompt names the files to read in order, the binding rulings, the gating
-   check command, and the report format, and every report pastes its
+   check command, the working directory (the unit's own worktree under
+   `.worktrees/` whenever the batch holds more than one build unit, created
+   by spgr-create-branch in worktree mode) with the absolute run-store path,
+   and the report format, and every report pastes its
    verification output and quotes any unmet obligation verbatim, per the
    dispatch contract in the reference. A report that describes a check rather
    than pasting it counts as unverified. The turn boundary is the fork-join barrier, and because all run-state
@@ -138,7 +141,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    (`artifacts/story-brief-<story-id>.json`, a few thousand tokens: operative
    refs, pinned rulings, open conditions, merge-bar state) so later units read
    it instead of the full artifact corpus. Refresh the run brief when a ruling
-   landed or an artifact was versioned. Record a fold-in as one line and apply
+   landed or an artifact was versioned. Remove the worktree of every unit
+   whose PR is now open with `git worktree remove .worktrees/<branch>`,
+   keeping the branch, and report a refused removal rather than forcing it. Record a fold-in as one line and apply
    it through a haiku unit in this cycle or defer it, per the fold-in policy in
    the reference. Keep the cycle record to roughly 2k tokens. Then take the
    transition: advance and loop, retry, escalate by routing per the orchestrator
@@ -179,7 +184,7 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    pause or report the story ready while a required check is failing or pending.
    Outside auto-merge the harness pushes and opens but never merges. The human
    merge is the gate and is read as the checkpoint response on resume. While it
-   is open, the next file-disjoint batch builds on its own branch. A local-only unpushed branch is
+   is open, the next file-disjoint batch builds on its own branch in its own worktree. A local-only unpushed branch is
    used only when a human explicitly asks for it. See the pr-merge gate rule in
    [../../references/pdca-harness.md](../../references/pdca-harness.md).
    When the Linear board is active, attach the PR to the story's issue with

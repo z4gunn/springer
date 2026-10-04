@@ -36,7 +36,7 @@ Hold the artifact contract that every agent-to-agent handoff depends on. Each ar
 2. For any required field whose value is unknown, include the field and mark its section `needs-human-input` in the confidence map rather than omitting it. The artifact must be complete even when some answers are open.
 3. Apply the confidence propagation rule: if the parent artifact has `needs-human-input` sections consumed here, mark the derived sections `needs-human-input` too, unless a HIL checkpoint resolved them.
 4. Validate inline with `spgr-validate-artifact`. If validation fails, do not write. Escalate with `spgr-escalate` carrying the itemized issue list.
-5. Write the artifact to the store with `spgr-write-file`. Record the path. Populate the decision log later with `spgr-log-decision`, never by editing the body inline.
+5. Write the artifact to the store with `spgr-write-file`. The store is `runs/<run-id>/` under the main worktree, reached by the absolute path the dispatch carries. A unit in a linked worktree never writes to the `runs/` under its own worktree. Record the path. Populate the decision log later with `spgr-log-decision`, never by editing the body inline.
 
 ## Notes
 

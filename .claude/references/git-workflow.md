@@ -7,6 +7,7 @@ This file governs applications Springer builds. It does not govern how the Sprin
 ## Contents
 - Branching model
 - Branch types and naming
+- Worktrees
 - Commit discipline
 - Pull requests
 - Merge criteria
@@ -29,6 +30,10 @@ spgr-create-branch owns the naming regex and base selection. The five types and 
 - `hotfix/<version>-<slug>`, cut from the matching `release/<version>`, not from `main`.
 
 Names match `^(feature|fix|hotfix|release|chore)/[a-z0-9-]+$`, lowercase letters, digits, and hyphens only. The mechanics, base refresh, and collision checks live in spgr-create-branch.
+
+## Worktrees
+
+A unit that runs beside another unit works in a linked worktree, `.worktrees/<branch>/`, created by spgr-create-branch in worktree mode and ignored by git. One working tree holds one branch, so co-scheduled units never switch each other's checkout or sweep each other's files into a commit. The worktree carries no ignored files, so the unit installs dependencies the way CI does and runs its scoped baseline before it writes code. The run store lives in the main worktree, and a unit writes artifacts there by absolute path. After the PR is open the harness removes the worktree and keeps the branch. A removal git refuses is reported, never forced.
 
 ## Commit discipline
 
@@ -62,7 +67,7 @@ A `release/<version>` branch is cut from `main` only when one of two conditions 
 A `hotfix/<version>-<slug>` branches from the matching `release/<version>`, fixes the defect, and is tagged as a new patch version. The same fix is brought forward to `main`, by cherry-pick or merge-forward, so `main` does not regress on the next release. The DevOps agent cuts and manages release branches.
 
 ## Boundaries
-- spgr-create-branch owns branch naming and base selection.
+- spgr-create-branch owns branch naming, base selection, and worktree creation.
 - spgr-git-commit owns commit discipline and the hook chain.
 - spgr-create-pr owns the pull-request artifact and its description.
 - spgr-review-pr and the Code Reviewer agent own the review verdict.
