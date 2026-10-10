@@ -23,6 +23,11 @@ class DeriveReadyQueueTest(unittest.TestCase):
     def snapshot(self, session_id=None):
         return drq.derive(self.store.run_dir, session_id)
 
+    def test_api_profile_defaults_to_standard_autonomy(self):
+        self.assertEqual(drq.DEFAULT_AUTONOMY["api"], "standard")
+        self.assertEqual(drq.resolve_autonomy({"profile": "api", "flags": {}}), "standard")
+        self.assertEqual(drq.resolve_autonomy({"profile": "api", "flags": {"autonomy": "autopilot"}}), "standard")
+
     def test_empty_store_is_not_blocked(self):
         snap = self.snapshot()
         self.assertFalse(snap["blocked"])

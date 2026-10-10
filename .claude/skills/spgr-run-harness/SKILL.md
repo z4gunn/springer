@@ -24,7 +24,8 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 | `problem_statement` | Required only when creating a new run, the seed the first phase consumes |
 | `mode` | `run` drives until a gate or completion, `tick` runs one cycle and returns |
 | `autonomy` | Optional on a new run. `supervised`, `standard`, or `autopilot`, recorded in the run brief `flags.autonomy`. Defaults to standard on brochure and small and supervised on saas and mobile. See Autonomy levels in the reference |
-| `profile` | Required on a new run. One of `brochure`, `small`, `saas`, `mobile`. Scales the phase set, the story and criteria caps, and the PR unit per the run-profiles table in the reference. Recorded in the run brief and read from there on resume |
+| `profile` | On a new run, one of `brochure`, `small`, `saas`, `mobile`, `api`, from the problem statement's `profile:` line. Scales the phase set, the story and criteria caps, and the PR unit per the run-profiles table in the reference. Recorded in the run brief and read from there on resume. When the line is missing or names something else, answer the four questions in the reference from the statement, open on the profile they give, record a DEF line with the answers, and carry it to the first gate as a default-review decision. Under supervised, ask before opening |
+| `size` | Optional on a new `mobile` run, from a `size:` line. `small` keeps the store lifecycle at the small profile's ceremony. Recorded in the run brief `flags.size` and ignored on other profiles |
 
 ## Outputs
 
@@ -56,7 +57,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    and the story briefs the pending batch names. Do not re-read the artifact
    corpus. On a new run only, run `scripts/preflight.py --profile <profile>`
    and record its table in the run brief, write the run brief with the profile
-   from the problem statement's `profile:` line and the autonomy level, and
+   from the problem statement's `profile:` line (or the one the four
+   questions give, as a recorded default), the `size` line on mobile, and
+   the autonomy level, and
    pin the advisory learnings set once with `scripts/pin-learnings.py` over the
    available prior run-retrospective artifacts, and record it in
    run-state.learnings_pinned so the run is reproducible. Whenever the run will

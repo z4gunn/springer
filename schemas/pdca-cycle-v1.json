@@ -83,7 +83,8 @@
             "brochure",
             "small",
             "saas",
-            "mobile"
+            "mobile",
+            "api"
           ],
           "description": "The run profile, projected from run-brief.json. Scales the phase set, caps, and PR unit."
         },
