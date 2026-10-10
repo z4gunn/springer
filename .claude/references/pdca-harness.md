@@ -53,9 +53,31 @@ hours before the first visible content. Nothing in the harness said "small".
 | Profile | Fits | Phases routed | Stories | Architecture | Criteria | PR unit |
 |---------|------|---------------|---------|--------------|----------|---------|
 | brochure | static site, landing page, docs site, no backend | requirements, design, development | at most 10, one per visible section or behavior | one architecture note (stack, file layout, constraints), no ADR set | one sentence plus one check command each | one PR per page |
-| small | one service or app, one or two integrations, no tenancy or billing | requirements, architecture, design, development | at most 25 | ADRs only for decisions a later change would regret | statement plus check | one PR per co-scheduled batch |
+| small | one service or app, one or two integrations, user accounts allowed, no tenancy and no billing | requirements, architecture, design, development | at most 25 | ADRs only for decisions a later change would regret | statement plus check | one PR per co-scheduled batch |
+| api | a headless service or product with no UI: a backend API, a webhook or integration service, a CLI, a library | requirements, architecture, development | at most 25 | ADRs only for decisions a later change would regret, plus the API design standards | statement plus check | one PR per co-scheduled batch |
 | saas | multi-tenant product with auth, billing, or an API surface | the full lifecycle | as scoped by the PM | full ADR set | full Given/When/Then sets | per story or batch |
 | mobile | store-distributed app | the full lifecycle plus the App Store vertical | as scoped | full ADR set | full sets | per story or batch |
+
+Choosing a profile is four questions, answered in order, and the first yes
+wins: is it distributed through an app store (`mobile`), does it charge
+money or serve more than one tenant (`saas`), does it have a user interface
+(`small`, or `brochure` when it also has no backend), otherwise `api`. User
+accounts alone do not make a run `saas`. A product that is both a store app
+and a multi-tenant service runs as `mobile` with the billing and tenancy
+verticals tagged, which the Architect does when the architecture names them.
+
+A `mobile` run may add a `size: small` line for a utility app with no
+backend of its own and no store commerce beyond a single purchase. It keeps
+the mobile phase set and the App Store vertical, and takes the `small`
+ceremony: at most 25 stories, ADRs only for regrettable decisions, statement
+plus check criteria, one PR per batch. `size` is ignored on every other
+profile. The size is recorded in the run brief `flags.size`.
+
+A problem statement with no `profile:` line, or one the table does not name,
+is not an error. The harness answers the four questions from the statement,
+opens the run on the profile they give, records the choice as a
+defaults-ledger line with the answers, and carries it to the first gate as a
+default-review decision. Under supervised it asks before opening instead.
 
 Rules the profile carries:
 - A phase outside the profile's set is not routed. Discovery runs on brochure
@@ -63,6 +85,10 @@ Rules the profile carries:
   line in the requirements unit, not a consultation.
 - NFR consultations on brochure and small fold into the PM unit as a checklist.
   A vertical is dispatched only when a later diff touches its surface.
+- `api` has no design phase. The Design, Accessibility, and i18n verticals
+  are never dispatched, the design-direction gate never fires, the direction
+  review carries the PRD and the architecture option only, and the API Design
+  and Documentation sign-offs take the place of the design handoff.
 - The definition of done on brochure is the CI check, which includes the SEO
   baseline from spgr-check-seo-baseline run strict on every built page. No DoD
   artifact is written.

@@ -23,7 +23,7 @@ On a new run, create the artifact store under `runs/<run-id>/` with subdirectori
 - WIP board state: stories by stage (backlog, development, review, validation, done).
 - Readiness snapshot: the deterministic output of the harness derive-ready-queue script, listing open gates with what each holds (`held`), answered gates, open escalations, the confirmed-artifact inventory, the latest phase, the run profile, the autonomy level, the open default count, and any un-joined dispatch. Treat it as the factual basis for routing.
 - Autonomy level: `supervised`, `standard`, or `autopilot`, from the snapshot. The autonomy table in `.claude/references/pdca-harness.md` fixes which gates fire and which decisions are taken by default.
-- Run profile: `brochure`, `small`, `saas`, or `mobile`, from the snapshot. The run-profiles table in `.claude/references/pdca-harness.md` fixes the phase set, the story cap, the architecture depth, and the PR unit for each. A profile is a routing constraint, not a suggestion.
+- Run profile: `brochure`, `small`, `saas`, `mobile`, or `api`, from the snapshot, with `flags.size` on mobile. The run-profiles table in `.claude/references/pdca-harness.md` fixes the phase set, the story cap, the architecture depth, and the PR unit for each. A profile is a routing constraint, not a suggestion.
 
 ## Workflow
 

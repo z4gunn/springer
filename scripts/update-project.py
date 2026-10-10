@@ -42,7 +42,7 @@ SOURCE = Path(__file__).resolve().parents[1]
 RUNTIME_DIRS = (".claude/skills", ".claude/agents", ".claude/references", ".claude/hooks", "schemas")
 MANIFEST_REL = ".claude/springer-manifest.json"
 UPDATE_DIR_REL = ".claude/springer-update"
-PROFILES = ("brochure", "small", "saas", "mobile")
+PROFILES = ("brochure", "small", "saas", "mobile", "api")
 STALE_LOCK_SECONDS = 30 * 60
 SKIP_NAMES = {"__pycache__", ".DS_Store"}
 SKIP_SUFFIXES = {".pyc"}
@@ -330,7 +330,7 @@ def main(argv):
             i = argv.index("--profile")
             profile = argv[i + 1] if i + 1 < len(argv) else None
         if not profile:
-            sys.stderr.write("manifest needs --profile <brochure|small|saas|mobile>\n")
+            sys.stderr.write("manifest needs --profile <brochure|small|saas|mobile|api>\n")
             return 2
         return cmd_manifest(target, profile)
     dry_run = args[0] == "status" or "--dry-run" in flags

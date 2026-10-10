@@ -11,7 +11,7 @@
   "$defs": {
     "profile": {
       "type": "string",
-      "enum": ["brochure", "small", "saas", "mobile"],
+      "enum": ["brochure", "small", "saas", "mobile", "api"],
       "description": "Scales the phase set, the story and criteria caps, and the PR unit. See the run-profiles table in .claude/references/pdca-harness.md."
     },
     "content": {
@@ -33,7 +33,12 @@
               "enum": ["supervised", "standard", "autopilot"],
               "description": "Which gates pause the run and which decisions are taken by default and reviewed in a batch. Defaults to standard on brochure and small and supervised on saas and mobile. autopilot is allowed on brochure and small only. See Autonomy levels in .claude/references/pdca-harness.md."
             },
-            "auto_merge_on_green": {
+            "size": {
+          "type": "string",
+          "enum": ["small", "standard"],
+          "description": "Honored on mobile only. small keeps the store lifecycle and the App Store vertical at the small profile's ceremony: at most 25 stories, ADRs only for regrettable decisions, statement plus check criteria, one PR per batch. Ignored on every other profile."
+        },
+        "auto_merge_on_green": {
               "type": "boolean",
               "default": false,
               "description": "brochure and small only. Code Reviewer APPROVE plus fully green required checks merges the PR without a human pause. A human decision recorded in the project CLAUDE.md. Implied true under autonomy autopilot."

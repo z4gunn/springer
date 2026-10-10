@@ -7,7 +7,7 @@ worked instead. This script answers those questions before any agent is
 dispatched and prints a table the harness records in the run brief.
 
 Usage:
-    python3 preflight.py [--profile brochure|small|saas|mobile]
+    python3 preflight.py [--profile brochure|small|saas|mobile|api]
 
 Prints one line per tool: name, status (ok, missing, broken), detail. Exit 0
 always, so a missing optional tool never blocks the run. The harness decides
@@ -145,7 +145,7 @@ def main(argv):
         ("markitdown (optional)", *check_binary("markitdown")),
         ("docling (optional)", *check_binary("docling")),
     ]
-    if profile in ("saas", "small", "mobile"):
+    if profile in ("saas", "small", "mobile", "api"):
         rows.append(("docker", *check_binary("docker")))
     if profile == "mobile":
         rows.append(("xcodebuild", *check_binary("xcodebuild", ("-version",))))

@@ -15,14 +15,14 @@
 # installs the downstream project ruleset as CLAUDE.md, seeds an empty run store,
 # and initializes a git repository with one commit.
 #
-# profile is the default run profile written into CLAUDE.md: brochure, small,
+# profile is the default run profile written into CLAUDE.md: brochure, small, api,
 # saas (the default), or mobile. See the run-profiles table in
 # .claude/references/pdca-harness.md.
 
 set -euo pipefail
 
 usage() {
-  echo "Usage: $(basename "$0") <target-dir> [brochure|small|saas|mobile]" >&2
+  echo "Usage: $(basename "$0") <target-dir> [brochure|small|saas|mobile|api]" >&2
   echo "Create a new Springer-driven project at <target-dir>." >&2
   exit 2
 }
@@ -31,7 +31,7 @@ usage() {
 TARGET="$1"
 PROFILE="${2:-saas}"
 case "$PROFILE" in
-  brochure|small|saas|mobile) ;;
+  brochure|small|saas|mobile|api) ;;
   *) echo "Error: unknown profile '$PROFILE'." >&2; usage ;;
 esac
 
