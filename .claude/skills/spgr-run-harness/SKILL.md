@@ -26,6 +26,8 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 | `autonomy` | Optional on a new run. `supervised`, `standard`, or `autopilot`, recorded in the run brief `flags.autonomy`. Defaults to standard on brochure and small and supervised on saas and mobile. See Autonomy levels in the reference |
 | `profile` | On a new run, one of `brochure`, `small`, `saas`, `mobile`, `api`, from the problem statement's `profile:` line. Scales the phase set, the story and criteria caps, and the PR unit per the run-profiles table in the reference. Recorded in the run brief and read from there on resume. When the line is missing or names something else, answer the four questions in the reference from the statement, open on the profile they give, record a DEF line with the answers, and carry it to the first gate as a default-review decision. Under supervised, ask before opening |
 | `size` | Optional on a new `mobile` run, from a `size:` line. `small` keeps the store lifecycle at the small profile's ceremony. Recorded in the run brief `flags.size` and ignored on other profiles |
+| `lane` | Optional on a new run, from a `lane:` line. `build` (default) runs the profile's lifecycle. `polish` takes one issue in the human's words to one PR with review, the verticals the diff touches, and the product check, and writes no PRD, story, criteria, or ADR artifact. Recorded in `flags.lane`. See Lanes in the reference |
+| `reference` | Optional on a new run, from a `reference:` line: a repo path or URL to a POC, prototype, or earlier version that the run treats as its spec. Recorded in `flags.reference`. See Reference implementation in the reference |
 
 ## Outputs
 
@@ -58,8 +60,8 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    corpus. On a new run only, run `scripts/preflight.py --profile <profile>`
    and record its table in the run brief, write the run brief with the profile
    from the problem statement's `profile:` line (or the one the four
-   questions give, as a recorded default), the `size` line on mobile, and
-   the autonomy level, and
+   questions give, as a recorded default), the `size` line on mobile, the
+   `lane` and `reference` lines, and the autonomy level, and
    pin the advisory learnings set once with `scripts/pin-learnings.py` over the
    available prior run-retrospective artifacts, and record it in
    run-state.learnings_pinned so the run is reproducible. Whenever the run will
@@ -86,7 +88,15 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    routing decision derives from the artifacts and config, never from a learning
    alone. When a unit's story touches UI error or retry paths, cascade or
    foreign-key delete paths, or pagination, the batch carries the pre-build
-   vertical consultations ahead of the build unit, per the reference.
+   vertical consultations ahead of the build unit, per the reference. On
+   `small`, `saas`, and `mobile` the first build batch is the walking
+   skeleton and nothing else enters development until it is deployed with
+   its product check passing. Under `polish` the batch is the implementing
+   unit for one issue, then its review, at most two verticals by the paths
+   touched, and the product check. For any unit that touches UI, a
+   pipeline, or user-visible data, the expected outcome is what a human
+   sees, in one sentence, and the brief names the product check that
+   proves it.
 3. Do. Dispatch each routed unit to its domain agent as a subagent. When the
    batch holds several independent units, dispatch them in one turn so they run in
    parallel, in the foreground and never with `run_in_background`, and do not
@@ -128,8 +138,14 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    re-read claims a script covers. A claim no script can check is recorded as
    unverified. Run each command in a code-review artifact's `cannot_verify`
    list and fold the result into the verdict. Dispatch a vertical audit only when the diff touches that
-   vertical's surface, as read-only subagents in parallel, and wait for all to
-   return. On brochure and small, the Code Reviewer carries the Accessibility
+   vertical's surface, at most two per PR, as read-only subagents in parallel, and wait for all to
+   return. A vertical finding holds the merge only when it is Critical in
+   that vertical's own domain. Every other finding is a follow-up issue.
+   For every unit whose diff touches UI, a pipeline, or user-visible data,
+   run `scripts/product-check.py <run-dir> --touches <changed paths> --cycle
+   <cycle-id>` and record its result in `check.product_check`. Exit 3 means
+   the project has no checks: the unit is unverified, never pass, and does
+   not reach a pr-merge gate until a check exists. On brochure and small, the Code Reviewer carries the Accessibility
    checklist in its pass and Accessibility is dispatched only to re-check a
    fix by execution. A change touching only `runs/`, `docs/`, or the run ledgers gets no
    review and no audit. Compare the actual
@@ -244,6 +260,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 - The artifact contracts (pdca-cycle, run-state, run-retrospective) live in the
   schema registry at `schemas/`. Reference them through spgr-validate-artifact
   rather than restating field lists here.
+- The harness is measured by one figure, product checks passed per hundred
+  dispatches, which the dashboard shows from the `product_check` events.
+  Dispatches, tokens, and artifacts are cost, not progress.
 - The harness session runs on sonnet by default. The main session writes run
   state and the cycle record and dispatches. It does not verify by hand and does
   not author narratives.

@@ -20,12 +20,13 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 - `accessibility_standard` (optional): WCAG target, default WCAG 2.1 AA.
 - `i18n_scope` (optional): MVP locales. If RTL is included, consult the i18n agent.
 - `design_inspiration` (optional): reference products as mood-board input, not templates to copy.
+- `reference` (optional): the run brief's `flags.reference`, a POC or earlier version of this product. Unlike inspiration, its look is a starting point: read its tokens, layout, and components first, and make one of the directions the reference carried forward.
 
 ## Workflow
 
 When invoked:
 1. Read the confirmed PRD, backlog, and ICP with spgr-read-artifact. If the PRD or backlog is not confirmed, halt and escalate. The one exception is the directions unit under `standard` and `autopilot`, which runs alongside the architecture options on the proposed PRD and backlog so the human decides both in one sitting. Work after selection always waits for the confirmed PRD.
-2. Generate three or more directions with spgr-generate-design-directions. Use maximum creative latitude here.
+2. Generate three or more directions with spgr-generate-design-directions. Use maximum creative latitude here. When a reference exists, one direction is the reference carried forward, with its tokens and components named, so the human can choose continuity.
 3. Render the directions for human review. Produce the clickable HTML mockups with spgr-render-design-mockups and one hero comp per direction with spgr-render-design-comps in `direction` mode, both linked from docs/design/index.html, so the human compares structure in the mockups and identity in the comps. Also render the directions write-up with spgr-render-doc to docs/design/directions.md.
 4. Under `supervised`, fire the direction-selection HIL checkpoint with spgr-notify-human, pointing the human at docs/design/index.html to open and compare the layouts in a browser. Under `standard` and `autopilot`, fire no gate and return the directions and the index.html path, and the harness puts them to the human in the direction review. Stop either way. Produce no IA, wireframes, design system, or screen specs until the human selects a direction or documents an approved hybrid.
 5. After selection, execute autonomously. Write the IA with spgr-write-ia. If RTL locales are in scope, consult the i18n agent with spgr-tag-vertical-agent before finalizing the IA, and include mirrored RTL variants in layout specs.
