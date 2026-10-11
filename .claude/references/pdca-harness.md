@@ -8,8 +8,12 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 ## Contents
 - Roles and the single delegation hop
 - Run profiles
+- Lanes
+- Reference implementation
+- Walking skeleton
 - The PDCA tick
 - Mechanical Check
+- Product check
 - Verdict and transition table
 - Rehydration: start equals resume
 - Parallel Do: the barrier and disjoint scheduling
@@ -18,7 +22,7 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 - Main-session budget
 - Fold-in policy
 - Docs rendering policy
-- Pre-build vertical consultation
+- Vertical budget
 - Human gates
 - Autonomy levels
 - Decision classes and the defaults ledger
@@ -27,6 +31,7 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 - Gates hold only dependent work
 - Gate batching and auto-merge
 - Escalations
+- Rule budget and the outcome figure
 - Self-improvement: advisory learnings
 - Linear board projection
 - Determinism scripts
@@ -113,6 +118,70 @@ Rules the profile carries:
   LinkedIn URL, and a tag list, each referenced by the spec and held only in a
   private vault.
 
+## Lanes
+
+A profile scales a build from nothing. A lane says what kind of change the
+run makes. The run brief records it in `flags.lane`, from a `lane:` line in
+the problem statement, default `build`.
+
+| Lane | Fits | Intake | Unit of work | Ceremony |
+|------|------|--------|--------------|----------|
+| build | a product that does not exist yet | the problem statement | the profile's phase set and stories | the profile's |
+| polish | a product that exists and is deployed: a gap a human saw, a port from a reference, a fix, a visible improvement | one issue in the human's own words, from the Linear intake or the statement | one PR per issue, or per batch of file-disjoint issues | code review, the verticals the diff touches under the vertical budget, and the product check |
+
+Under polish there is no PRD, story, criteria, test-plan, or ADR artifact.
+The dispatch brief carries the human's words, the files the implementer
+reads, the check command, and the product check the change must pass. The
+expected outcome in Plan is what the human will see, in one sentence. A
+polish change meets a blocking decision (the gate list in Decision classes)
+exactly as a build change does, and nothing else pauses it. A polish change
+that grows past one PR, or needs a decision on the gate list, is a
+scope-change question to the human, who may open a build run for it.
+
+The reference case: on a saas instance a one-rule CSS fix received eight
+acceptance criteria, and "show the candidate's name" became a compliance
+flag, an architecture checkpoint, and a three-version ADR for a regex rule
+that never ran on a real PDF. Under polish each is one PR checked by a real
+upload.
+
+## Reference implementation
+
+A problem statement may carry a `reference:` line naming a repo path or URL
+to a POC, prototype, or earlier version of the product. The run brief
+records it in `flags.reference`. When a reference exists it is the spec,
+and the rules change in four places.
+- The PM unit's first output is a feature inventory of the reference: every
+  screen, action, field, and behavior a user can reach, read from its code,
+  one line each with the reference's own file paths. The backlog is
+  transcribed from the inventory, not re-derived from the problem. A
+  feature the backlog drops is a logged deferral the human sees at the
+  first gate.
+- Design directions start from the reference's look. The directions unit
+  reads its tokens, layout, and components before proposing, and one of the
+  directions is the reference carried forward. The human may pick another.
+- Parity is in the definition of done. A build is not complete while a line
+  of the inventory is absent from the product and not deferred by the
+  human. The product check covers the reference's primary flows.
+- A guard against copying the reference's name or brand never becomes a
+  guard against copying its product. The reference case carried a trademark
+  guard that the run read as "never propagate the POC", and four months
+  later the product had none of the POC's candidate card, contact links, or
+  resume view.
+
+## Walking skeleton
+
+On small, saas, and mobile the first build batch is a walking skeleton: the
+primary flow end to end, thin at every step, deployed to staging, with its
+product check passing. The orchestrator routes no other story into
+development until it has landed. Every later batch is ordered by the gap
+the product check and the human's use of the skeleton show, not by backlog
+position, and the orchestrator names the observed gap each unit closes.
+
+The reference case built the auth, tenancy, encryption, billing, and audit
+surfaces in full across four months before a recruiter could see a name on
+the leaderboard. The skeleton for that product is sign up, upload, score,
+list, in one PR.
+
 ## The PDCA tick
 
 Each tick runs four phases in order.
@@ -167,6 +236,43 @@ agent controls its precision: a finding names its line, its failing input, and
 the rule it violates, a blocking finding carries evidence the code-review
 schema requires, and a known class of false findings is never raised. Under
 auto-merge the reviewer's verdict is the last gate, so both bounds matter.
+
+## Product check
+
+Validation says an artifact matches its schema. A test suite says the code
+matches its tests. Neither says the product does what the human asked. The
+product check does: `scripts/product-check.py <run-dir> --touches <changed
+paths>` runs the project's own checks from `runs/_product-check.json`, each
+a command that drives the real product on real inputs (the fixtures under
+`tests/fixtures/real/`, the deployed staging host, the human's own sample
+files) and exits 0 when a human would see the promised outcome. It records
+every result under `runs/<run-id>/product-checks/` and as `product_check`
+events, which feed the dashboard's outcome figure.
+
+- Check runs it for every unit whose diff touches UI, a pipeline, or
+  user-visible data. The cycle record carries the result in
+  `check.product_check`. Such a unit with no product check is unverified,
+  never pass, and an unverified unit does not reach a pr-merge gate.
+- The expected outcome in Plan for such a unit is what a human sees, in one
+  sentence, and the check that proves it is named in the dispatch brief. A
+  unit that cannot name its check names the fixture it is missing, and
+  adding the fixture is part of the unit.
+- Real fixtures, not synthetic ones. A fixture written by the agent that
+  wrote the rule tests the rule's idea of the input. The project keeps a
+  small set of real, anonymized inputs under `tests/fixtures/real/`, and
+  the human's own sample files are the first ones in it.
+- On a build run the QA unit writes the first checks with the test plan,
+  one per primary flow, and the implementing unit of a later story adds the
+  check its story needs. On polish the implementing unit adds or extends
+  the check in the same PR.
+- The product check is the definition of done for a user-visible story.
+  Validation, a green suite, and a reviewer APPROVE are the merge bar. The
+  story is done when its product check passes on the deployed result.
+
+The reference case: a name-derivation rule passed its unit tests through
+three ADR amendments and never produced a name on staging, because every
+fixture was a synthetic header and the real PDF path flattened each page
+into one line. Nobody uploaded a real resume until the human did.
 
 ## Verdict and transition table
 
@@ -478,25 +584,33 @@ who wants a current copy of an artifact between gates asks for spgr-render-doc.
 A doc that is stale between gates is expected and says so in its header. The
 reference case spent one session of six regenerating and policing the mirror.
 
-## Pre-build vertical consultation
+## Vertical budget
 
-A story whose scope touches UI error or retry paths, cascade or foreign-key
-delete paths, or pagination runs its vertical consultations before the build
-unit is dispatched, and folds their conditions into the acceptance criteria and
-the developer handoff. The orchestrator routes the consultation units in the
-batch ahead of the build unit through spgr-tag-vertical-agent: Accessibility
-for focus management on error and retry paths, Performance and Multi-tenancy
-for delete and cascade paths, API Design and Performance for pagination. The
-build unit does not dispatch until the handoff carries the folded conditions.
+Verticals are consulted by diff and budgeted by PR. They are advisory by
+default and block only inside their own gate.
+- Routing is by path. The project CLAUDE.md carries a path-to-vertical table
+  (for example the database package and migrations to Multi-tenancy and
+  Performance, the auth module to Auth and Security, the web package to
+  Accessibility). A vertical whose paths the diff does not touch is not
+  dispatched, and there is no scheduled sweep inside a story's cycle.
+- At most two vertical units per PR, chosen by the orchestrator from the
+  paths touched, Security first when a path on its list is touched. A third
+  concern is a follow-up issue on the board, not a unit.
+- A vertical finding blocks merge only when it is Critical in that
+  vertical's own domain: a cross-tenant read, a secret in the diff, a
+  Critical WCAG A failure on a core flow, a query that cannot complete.
+  Every other finding is a follow-up issue naming the vertical, and the PR
+  merges.
+- Pre-build consultation stays for the three classes where a late finding
+  cost a retry in the test-bed run: UI error and retry paths
+  (Accessibility), cascade or foreign-key delete paths (Performance,
+  Multi-tenancy), and pagination (API Design, Performance). The orchestrator
+  routes those consultations in the batch ahead of the build unit and the
+  handoff carries the folded conditions. They count toward the two.
 
-The evidence behind the rule: in a test-bed run, seven build ticks gated at
-their first Check on late Critical or High findings in exactly these classes
-(WCAG 2.4.3 focus loss on error paths, unindexed foreign-key and cascade joins,
-unbounded embeds and keyset-pagination correctness), each burning a bounded
-retry after the code was written. The one story that ran its consultations
-pre-build and folded the conditions into its acceptance criteria came back
-APPROVE and PASS with zero retries on those classes. The rule was promoted from
-a run retrospective through a human gate, per the self-improvement rules below.
+The reference case: in a saas run the six vertical agents took 247 of 585
+dispatches and the frontend developer 24, and the product surface was the
+thinnest part of the result.
 
 ## Human gates
 
@@ -558,6 +672,17 @@ Deferrable: every other decision that is reversible within the profile and the
 approved architecture, for example copy wording, a heading or section owner,
 file layout, test-tier placement, a tooling choice inside the hard rules, and
 a content fact the human has not supplied.
+
+An architecture decision is blocking only when it is on the gate list: the
+data model and the tenancy boundary, the auth model, billing, a vendor or
+sub-processor, and anything irreversible. Every other ADR clause is
+amendable by the implementing unit: a derivation rule, a prompt, a layout, a
+library inside the approved stack, an extraction path. The unit records the
+amendment as one decision-log line on the ADR carrying the PR number and the
+reason, the PR description repeats it, and the reviewer checks that the line
+exists. No versioned ADR, no escalation, no gate. In the reference case a
+name-derivation regex went through ADR amendments v1.1, v1.2, and v1.3, each
+a human sitting, each a rule a PR note could have carried.
 
 Under standard and autopilot a unit meets a deferrable decision by taking the
 recommended option, recording it, and continuing. It never raises an
@@ -723,6 +848,22 @@ An escalation is raised only for a blocking decision, for missing or
 contradictory input that no default can cover, or for a conflict with approved
 architecture.
 
+## Rule budget and the outcome figure
+
+This reference is capped at its length when the budget opened, 1000 lines,
+and the project CLAUDE.md template at 60. A change that adds a rule removes
+or merges one of equal weight in the same change and names it in the
+commit. A retrospective learning may propose a removal, and the
+run-retrospective lists the rules no cycle in the run exercised. Every rule
+here was added after a run that hurt, and the runs since hurt in new ways,
+because process answered process.
+
+The harness is measured by one figure: product checks passed per hundred
+agent dispatches, on the dashboard beside the token and cost lines. A change
+to the harness that does not move it is not an improvement. The reference
+instance recorded 767 dispatches, 125 cycles, and 785 run-store files before
+a recruiter could read a candidate's name.
+
 ## Self-improvement: advisory learnings
 
 At run end the harness writes a run-retrospective artifact. Future runs may
@@ -806,6 +947,10 @@ These scripts keep the deterministic work out of the model.
 - `scripts/review-package.py <base> <head> --out <file>` writes the commit
   list, stat, and diff a reviewer reads, and refuses a range whose head does
   not descend from its base. The diff never enters the main session.
+- `scripts/product-check.py <run-dir> --touches <paths>` runs the project's
+  product checks from `runs/_product-check.json` against the real product
+  and records each result as a `product_check` event. Exit 3 means the
+  project has no checks and the unit is unverified.
 - `scripts/preflight.py [--profile <profile>]` checks once at run open that
   the interpreter, the venv, git identity, gh auth, node, npx, and a headless
   Chromium-family browser actually work, and prints the table the harness
@@ -841,4 +986,8 @@ un-joined dispatch barrier, and batch-level pr-merge with opt-in auto-merge
 were added after the brochure reference run. Autonomy levels, the defaults
 ledger, the intake question sweep, the direction-review gate, and gates that
 hold only dependent work followed from the same run's timing: about 55 idle
-hours of 70 and nine gates for one page.
+hours of 70 and nine gates for one page. Lanes, the reference
+implementation, the walking skeleton, the product check, the vertical
+budget, amendable ADR clauses, and the rule budget followed the saas
+reference instance: 767 dispatches and four months before the product
+showed a candidate's name, while a five-week hand-built POC did.

@@ -230,6 +230,8 @@ def aggregate_project(project_root):
         "by_run": {},
         "usd": 0.0,
         "usd_estimated": False,
+        "outcomes_passed": 0,
+        "outcomes_total": 0,
     }
     pattern = os.path.join(project_root, "runs", "*", "events.jsonl")
     for path in sorted(glob.glob(pattern)):
@@ -240,6 +242,13 @@ def aggregate_project(project_root):
             kind = ev.get("event")
             if kind == "agent_dispatched":
                 stats["dispatches"] += 1
+            elif kind == "product_check":
+                # The outcome figure: a product check is the product doing
+                # what the human asked, on real inputs, not an artifact
+                # validating. See Product check in the harness reference.
+                stats["outcomes_total"] += 1
+                if ev.get("result") == "pass":
+                    stats["outcomes_passed"] += 1
             elif kind in ("agent_completed", "agent_joined", "agent_abandoned"):
                 stats["completions"] += 1
                 metrics = ev.get("metrics") or {}
@@ -257,6 +266,20 @@ def aggregate_project(project_root):
                     stats["usd"] += usd
                     stats["usd_estimated"] = stats["usd_estimated"] or est
     return stats
+
+
+def outcome_line(stats):
+    """The one figure the harness is measured by: product checks passed per
+    hundred dispatches. Dispatches, tokens, and artifacts are cost. A passed
+    product check is the product doing what the human asked."""
+    passed, total, dispatches = stats["outcomes_passed"], stats["outcomes_total"], stats["dispatches"]
+    if not total:
+        return f"  outcomes {BOLD}none recorded{RESET}   {DIM}no product check has run, see product-check.py{RESET}"
+    per_hundred = (passed * 100.0 / dispatches) if dispatches else float(passed)
+    return (
+        f"  outcomes {BOLD}{passed}/{total}{RESET} product checks passed"
+        f"   {BOLD}{per_hundred:.1f}{RESET} per 100 dispatches"
+    )
 
 
 def pair_events(events):
@@ -539,6 +562,7 @@ def render(run_dir, project_root, width):
             mark = "~" if stats["usd_estimated"] else ""
             summary += f"   subagent cost {BOLD}{mark}{fmt_usd(stats['usd'])}{RESET}"
         lines.append(clip(summary, width))
+        lines.append(clip(outcome_line(stats), width))
         split = [
             f"{label} {fmt_tokens(stats['tokens'][key])}"
             for key, label in (

@@ -48,6 +48,17 @@
               "enum": ["at-gates", "on-demand"],
               "default": "at-gates",
               "description": "When docs/ is rendered. Never on every artifact edit."
+            },
+            "lane": {
+              "type": "string",
+              "enum": ["build", "polish"],
+              "default": "build",
+              "description": "build is the lifecycle the profile routes. polish is the lane for an existing product: one issue in the human's words becomes one PR, with code review, the verticals the diff touches, and the product check, and no PRD, story, criteria, or ADR artifact unless the change is on the gate list. See Lanes in .claude/references/pdca-harness.md."
+            },
+            "reference": {
+              "type": ["string", "null"],
+              "default": null,
+              "description": "A reference implementation the run treats as its spec: a repo path or URL to a POC or prototype. The PM inventories its features, the backlog is transcribed from the inventory, design starts from its look, and parity with it is in the definition of done. See Reference implementation in .claude/references/pdca-harness.md."
             }
           },
           "additionalProperties": false
