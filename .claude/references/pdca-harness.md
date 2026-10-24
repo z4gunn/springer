@@ -122,7 +122,11 @@ Rules the profile carries:
 
 A profile scales a build from nothing. A lane says what kind of change the
 run makes. The run brief records it in `flags.lane`, from a `lane:` line in
-the problem statement, default `build`.
+the problem statement. With no line, one question decides: does the product
+already run where a user can reach it? Yes opens `polish`, no opens `build`.
+The project CLAUDE.md names the default an unclear answer falls back to,
+`build` for a new instance and `polish` for an adopted repository, and the
+choice is a defaults-ledger line like an inferred profile.
 
 | Lane | Fits | Intake | Unit of work | Ceremony |
 |------|------|--------|--------------|----------|
@@ -176,6 +180,14 @@ product check passing. The orchestrator routes no other story into
 development until it has landed. Every later batch is ordered by the gap
 the product check and the human's use of the skeleton show, not by backlog
 position, and the orchestrator names the observed gap each unit closes.
+
+Once the skeleton has landed, the product exists, and every later story
+runs at polish ceremony: one implementing unit that writes the failing test
+and the product check itself, then review, the verticals the diff touches,
+and the product check. The QA acceptance-test unit and the pre-build
+consultations run only for a story that touches a gate-list surface (the
+data model or tenancy boundary, auth, billing, a vendor, anything
+irreversible), which keeps the profile's ceremony.
 
 The reference case built the auth, tenancy, encryption, billing, and audit
 surfaces in full across four months before a recruiter could see a name on
@@ -645,9 +657,10 @@ always rules on a security or compliance flag.
 | scope-change | blocks | blocks beyond the profile cap or on a profile change, a default within the cap | same as standard |
 | deferrable decisions | each ruled in-cycle by the specialist, a human-constraint change escalates | defaults ledger, reviewed at the next gate that fires | defaults ledger, reviewed in the completion notice |
 
-Defaults: standard on brochure and small, supervised on saas and mobile.
-autopilot is allowed on brochure and small only, and a brief that names it
-elsewhere runs at standard. Changing the level mid-run is a human instruction
+Default: standard on every profile, because the blocking classes below
+hold at every level and supervised only multiplies the sittings. supervised
+is opt-in. autopilot is allowed on brochure and small only, and a brief that
+names it elsewhere runs at standard. Changing the level mid-run is a human instruction
 recorded as a pinned ruling, not a gate.
 
 Under standard and autopilot, the architecture downstream set is confirmed
@@ -968,26 +981,11 @@ superseded artifact cannot resurrect a gate or a block.
 
 ## Increment status
 
-The current build runs the sequential spine with the full Check: single-unit Plan
-to Do to Check (validate plus the read-only audit fan-out and the expected-versus
--actual comparison) to Act, with the fix-and-retry branch on a fail verdict,
-terminate at a gate, rehydrate on entry. WIP-bounded parallel Do is live: the
-orchestrator returns a ready-batch and the harness dispatches independent
-file-disjoint units in one turn behind the fork-join barrier. The
-self-improvement loop is live: learnings are pinned by hash at run start, cited
-as advisory proposed rationale in Plan, and written to a retrospective at
-completion, with rule changes gated on human promotion. The run-state wip_board
-is maintained by the harness after each barrier, and rebuild-projection carries
-it forward when replaying the log. The token-economy rules, the dispatch tiers,
-the per-story brief, and the pre-build consultation rule are live. The Linear
-board projection is opt-in per project. Run profiles, the run brief, the
-mechanical Check, the fold-in and docs policies, the review bound, the
-un-joined dispatch barrier, and batch-level pr-merge with opt-in auto-merge
-were added after the brochure reference run. Autonomy levels, the defaults
-ledger, the intake question sweep, the direction-review gate, and gates that
-hold only dependent work followed from the same run's timing: about 55 idle
-hours of 70 and nine gates for one page. Lanes, the reference
-implementation, the walking skeleton, the product check, the vertical
-budget, amendable ADR clauses, and the rule budget followed the saas
-reference instance: 767 dispatches and four months before the product
-showed a candidate's name, while a five-week hand-built POC did.
+Everything in this reference is live. Parallel Do, the learnings loop, and
+the Linear projection came first. Profiles, the mechanical Check, the review
+bound, autonomy levels, the defaults ledger, and the direction review came
+from the brochure reference run (nine gates and about 55 idle hours of 70
+for one page). Lanes, the reference implementation, the walking skeleton,
+the product check, the vertical budget, and the rule budget came from the
+saas reference instance (767 dispatches and four months before the product
+showed a candidate's name that a five-week hand-built POC already showed).

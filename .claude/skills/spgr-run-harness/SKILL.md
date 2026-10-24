@@ -23,10 +23,10 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 | `run_id` | The run to drive. A new run-id creates the store, an existing one resumes it |
 | `problem_statement` | Required only when creating a new run, the seed the first phase consumes |
 | `mode` | `run` drives until a gate or completion, `tick` runs one cycle and returns |
-| `autonomy` | Optional on a new run. `supervised`, `standard`, or `autopilot`, recorded in the run brief `flags.autonomy`. Defaults to standard on brochure and small and supervised on saas and mobile. See Autonomy levels in the reference |
+| `autonomy` | Optional on a new run. `supervised`, `standard`, or `autopilot`, recorded in the run brief `flags.autonomy`. Defaults to standard on every profile. supervised is opt-in. See Autonomy levels in the reference |
 | `profile` | On a new run, one of `brochure`, `small`, `saas`, `mobile`, `api`, from the problem statement's `profile:` line. Scales the phase set, the story and criteria caps, and the PR unit per the run-profiles table in the reference. Recorded in the run brief and read from there on resume. When the line is missing or names something else, answer the four questions in the reference from the statement, open on the profile they give, record a DEF line with the answers, and carry it to the first gate as a default-review decision. Under supervised, ask before opening |
 | `size` | Optional on a new `mobile` run, from a `size:` line. `small` keeps the store lifecycle at the small profile's ceremony. Recorded in the run brief `flags.size` and ignored on other profiles |
-| `lane` | Optional on a new run, from a `lane:` line. `build` (default) runs the profile's lifecycle. `polish` takes one issue in the human's words to one PR with review, the verticals the diff touches, and the product check, and writes no PRD, story, criteria, or ADR artifact. Recorded in `flags.lane`. See Lanes in the reference |
+| `lane` | Optional on a new run, from a `lane:` line. With no line, open `polish` when the product already runs where a user can reach it and `build` otherwise, falling back to the project CLAUDE.md default, and record a DEF line. `build` runs the profile's lifecycle. `polish` takes one issue in the human's words to one PR with review, the verticals the diff touches, and the product check, and writes no PRD, story, criteria, or ADR artifact. Recorded in `flags.lane`. See Lanes in the reference |
 | `reference` | Optional on a new run, from a `reference:` line: a repo path or URL to a POC, prototype, or earlier version that the run treats as its spec. Recorded in `flags.reference`. See Reference implementation in the reference |
 
 ## Outputs
@@ -91,7 +91,9 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    vertical consultations ahead of the build unit, per the reference. On
    `small`, `saas`, and `mobile` the first build batch is the walking
    skeleton and nothing else enters development until it is deployed with
-   its product check passing. Under `polish` the batch is the implementing
+   its product check passing. After it lands, a story runs at polish
+   ceremony unless it touches a gate-list surface, per Walking skeleton in
+   the reference. Under `polish` the batch is the implementing
    unit for one issue, then its review, at most two verticals by the paths
    touched, and the product check. For any unit that touches UI, a
    pipeline, or user-visible data, the expected outcome is what a human

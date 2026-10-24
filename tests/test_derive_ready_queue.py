@@ -147,8 +147,11 @@ class DeriveReadyQueueTest(unittest.TestCase):
 
     def test_autonomy_defaults_by_profile(self):
         self.assertEqual(self.snapshot()["autonomy"], "standard")
-        saas = RunStore(self.tmp.name, run_id="saas", profile="saas")
-        self.assertEqual(drq.derive(saas.run_dir)["autonomy"], "supervised")
+        for profile in ("saas", "mobile", "api"):
+            store = RunStore(self.tmp.name, run_id=profile, profile=profile)
+            self.assertEqual(drq.derive(store.run_dir)["autonomy"], "standard")
+        opted = RunStore(self.tmp.name, run_id="opted", profile="saas", autonomy="supervised")
+        self.assertEqual(drq.derive(opted.run_dir)["autonomy"], "supervised")
 
     def test_autopilot_falls_back_to_standard_outside_brochure_and_small(self):
         store = RunStore(self.tmp.name, run_id="big", profile="saas", autonomy="autopilot")

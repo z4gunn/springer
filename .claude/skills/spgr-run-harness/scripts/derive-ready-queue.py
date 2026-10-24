@@ -77,7 +77,7 @@ def load_run_brief(run_dir):
 
 # The autonomy level a profile runs at when the run brief does not name one.
 DEFAULT_AUTONOMY = {"brochure": "standard", "small": "standard", "api": "standard",
-                    "saas": "supervised", "mobile": "supervised"}
+                    "saas": "standard", "mobile": "standard"}
 
 
 def resolve_autonomy(brief):

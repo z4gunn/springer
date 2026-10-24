@@ -31,7 +31,7 @@
             "autonomy": {
               "type": "string",
               "enum": ["supervised", "standard", "autopilot"],
-              "description": "Which gates pause the run and which decisions are taken by default and reviewed in a batch. Defaults to standard on brochure and small and supervised on saas and mobile. autopilot is allowed on brochure and small only. See Autonomy levels in .claude/references/pdca-harness.md."
+              "description": "Which gates pause the run and which decisions are taken by default and reviewed in a batch. Defaults to standard on every profile, supervised is opt-in. autopilot is allowed on brochure and small only. See Autonomy levels in .claude/references/pdca-harness.md."
             },
             "size": {
           "type": "string",
