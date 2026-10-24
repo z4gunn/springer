@@ -1,6 +1,7 @@
 ---
 name: spgr-write-resilience-spec
 description: Produce a resilience-spec artifact defining the resilience patterns each service must implement per dependency call (timeouts, retries, circuit breakers, fallbacks) plus the chaos fault-injection plan that verifies them. Use when the Resilience Agent must design graceful degradation before failure occurs or a new external dependency ships.
+disable-model-invocation: true
 ---
 
 # write-resilience-spec

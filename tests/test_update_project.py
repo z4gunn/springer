@@ -19,7 +19,7 @@ up = load_script(REPO / "scripts" / "update-project.py")
 
 CLAUDE_TEMPLATE = """# Project rules
 
-Default profile for this project: `saas`.
+Default profile for this project: `saas`. Default lane for this project: `build`.
 
 Build the app.
 """
@@ -227,6 +227,124 @@ class UpdateProjectTest(unittest.TestCase):
         self.assertEqual(run_main("bogus", str(self.target))[0], 2)
         self.assertEqual(run_main("manifest", str(self.target))[0], 2)
         self.assertEqual(run_main("manifest", str(self.target), "--profile", "enterprise")[0], 2)
+
+
+ADOPT_SETTINGS = {
+    "permissions": {"allow": ["Bash(git status:*)", "Bash(python3 schemas/validate.py:*)"],
+                    "deny": ["Bash(git push --force:*)"]},
+    "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [
+        {"type": "command", "command": "python3 .claude/hooks/h.py"}]}]},
+}
+
+
+class AdoptTest(unittest.TestCase):
+    """adopt installs the runtime into a repository new-project.sh never made,
+    keeping everything the repository already has."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.source = Path(self.tmp.name) / "springer"
+        self.target = Path(self.tmp.name) / "existing"
+        self.source.mkdir()
+        make_source(self.source)
+        (self.source / "templates" / "project-settings.json").write_text(json.dumps(ADOPT_SETTINGS))
+        self.target.mkdir()
+        (self.target / "src").mkdir()
+        (self.target / "src" / "app.ts").write_text("export {};\n")
+        (self.target / "CLAUDE.md").write_text("# Our app\n\nUse pnpm.\n")
+        (self.target / ".claude").mkdir()
+        (self.target / ".claude" / "settings.json").write_text(json.dumps({
+            "permissions": {"allow": ["Bash(pnpm test:*)", "Bash(git status:*)"]},
+            "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [
+                {"type": "command", "command": "python3 .claude/hooks/h.py"}]}]}}))
+        (self.target / ".gitignore").write_text("node_modules/\n.env\n")
+        self.saved_source = up.SOURCE
+        up.SOURCE = self.source
+
+    def tearDown(self):
+        up.SOURCE = self.saved_source
+        self.tmp.cleanup()
+
+    def manifest(self):
+        return json.loads((self.target / up.MANIFEST_REL).read_text())
+
+    def test_adopt_keeps_the_repository_and_imports_the_rules(self):
+        code, out, err = run_main("adopt", str(self.target), "--profile", "small")
+        self.assertEqual(code, 0, err)
+        claude = (self.target / "CLAUDE.md").read_text()
+        self.assertTrue(claude.startswith("# Our app\n\nUse pnpm.\n"))
+        self.assertIn(up.IMPORT_LINE, claude.splitlines())
+        rules = (self.target / up.ADOPTED_RULES_REL).read_text()
+        self.assertIn("Default profile for this project: `small`.", rules)
+        self.assertIn("Default lane for this project: `polish`.", rules)
+        self.assertEqual((self.target / "src" / "app.ts").read_text(), "export {};\n")
+        self.assertTrue((self.target / ".claude" / "skills" / "spgr-one" / "SKILL.md").exists())
+        self.assertTrue((self.target / "runs" / ".gitkeep").exists())
+        m = self.manifest()
+        self.assertEqual((m["lane"], m["claude_md"], m["profile"]), ("polish", up.ADOPTED_RULES_REL, "small"))
+        self.assertNotIn("CLAUDE.md", m["templates"])
+
+    def test_settings_and_gitignore_gain_only_what_they_lack(self):
+        run_main("adopt", str(self.target), "--profile", "small")
+        settings = json.loads((self.target / ".claude" / "settings.json").read_text())
+        self.assertEqual(settings["permissions"]["allow"],
+                         ["Bash(pnpm test:*)", "Bash(git status:*)", "Bash(python3 schemas/validate.py:*)"])
+        self.assertEqual(settings["permissions"]["deny"], ["Bash(git push --force:*)"])
+        self.assertEqual(len(settings["hooks"]["PreToolUse"]), 1)
+        gitignore = (self.target / ".gitignore").read_text()
+        self.assertTrue(gitignore.startswith("node_modules/\n.env\n"))
+        self.assertIn(".venv/", gitignore)
+        self.assertEqual(gitignore.count(".env\n"), 1)
+        self.assertNotIn("/runs/", gitignore)
+
+    def test_a_fresh_adoption_needs_no_update(self):
+        run_main("adopt", str(self.target), "--profile", "small")
+        code, out, _ = run_main("status", str(self.target))
+        self.assertEqual(code, 0)
+        self.assertIn("6 runtime files and 3 template renders already match", out)
+
+    def test_template_change_after_adoption(self):
+        run_main("adopt", str(self.target), "--profile", "small")
+        (self.source / "templates" / "project-CLAUDE.md").write_text(CLAUDE_TEMPLATE + "New rule.\n")
+        settings = dict(ADOPT_SETTINGS, permissions=dict(ADOPT_SETTINGS["permissions"], allow=["Bash(ls:*)"]))
+        (self.source / "templates" / "project-settings.json").write_text(json.dumps(settings))
+        code, out, _ = run_main("update", str(self.target))
+        self.assertEqual(code, 0)
+        self.assertIn("New rule.", (self.target / up.ADOPTED_RULES_REL).read_text())
+        self.assertNotIn("New rule.", (self.target / "CLAUDE.md").read_text())
+        self.assertIn("Bash(pnpm test:*)", (self.target / ".claude" / "settings.json").read_text())
+        self.assertTrue((self.target / up.UPDATE_DIR_REL / ".claude" / "settings.json").exists())
+
+    def test_conflicting_runtime_path_refuses_unless_forced(self):
+        skill = self.target / ".claude" / "skills" / "spgr-one" / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text("our own skill\n")
+        code, _, err = run_main("adopt", str(self.target), "--profile", "small")
+        self.assertEqual(code, 1)
+        self.assertIn(".claude/skills/spgr-one/SKILL.md", err)
+        self.assertFalse((self.target / up.MANIFEST_REL).exists())
+        self.assertFalse((self.target / ".claude" / "agents").exists())
+        code, out, _ = run_main("adopt", str(self.target), "--profile", "small", "--force")
+        self.assertEqual(code, 0)
+        self.assertEqual(skill.read_text(), "one v1\n")
+
+    def test_repository_without_claude_md_gets_the_rules_as_its_claude_md(self):
+        (self.target / "CLAUDE.md").unlink()
+        run_main("adopt", str(self.target), "--profile", "api")
+        self.assertIn("Default lane for this project: `polish`.", (self.target / "CLAUDE.md").read_text())
+        self.assertFalse((self.target / up.ADOPTED_RULES_REL).exists())
+        self.assertEqual(self.manifest()["claude_md"], "CLAUDE.md")
+
+    def test_refusals(self):
+        run_main("adopt", str(self.target), "--profile", "small")
+        code, _, err = run_main("adopt", str(self.target), "--profile", "small")
+        self.assertEqual(code, 1)
+        self.assertIn("Use update instead", err)
+        self.assertEqual(run_main("adopt", str(self.target))[0], 2)
+        other = Path(self.tmp.name) / "broken"
+        (other / ".claude").mkdir(parents=True)
+        (other / ".claude" / "settings.json").write_text("{not json")
+        self.assertEqual(run_main("adopt", str(other), "--profile", "small")[0], 1)
 
 
 class NewProjectIntegrationTest(unittest.TestCase):

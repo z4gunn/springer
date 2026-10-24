@@ -1,6 +1,7 @@
 ---
 name: spgr-search-web
 description: Produce a web-search findings artifact with a prose summary, a deduplicated source list, verbatim key quotes, and a gaps list, every claim carrying a source URL. Use when the Discovery, PM, Architect, Security, Compliance, or a developer agent needs current external intelligence that training data cannot ground and downstream artifacts will cite.
+disable-model-invocation: true
 ---
 
 # search-web

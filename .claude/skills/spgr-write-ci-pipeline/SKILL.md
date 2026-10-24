@@ -1,6 +1,7 @@
 ---
 name: spgr-write-ci-pipeline
 description: Produce the CI pipeline configuration that builds, lints, tests, and scans on every push, with a fast run under 3 minutes and a full run under 10 minutes per the XP ten-minute build rule. Use when the DevOps Agent must stand up or change the automated quality gate from a confirmed tech stack and test-suite structure.
+disable-model-invocation: true
 ---
 
 # write-ci-pipeline

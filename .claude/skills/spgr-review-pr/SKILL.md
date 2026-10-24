@@ -1,6 +1,7 @@
 ---
 name: spgr-review-pr
 description: Review a pull request for correctness, architecture compliance, XP discipline, and test coverage, producing a code-review envelope with severity-categorized findings and an APPROVE, REQUEST_CHANGES, or COMMENT verdict. Use when the Code Reviewer agent picks up a ready PR, or when a change needs a structured review gate before merging to main.
+disable-model-invocation: true
 ---
 
 # review-pr

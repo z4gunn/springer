@@ -1,6 +1,7 @@
 ---
 name: spgr-mine-app-store-reviews
 description: Produce an app-store-review analysis artifact from App Store and Google Play reviews of competitor or category apps, surfacing complaint and praise themes, feature-gap signals, and sentiment trend. Use when the Discovery agent mines competitor reviews for the pain-point taxonomy, or when the PM agent needs review-grounded competitor evidence.
+disable-model-invocation: true
 ---
 
 # mine-app-store-reviews

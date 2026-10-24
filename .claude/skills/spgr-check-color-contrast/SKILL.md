@@ -1,6 +1,7 @@
 ---
 name: spgr-check-color-contrast
 description: Produce a color-contrast report that measures every text and UI-component color pair against WCAG thresholds, recommending corrected values that reach AA, with a PASS or GATE verdict that blocks a token lock or release on any AA failure. Use when the Accessibility Agent must confirm a design token set or component palette before tokens are locked.
+disable-model-invocation: true
 ---
 
 # check-color-contrast

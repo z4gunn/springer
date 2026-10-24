@@ -12,6 +12,7 @@ Stdlib only.
 
 Usage:
     python3 scripts/update-project.py manifest <target> --profile <profile>
+    python3 scripts/update-project.py adopt <target> --profile <profile> [--force]
     python3 scripts/update-project.py update <target> [--dry-run] [--force]
     python3 scripts/update-project.py status <target>
 
@@ -27,6 +28,15 @@ update    brings the target up to this checkout. Per runtime file: added when
           hand merge. Refuses to touch a target with a live run lock unless
           --force, because a harness may be mid-tick.
 status    prints what update would do, same as update --dry-run.
+adopt     installs the runtime into an existing repository that was not made
+          by new-project.sh. Never deletes or replaces a file the repository
+          already has: a runtime path that already holds different content
+          is a conflict that refuses the adoption unless --force. An existing
+          CLAUDE.md is kept and gains one import line for the Springer rules,
+          rendered to .claude/springer-rules.md. An existing settings.json
+          gains the runtime's permissions and hooks it lacks, and an existing
+          .gitignore gains the lines it lacks. The default lane is `polish`,
+          because an adopted repository holds a product that already exists.
 
 Exit 0 on success, 1 on a refusal or error, 2 on usage.
 """
@@ -43,6 +53,9 @@ RUNTIME_DIRS = (".claude/skills", ".claude/agents", ".claude/references", ".clau
 MANIFEST_REL = ".claude/springer-manifest.json"
 UPDATE_DIR_REL = ".claude/springer-update"
 PROFILES = ("brochure", "small", "saas", "mobile", "api")
+LANES = ("build", "polish")
+ADOPTED_RULES_REL = ".claude/springer-rules.md"
+IMPORT_LINE = "@" + ADOPTED_RULES_REL
 STALE_LOCK_SECONDS = 30 * 60
 SKIP_NAMES = {"__pycache__", ".DS_Store"}
 SKIP_SUFFIXES = {".pyc"}
@@ -76,12 +89,15 @@ def runtime_files(root):
     return out
 
 
-def render_claude_md(source, profile):
-    """The same substitution new-project.sh applies with sed. The sentence sits
-    mid-paragraph in the template, so the match is not anchored."""
+def render_claude_md(source, profile, lane="build"):
+    """The same substitution new-project.sh applies with sed, plus the default
+    lane an adopted repository takes. Both sentences sit mid-paragraph in the
+    template, so the matches are not anchored."""
     text = (source / "templates" / "project-CLAUDE.md").read_text()
-    return text.replace("Default profile for this project: `saas`.",
+    text = text.replace("Default profile for this project: `saas`.",
                         f"Default profile for this project: `{profile}`.")
+    return text.replace("Default lane for this project: `build`.",
+                        f"Default lane for this project: `{lane}`.")
 
 
 def render_gitignore(source):
@@ -95,9 +111,12 @@ def render_settings(source):
     return (source / "templates" / "project-settings.json").read_text()
 
 
-def template_renders(source, profile):
+def template_renders(source, profile, lane="build", claude_md="CLAUDE.md"):
+    """Each template-rendered file keyed by where it lives in the instance. An
+    adopted repository keeps its own CLAUDE.md, so the ruleset renders to the
+    path the manifest records instead."""
     return {
-        "CLAUDE.md": ("templates/project-CLAUDE.md", render_claude_md(source, profile)),
+        claude_md: ("templates/project-CLAUDE.md", render_claude_md(source, profile, lane)),
         ".claude/settings.json": ("templates/project-settings.json", render_settings(source)),
         ".gitignore": (".gitignore", render_gitignore(source)),
     }
@@ -115,12 +134,21 @@ def utc_now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def build_manifest(target, source, profile, previous=None):
+def renders_for(source, manifest):
+    return template_renders(source, manifest.get("profile") or "saas",
+                            manifest.get("lane") or "build",
+                            manifest.get("claude_md") or "CLAUDE.md")
+
+
+def build_manifest(target, source, profile, previous=None, lane=None, claude_md=None, merged=()):
+    previous = previous or {}
     manifest = {
         "springer_manifest": 1,
         "source_commit": source_commit(source),
         "profile": profile,
-        "created_at": (previous or {}).get("created_at") or utc_now(),
+        "lane": lane or previous.get("lane") or "build",
+        "claude_md": claude_md or previous.get("claude_md") or "CLAUDE.md",
+        "created_at": previous.get("created_at") or utc_now(),
         "updated_at": utc_now(),
         "runtime": {rel: sha256(path) for rel, path in runtime_files(target).items()},
         "templates": {},
@@ -130,11 +158,14 @@ def build_manifest(target, source, profile, previous=None):
     # file as owned would let a later update replace an instance's own
     # gitignore or settings additions. A file that differs from the render at
     # adoption is therefore treated as edited until an update rewrites it.
-    for rel, (from_rel, rendered) in template_renders(source, profile).items():
+    merged = set(merged) | {rel for rel, rec in previous.get("templates", {}).items() if rec.get("merged")}
+    for rel, (from_rel, rendered) in renders_for(source, manifest).items():
         manifest["templates"][rel] = {
             "from": from_rel,
             "rendered_hash": sha256_text(rendered),
         }
+        if rel in merged:
+            manifest["templates"][rel]["merged"] = True
     return manifest
 
 
@@ -199,13 +230,16 @@ def plan_update(target, source, manifest):
         else:
             plan["keep_instance_only"].append(rel)
 
-    profile = manifest.get("profile") or "saas"
-    for rel, (_, rendered) in template_renders(source, profile).items():
+    for rel, (_, rendered) in renders_for(source, manifest).items():
         path = target / rel
         record = manifest.get("templates", {}).get(rel) or {}
         new_hash = sha256_text(rendered)
         current = sha256(path) if path.exists() else None
         if current == new_hash:
+            plan["template_unchanged"].append(rel)
+        elif record.get("merged") and new_hash == record.get("rendered_hash"):
+            # Adoption merged the template into the repository's own file.
+            # Until the template itself moves there is nothing new to merge.
             plan["template_unchanged"].append(rel)
         elif current is None or current == record.get("rendered_hash"):
             plan["template_replace"].append(rel)
@@ -223,8 +257,7 @@ def apply_update(target, source, manifest, plan, force):
         dest.chmod(src_files[rel].stat().st_mode & 0o777)
     for rel in plan["remove"] + (plan["keep_modified_removed"] if force else []):
         (target / rel).unlink()
-    profile = manifest.get("profile") or "saas"
-    renders = template_renders(source, profile)
+    renders = renders_for(source, manifest)
     for rel in plan["template_replace"] + (plan["template_merge"] if force else []):
         (target / rel).write_text(renders[rel][1])
     if not force:
@@ -282,7 +315,7 @@ def cmd_manifest(target, profile):
         for rel in differing:
             print(f"  {rel}")
     edited_templates = sorted(
-        rel for rel, (_, rendered) in template_renders(SOURCE, profile).items()
+        rel for rel, (_, rendered) in renders_for(SOURCE, manifest).items()
         if (target / rel).exists() and sha256(target / rel) != sha256_text(rendered))
     if edited_templates:
         print(f"{len(edited_templates)} template-rendered file(s) differ from the render and are "
@@ -290,6 +323,110 @@ def cmd_manifest(target, profile):
               f"{UPDATE_DIR_REL}/ for a hand merge:")
         for rel in edited_templates:
             print(f"  {rel}")
+    return 0
+
+
+def merge_settings(existing, template):
+    """The repository's settings with the runtime's permission rules and hook
+    entries added where absent. Nothing the repository has is removed or
+    reordered, so its own allowlist and hooks keep working."""
+    merged = json.loads(json.dumps(existing))
+    perms = merged.setdefault("permissions", {})
+    for key, rules in template.get("permissions", {}).items():
+        have = perms.setdefault(key, [])
+        have.extend(r for r in rules if r not in have)
+    hooks = merged.setdefault("hooks", {})
+    for event, entries in template.get("hooks", {}).items():
+        have = hooks.setdefault(event, [])
+        commands = {h.get("command") for e in have for h in e.get("hooks", [])}
+        for entry in entries:
+            if not all(h.get("command") in commands for h in entry.get("hooks", [])):
+                have.append(entry)
+    return merged
+
+
+def cmd_adopt(target, profile, force):
+    if profile not in PROFILES:
+        sys.stderr.write(f"profile must be one of {', '.join(PROFILES)}\n")
+        return 2
+    if load_manifest(target) is not None:
+        sys.stderr.write(f"{target} already has {MANIFEST_REL}. Use update instead.\n")
+        return 1
+    src_files = runtime_files(SOURCE)
+    tgt_files = runtime_files(target)
+    conflicts = sorted(rel for rel, path in src_files.items()
+                       if rel in tgt_files and sha256(tgt_files[rel]) != sha256(path))
+    settings_path = target / ".claude" / "settings.json"
+    existing_settings = None
+    if settings_path.exists():
+        try:
+            existing_settings = json.loads(settings_path.read_text())
+        except json.JSONDecodeError as exc:
+            sys.stderr.write(f"refusing: {settings_path} is not valid JSON ({exc}). Fix it and rerun.\n")
+            return 1
+    if conflicts and not force:
+        sys.stderr.write(f"refusing: {len(conflicts)} runtime path(s) already hold different content. "
+                         "Move them aside, or pass --force to replace them:\n")
+        for rel in conflicts:
+            sys.stderr.write(f"  {rel}\n")
+        return 1
+    written = 0
+    for rel, path in src_files.items():
+        dest = target / rel
+        if rel in tgt_files and rel not in conflicts:
+            continue
+        written += 1
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(path.read_bytes())
+        dest.chmod(path.stat().st_mode & 0o777)
+
+    merged = []
+    claude_md = target / "CLAUDE.md"
+    if claude_md.exists():
+        rules_rel = ADOPTED_RULES_REL
+        text = claude_md.read_text()
+        if IMPORT_LINE not in text.splitlines():
+            claude_md.write_text(text.rstrip("\n") + "\n\n## Springer\n\n" + IMPORT_LINE + "\n")
+    else:
+        rules_rel = "CLAUDE.md"
+    renders = template_renders(SOURCE, profile, "polish", rules_rel)
+    (target / rules_rel).parent.mkdir(parents=True, exist_ok=True)
+    (target / rules_rel).write_text(renders[rules_rel][1])
+
+    settings_render = renders[".claude/settings.json"][1]
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    if existing_settings is None:
+        settings_path.write_text(settings_render)
+    else:
+        settings_path.write_text(json.dumps(merge_settings(existing_settings, json.loads(settings_render)),
+                                            indent=2) + "\n")
+        merged.append(".claude/settings.json")
+
+    gitignore = target / ".gitignore"
+    render = renders[".gitignore"][1]
+    if gitignore.exists():
+        have = set(gitignore.read_text().splitlines())
+        missing = [l for l in render.splitlines() if l.strip() and l not in have]
+        if missing:
+            gitignore.write_text(gitignore.read_text().rstrip("\n") + "\n\n# Springer runtime\n"
+                                 + "\n".join(missing) + "\n")
+        merged.append(".gitignore")
+    else:
+        gitignore.write_text(render)
+    runs = target / "runs"
+    if not runs.exists():
+        runs.mkdir()
+        (runs / ".gitkeep").touch()
+
+    manifest = build_manifest(target, SOURCE, profile, lane="polish", claude_md=rules_rel, merged=merged)
+    write_manifest(target, manifest)
+    print(f"adopted {target}: {written} runtime files written, profile {profile}, default lane polish")
+    if conflicts:
+        print(f"{len(conflicts)} conflicting runtime file(s) replaced (--force)")
+    print(f"rules: {rules_rel}" + (" (imported from CLAUDE.md)" if rules_rel != "CLAUDE.md" else ""))
+    for rel in merged:
+        print(f"merged into the existing {rel}")
+    print("Review the change with git diff and commit it. Start a run with the spgr-run-harness skill.")
     return 0
 
 
@@ -317,21 +454,23 @@ def cmd_update(target, dry_run, force):
 def main(argv):
     args = [a for a in argv[1:] if not a.startswith("--")]
     flags = [a for a in argv[1:] if a.startswith("--")]
-    if len(args) < 2 or args[0] not in ("manifest", "update", "status"):
+    if len(args) < 2 or args[0] not in ("manifest", "adopt", "update", "status"):
         sys.stderr.write(__doc__)
         return 2
     target = Path(args[1]).resolve()
     if not target.is_dir():
         sys.stderr.write(f"no such directory: {target}\n")
         return 1
-    if args[0] == "manifest":
+    if args[0] in ("manifest", "adopt"):
         profile = None
         if "--profile" in argv:
             i = argv.index("--profile")
             profile = argv[i + 1] if i + 1 < len(argv) else None
         if not profile:
-            sys.stderr.write("manifest needs --profile <brochure|small|saas|mobile|api>\n")
+            sys.stderr.write(f"{args[0]} needs --profile <brochure|small|saas|mobile|api>\n")
             return 2
+        if args[0] == "adopt":
+            return cmd_adopt(target, profile, "--force" in flags)
         return cmd_manifest(target, profile)
     dry_run = args[0] == "status" or "--dry-run" in flags
     return cmd_update(target, dry_run, "--force" in flags)

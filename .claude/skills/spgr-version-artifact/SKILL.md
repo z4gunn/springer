@@ -1,6 +1,7 @@
 ---
 name: spgr-version-artifact
 description: Stamp a new version on an artifact, incrementing minor on agent revision and major on human approval, and write a tamper checksum once approved. Use when an artifact changes after its first write, or when a human approves an artifact and it must become an immutable baseline.
+disable-model-invocation: true
 ---
 
 # version-artifact

@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-uml-class-diagram
 description: Generate a UML class diagram of static code structure, committed diagram-as-code (PlantUML or Mermaid classDiagram) plus a rendered SVG, with object and package diagram views in the same family. Use when the Architect or a developer agent needs a code-level static-structure view, not C4, ERD, deployment, or sequence views.
+disable-model-invocation: true
 ---
 
 # generate-uml-class-diagram

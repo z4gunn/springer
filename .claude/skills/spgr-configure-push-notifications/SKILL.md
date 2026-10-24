@@ -1,6 +1,7 @@
 ---
 name: spgr-configure-push-notifications
 description: Implement end-to-end mobile push notification infrastructure as source code, covering APNs and FCM credentials, device token lifecycle, all app-state handlers, tap-to-deep-link routing, preferences, and delivery monitoring. Use when the Mobile Developer agent picks up a push notification story with confirmed requirements.
+disable-model-invocation: true
 ---
 
 # configure-push-notifications

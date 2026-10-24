@@ -1,6 +1,7 @@
 ---
 name: spgr-write-slo-spec
 description: Produce an slo-spec artifact setting the system's Service Level Objectives, each with an SLI, a target threshold, a measurement window, the derived error budget, and burn-rate alert windows. Use when the Observability Agent must commit reliability targets before alerting is designed, or when targets must be revised after maturity data arrives.
+disable-model-invocation: true
 ---
 
 # write-slo-spec

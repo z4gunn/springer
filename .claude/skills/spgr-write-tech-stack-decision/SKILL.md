@@ -1,6 +1,7 @@
 ---
 name: spgr-write-tech-stack-decision
 description: Produce a tech-stack-decision artifact documenting the selected stack layer by layer, with a pinned version, rationale, rejected alternatives, and an upgrade policy per layer, traced to the approved architecture. Use when the Architect Agent must turn an implicit technology choice into an explicit record before the project is scaffolded.
+disable-model-invocation: true
 ---
 
 # write-tech-stack-decision

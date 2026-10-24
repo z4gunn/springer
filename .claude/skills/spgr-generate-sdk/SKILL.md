@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-sdk
 description: Generate a typed client SDK from the validated OpenAPI spec for one or more target languages, with typed models, auth, pagination, error classes, a quickstart, and contract tests against staging. Use when the Documentation Agent regenerates SDKs after an API spec change, or when the DevOps Agent needs SDK packages built before publishing.
+disable-model-invocation: true
 ---
 
 # generate-sdk

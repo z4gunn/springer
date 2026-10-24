@@ -1,6 +1,7 @@
 ---
 name: spgr-scaffold-project
 description: Generate a new project skeleton from the approved architecture ADRs and tech-stack decision, with directory structure, pinned dependencies, passing lint and format, a test runner with one example test, a CI stub, and an .env.example. Use when a developer agent starts a project and must lay the foundation before any feature code.
+disable-model-invocation: true
 ---
 
 # scaffold-project

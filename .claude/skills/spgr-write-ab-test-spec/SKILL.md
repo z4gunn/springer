@@ -1,6 +1,7 @@
 ---
 name: spgr-write-ab-test-spec
 description: Produce an ab-test-spec artifact that pre-registers an A/B experiment before any code is written, fixing the hypothesis, arms, assignment logic, sample size, primary metric, guardrails, and decision rules. Use when the Analytics Agent must define an experiment before it runs, or when the Feature Flag Agent needs assignment logic for a test flag.
+disable-model-invocation: true
 ---
 
 # write-ab-test-spec

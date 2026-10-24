@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-state-diagram
 description: Produce a UML state machine diagram for one stateful entity, committed diagram-as-code (Mermaid stateDiagram-v2 or PlantUML state) plus a rendered SVG. Use when the Architect Agent must capture the authoritative lifecycle of an entity, or the Backend Developer needs a verifiable contract for a status field and its allowed transitions.
+disable-model-invocation: true
 ---
 
 # generate-state-diagram

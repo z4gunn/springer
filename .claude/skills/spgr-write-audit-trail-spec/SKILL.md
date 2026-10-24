@@ -1,6 +1,7 @@
 ---
 name: spgr-write-audit-trail-spec
 description: Produce an audit-trail-spec artifact that defines which events are audited, the log entry schema, tamper protection, per-framework retention, and access controls on the log store. Use when the Compliance Agent must settle audit logging requirements before retention, access control, or observability work proceeds.
+disable-model-invocation: true
 ---
 
 # write-audit-trail-spec

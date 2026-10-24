@@ -1,6 +1,7 @@
 ---
 name: spgr-audit-async-coverage
 description: Produce an async-coverage audit report that checks every background job, webhook delivery, email send, and event consumer against the async job spec registry for retry, DLQ, and observability coverage, returning a PASS or GATE verdict that blocks release on any unguarded async process. Use when the Async Infrastructure Agent must confirm a release.
+disable-model-invocation: true
 ---
 
 # audit-async-coverage

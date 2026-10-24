@@ -1,6 +1,7 @@
 ---
 name: spgr-check-rtl-support
 description: Produce an RTL-support audit report that verifies layout mirroring, icon direction, text alignment, and interaction patterns for right-to-left languages, with a PASS or GATE verdict that blocks release on any core function broken under RTL. Use when the i18n Agent must confirm a release or component library renders correctly under an RTL locale.
+disable-model-invocation: true
 ---
 
 # check-rtl-support

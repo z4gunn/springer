@@ -1,6 +1,7 @@
 ---
 name: spgr-write-migration
 description: Write a database schema migration as an expand/contract pair of up and down scripts, so every deploy step stays backwards compatible and reversible with no downtime window. Use when the Backend Developer agent must apply an ERD change to the live schema, or when a story's schema change needs its migration.
+disable-model-invocation: true
 ---
 
 # write-migration

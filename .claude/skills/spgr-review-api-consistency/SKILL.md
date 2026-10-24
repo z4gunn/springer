@@ -1,6 +1,7 @@
 ---
 name: spgr-review-api-consistency
 description: Produce an api-consistency review report that checks an API spec against the project's API design standards, returning a PASS or GATE verdict that blocks new or changed endpoints on any high-severity inconsistency. Use when the API Design Agent reviews a PR that adds or modifies API endpoints.
+disable-model-invocation: true
 ---
 
 # review-api-consistency

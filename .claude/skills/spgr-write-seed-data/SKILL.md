@@ -1,6 +1,7 @@
 ---
 name: spgr-write-seed-data
 description: Produce a deterministic database seed script that loads normal-case, edge-case, boundary, relationship, and state-coverage data, with each scenario seedable independently. Use when the Backend Developer agent needs a reproducible dataset, QA needs a known fixture state, or a schema migration puts the seed data out of sync.
+disable-model-invocation: true
 ---
 
 # write-seed-data

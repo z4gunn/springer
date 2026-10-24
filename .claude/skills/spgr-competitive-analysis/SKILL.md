@@ -1,6 +1,7 @@
 ---
 name: spgr-competitive-analysis
 description: Produce a competitive-analysis artifact comparing direct competitors, indirect alternatives, and the status quo across a fixed matrix, with pricing, positioning, and differentiation gaps, every data point source-cited. Use when the Discovery Agent needs competitive context before a go/no-go recommendation.
+disable-model-invocation: true
 ---
 
 # competitive-analysis

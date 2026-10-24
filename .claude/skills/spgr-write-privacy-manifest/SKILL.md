@@ -1,6 +1,7 @@
 ---
 name: spgr-write-privacy-manifest
 description: Produce the iOS Privacy Manifest (PrivacyInfo.xcprivacy) declaring tracking status, tracking domains, collected data types with purposes, and every Required Reason API with its approved reason code. Use when the App Store Agent prepares an iOS submission, or when a new SDK or Required Reason API requires the manifest regenerated.
+disable-model-invocation: true
 ---
 
 # write-privacy-manifest

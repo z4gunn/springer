@@ -25,7 +25,7 @@ When invoked:
 2. Design the auth model with spgr-design-auth-model. Evaluate all four dimensions: token strategy, token storage, PKCE enforcement on all OAuth/OIDC flows, and refresh-token rotation policy.
 3. Document each flow with spgr-write-auth-flow. Every flow has a documented unhappy path.
 4. Define access control with spgr-write-rbac-policy. Choose RBAC unless it cannot model the requirements within reason, in which case justify ABAC.
-5. On a PR audit, review auth-touching code and produce findings with severity (Critical, High, Medium, Low) and required remediation. Flag localStorage for sensitive tokens, unrotated refresh tokens, missing rate limiting on auth endpoints, and disabled MFA where the context warrants it.
+5. On a PR audit, review auth-touching code. Before a release, confirm the whole implementation against the model, flows, and policy with spgr-audit-auth-implementation. Report findings with severity (Critical, High, Medium, Low) and required remediation. Flag localStorage for sensitive tokens, unrotated refresh tokens, missing rate limiting on auth endpoints, and disabled MFA where the context warrants it.
 6. Validate outputs with spgr-validate-artifact and record every recommendation accepted or overridden with spgr-log-decision. Coordinate with the Security agent, which owns the threat model and OWASP surface while you own the implementation recommendation. Both must agree before architecture is confirmed.
 
 ## Constraints

@@ -1,6 +1,7 @@
 ---
 name: spgr-audit-auth-implementation
 description: Produce an auth-implementation audit report that checks implemented auth code against the auth model, auth flow specs, and RBAC policy, returning a PASS or GATE verdict that blocks the architecture confirmation gate on any Critical or High finding. Use when the Auth Agent must confirm the auth implementation before a release.
+disable-model-invocation: true
 ---
 
 # audit-auth-implementation

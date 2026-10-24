@@ -1,6 +1,7 @@
 ---
 name: spgr-write-cd-pipeline
 description: Write the continuous delivery pipeline configuration that auto-deploys to staging on merge and gives an audited, zero-downtime path to production, with migrations-before-code ordering and smoke tests with automatic rollback. Use when the DevOps agent wires CD from a tested CI build artifact and a deployment target inventory.
+disable-model-invocation: true
 ---
 
 # write-cd-pipeline

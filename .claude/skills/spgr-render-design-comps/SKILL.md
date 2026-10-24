@@ -1,6 +1,7 @@
 ---
 name: spgr-render-design-comps
 description: Render one or two key screens of a design direction as high-fidelity HTML comps from proposed tokens, capture them at phone, tablet, and desktop widths in light and dark, and critique them against the design-quality bar until they pass. Use after a direction is selected and before tokens lock, or per direction at the selection gate.
+disable-model-invocation: true
 ---
 
 # render-design-comps

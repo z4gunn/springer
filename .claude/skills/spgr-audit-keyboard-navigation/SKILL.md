@@ -1,6 +1,7 @@
 ---
 name: spgr-audit-keyboard-navigation
 description: Produce a keyboard-navigation audit report that verifies every interactive element and user flow is reachable, operable, and focus-managed by keyboard alone, with a PASS or GATE verdict that blocks release on any core function a keyboard cannot reach. Use when the Accessibility Agent must confirm a release or component library is keyboard-operable.
+disable-model-invocation: true
 ---
 
 # audit-keyboard-navigation

@@ -1,6 +1,7 @@
 ---
 name: spgr-format-code
 description: Run the project's configured code formatter on every file touched in a change, apply the results in place, and wire a pre-commit hook so staged files are formatted before each commit. Use when a developer agent needs edited files formatted before lint, test, or commit, or when a repo needs the formatter hook installed.
+disable-model-invocation: true
 ---
 
 # format-code

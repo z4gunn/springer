@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-changelog
 description: Maintain the project CHANGELOG.md in Keep a Changelog format by parsing conventional commits since the last release tag into Added, Changed, Deprecated, Removed, Fixed, and Security entries, with breaking changes called out. Use when the Documentation Agent updates the changelog as changes merge, or when the DevOps Agent finalizes a release.
+disable-model-invocation: true
 ---
 
 # generate-changelog

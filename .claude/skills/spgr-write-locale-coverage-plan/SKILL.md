@@ -1,6 +1,7 @@
 ---
 name: spgr-write-locale-coverage-plan
 description: Produce a locale-coverage-plan artifact that fixes which locales the product supports, in tiered priority order, with per-locale coverage thresholds, a translation workflow, and a new-string process. Use when the i18n Agent must set the target localization state, or when a market change requires the supported-locale set re-decided.
+disable-model-invocation: true
 ---
 
 # write-locale-coverage-plan

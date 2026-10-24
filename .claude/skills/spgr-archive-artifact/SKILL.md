@@ -1,6 +1,7 @@
 ---
 name: spgr-archive-artifact
 description: Move a superseded or retired artifact to the dated archive store, append an archive index entry, and clear the active-store copy. Use when an artifact is superseded by a new version or retired, so the active store holds only current artifacts and history stays recoverable.
+disable-model-invocation: true
 ---
 
 # archive-artifact

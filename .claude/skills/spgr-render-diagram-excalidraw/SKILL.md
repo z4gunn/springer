@@ -1,6 +1,7 @@
 ---
 name: spgr-render-diagram-excalidraw
 description: Convert a committed Mermaid or PlantUML diagram into an editable .excalidraw file and a rendered PNG, keeping the code-first source authoritative. Use when the Documentation, Architect, or Design agent needs a polished human-facing copy of a generated diagram for a deck, review, or docs. It authors no model.
+disable-model-invocation: true
 ---
 
 # render-diagram-excalidraw

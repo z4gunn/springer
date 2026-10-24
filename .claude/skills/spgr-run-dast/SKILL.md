@@ -1,6 +1,7 @@
 ---
 name: spgr-run-dast
 description: Run dynamic application security testing against a running staging environment, unauthenticated and authenticated as each role, producing a dast-findings report with per-finding evidence and a gate verdict that blocks on Critical and High findings. Use when the Security Agent runs DAST before a major release or architecture change.
+disable-model-invocation: true
 ---
 
 # run-dast
@@ -49,6 +50,6 @@ Find vulnerabilities that only manifest at runtime. SAST reads source code, this
 ## Notes
 
 - Output type is an envelope artifact. No content schema is registered for dast-findings yet, so spgr-validate-artifact applies envelope-only validation (header, confidence map, decision log, version) until a content schema is registered. Reference the schema registry at schemas/ rather than inlining field lists here.
-- DAST is not a per-PR check. It is slow and needs a running environment, so it runs at minimum before each major release and after a significant architecture change. The continuous per-PR gate is spgr-run-security-scan.
+- DAST is not a per-PR check. It is slow and needs a running environment, so it runs at minimum before each major release and after a significant architecture change. The continuous per-PR gate is spgr-run-sast with spgr-run-dependency-audit.
 - This skill runs scanners and reports results. It does not modify application code to fix a finding. Remediation is a separate developer change verified by spgr-run-tests and CI.
 - Credentials are read from secrets at run time and never written into the report or the decision log. A GATE verdict is a correct output, not a failure of this skill.

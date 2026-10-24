@@ -1,6 +1,7 @@
 ---
 name: spgr-write-dockerfile
 description: Write a secure multi-stage Dockerfile plus a matching .dockerignore, with a minimal runtime layer, a pinned base image, a non-root user, and no embedded secrets. Use when the DevOps agent containerizes a service, or when the Security agent needs the image hardened before a release.
+disable-model-invocation: true
 ---
 
 # write-dockerfile
@@ -38,13 +39,13 @@ Produce the container build definition for one service. The Dockerfile is the de
 6. Add `EXPOSE` for the listen port and a `HEALTHCHECK` that calls the health endpoint.
 7. For any build-time secret (for example a private registry token), use a BuildKit `--secret` mount. Never place a secret in `ENV` or `ARG`, because both persist in the image layer history.
 8. Write the `.dockerignore` alongside the Dockerfile with the exclusions above.
-9. Write both files with spgr-write-file, then build the image to confirm it succeeds. Tag the verification with spgr-run-security-scan against the runtime image and fail on Critical or High OS-level CVE findings. If a size budget is set and the runtime image exceeds it, stop and report the largest layers.
+9. Write both files with spgr-write-file, then build the image to confirm it succeeds. Tag the verification with spgr-run-dependency-audit against the runtime image and fail on Critical or High OS-level CVE findings. If a size budget is set and the runtime image exceeds it, stop and report the largest layers.
 10. If a required input is missing or contradictory (for example a build step is declared but no build dependencies are given, or no runtime version is supplied), stop and raise spgr-escalate with the precise list of what is missing rather than guessing a base image or version. If the chosen base or non-root model conflicts with a security constraint, tag the Security agent with spgr-tag-vertical-agent before finalizing. Record any consequential base-image or hardening choice with spgr-log-decision.
 
 ## Notes
 
-- The output is source code (a Dockerfile and a .dockerignore), verified by a successful image build, spgr-run-security-scan, and CI rather than by an envelope schema.
+- The output is source code (a Dockerfile and a .dockerignore), verified by a successful image build, spgr-run-dependency-audit on the image, and CI rather than by an envelope schema.
 - Multi-stage is mandatory for any language with a build step. The runtime image must not carry the toolchain.
 - `EXPOSE` is documentation only and does not publish the port. Port publishing is a runtime concern.
 - Build from an organization-owned hardened base image where one exists for the runtime, rather than directly from the public registry.
-- Image vulnerability scanning and the size budget are CI gates wired through spgr-run-security-scan and the pipeline, not steps the developer runs by hand on every change.
+- Image vulnerability scanning and the size budget are CI gates wired through spgr-run-dependency-audit and the pipeline, not steps the developer runs by hand on every change.

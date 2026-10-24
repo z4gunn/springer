@@ -1,6 +1,7 @@
 ---
 name: spgr-check-rate-limit-consistency
 description: Produce a rate-limit-consistency report that checks every API endpoint against the rate-limit configuration and entitlement map, verifying tenant-level enforcement, with a PASS or GATE verdict that blocks release on IP-only limits or cross-tenant degradation. Use when the Multi-tenancy Agent must confirm tenant-fair rate limiting before a release.
+disable-model-invocation: true
 ---
 
 # check-rate-limit-consistency

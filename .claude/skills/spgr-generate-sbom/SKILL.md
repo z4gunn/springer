@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-sbom
 description: Generate a Software Bill of Materials in CycloneDX or SPDX format from a release's lock and manifest files, attach it to the release artifact, and upload it to vulnerability monitoring. Use when the Security Agent produces the supply-chain inventory for a release, or when the DevOps Agent attaches an SBOM as a pipeline step.
+disable-model-invocation: true
 ---
 
 # generate-sbom

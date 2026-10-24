@@ -1,6 +1,7 @@
 ---
 name: spgr-diagnose-error
 description: Produce an error-diagnosis from a stack trace, error log, or failing test output, with a root-cause statement, affected components, an evidence-backed confidence level, and ranked remediation options. Use when a developer or QA agent hits a failing test or runtime error and must find the root cause from evidence before writing a fix.
+disable-model-invocation: true
 ---
 
 # diagnose-error

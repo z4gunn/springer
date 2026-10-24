@@ -1,6 +1,7 @@
 ---
 name: spgr-run-compliance-audit
 description: Produce a compliance-audit report that checks the implemented system against its compliance scope, with per-control status and per-framework readiness scores, returning a PASS or GATE verdict that blocks release on open gaps in a regulated framework. Use when the Compliance Agent runs a readiness assessment before a formal external audit.
+disable-model-invocation: true
 ---
 
 # run-compliance-audit

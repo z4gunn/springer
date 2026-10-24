@@ -1,6 +1,7 @@
 ---
 name: spgr-check-seo-baseline
 description: Produce a PASS or GATE verdict per built public page against the structural SEO standards (title, description, H1, canonical, lang, viewport, noindex, social cards, JSON-LD, image alt and size, sitemap and robots). Use before a PR on a brochure site or any public page, as the brochure CI check, and as a code-review finding source.
+disable-model-invocation: true
 ---
 
 # check-seo-baseline

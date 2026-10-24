@@ -1,6 +1,7 @@
 ---
 name: spgr-scaffold-service
 description: Add a new service or module to an existing project as source code, matching established conventions, with routing, controller, service layer, error handling, structured logging, and a running health-check smoke test. Use when the Backend Developer agent must add a service or module to an existing project before feature code or review.
+disable-model-invocation: true
 ---
 
 # scaffold-service

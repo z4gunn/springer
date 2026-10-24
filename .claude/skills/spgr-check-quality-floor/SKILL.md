@@ -1,6 +1,7 @@
 ---
 name: spgr-check-quality-floor
 description: Produce a floor-guard report that scans a change's diff for a lowered quality bar (new lint or type suppressions, skipped or deleted tests, removed assertions, stubs in source, hook bypasses, loosened coverage thresholds), with a clean, violation, or unverified status. Use on every PR review and before a developer agent opens a PR.
+disable-model-invocation: true
 ---
 
 # check-quality-floor

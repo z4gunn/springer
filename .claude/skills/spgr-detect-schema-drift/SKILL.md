@@ -1,6 +1,7 @@
 ---
 name: spgr-detect-schema-drift
 description: Produce a schema-drift report comparing each environment's live database schema against the schema derived from the full migration history, returning a go or no-go deployment verdict that gates on unexplained drift. Use when the Architect Agent must confirm a deployment is safe, or when a backend agent checks after a manual database change.
+disable-model-invocation: true
 ---
 
 # detect-schema-drift

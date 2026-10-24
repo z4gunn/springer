@@ -14,7 +14,7 @@ An architecture-first AI software development team, from idea to production.
 
 Springer is an AI software development team, built as a library of Claude Code agents and skills. Each agent models a role from a traditional product and engineering organization, from discovery and product management through architecture, design, development, QA, and DevOps, plus the cross-cutting specialties that span those roles. Together they carry a greenfield SaaS or mobile application across the full software lifecycle, from a raw problem statement to production, with a human entering only at deliberate checkpoints.
 
-This repository is the working build of that team: 27 agents and 202 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
+This repository is the working build of that team: 27 agents and 201 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
 
 ## Contents
 
@@ -114,7 +114,7 @@ Twenty-seven agents in three groups. Horizontal agents own a lifecycle phase. Un
 
 ## The skills
 
-A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Each one carries its own triggering information, so the right skill activates when an agent needs it. The 202 skills group as follows.
+A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Agents name the skills they use in their workflow steps and read each one by path, so only the nine skills the main session starts itself (the harness, gate notification, validation, doc rendering, branch and PR creation, escalation, bug reports, and document ingest) carry a description into every session. The rest are marked `disable-model-invocation: true`, and a person can still start any of them by name. The validator keeps that catalog under a count and character budget and fails any skill that no agent, reference, or reachable skill names. The 201 skills group as follows.
 
 ### Shared and product
 
@@ -148,7 +148,7 @@ A skill is a single-responsibility capability that an agent invokes, such as wri
 | Group | Count | Examples |
 |-------|-------|----------|
 | Auth | 4 | design-auth-model, write-auth-flow, write-rbac-policy, audit-auth-implementation |
-| Security | 7 | write-threat-model, run-sast, run-dast, run-dependency-audit, generate-sbom |
+| Security | 6 | write-threat-model, run-sast, run-dast, run-dependency-audit, generate-sbom |
 | Compliance | 5 | assess-compliance-scope, classify-data, write-retention-policy, run-compliance-audit |
 | Performance | 5 | analyze-query-plan, write-caching-strategy, identify-bottleneck, write-performance-budget |
 | Observability | 5 | write-logging-schema, write-metric-definitions, write-slo-spec, write-alert-runbook |
@@ -173,7 +173,7 @@ springer/
   CLAUDE.md              the operative ruleset for AI agents, loaded every session
   .claude/
     agents/<name>.md         the 27 agents, auto-loaded in this repo
-    skills/<name>/SKILL.md    the 202 skills, auto-loaded in this repo
+    skills/<name>/SKILL.md    the 201 skills, auto-loaded in this repo
     references/<name>.md      shared cross-skill references (for example diagram-standards, typescript-standards)
   schemas/               JSON Schemas for the typed artifacts that flow between agents
   scripts/               repo tooling: new-project.sh and the repo validator
@@ -277,6 +277,14 @@ python3 scripts/update-project.py update ~/path/to/my-saas-app   # apply it
 
 A runtime file the instance never edited is replaced, one it edited is kept and listed, one it added is left alone, and a template-rendered file (CLAUDE.md, the settings, the gitignore) that was edited gets its new rendering written under `.claude/springer-update/` for a hand merge. The update refuses to run while a harness holds a live lock on a run in the instance.
 
+To bring Springer to a repository that already exists, adopt it instead:
+
+```bash
+python3 scripts/update-project.py adopt ~/path/to/existing-app --profile small
+```
+
+Adoption writes the runtime beside the repository's own files and never replaces one. A runtime path that already holds different content refuses the adoption until it is moved aside or `--force` is passed. An existing `CLAUDE.md` keeps its text and gains one import line for the Springer rules, which render to `.claude/springer-rules.md`. An existing settings file gains only the permissions and hooks it lacks, and an existing gitignore only the lines it lacks. The default lane of an adopted repository is `polish`, because the product already exists, so a run takes one issue to one pull request. Later updates work the same as on any instance.
+
 One skill family needs a one-time setup, and it is optional. The diagram skills render Mermaid and PlantUML sources. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, and make the Mermaid CLI available through `npx`. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
 
 A few skills have optional external dependencies, none bundled with Springer. `spgr-render-diagram-excalidraw` builds on the third-party `excalidraw-diagram` skill by Cole Medin. Install it separately only if you want polished Excalidraw output:
@@ -303,7 +311,7 @@ Every line of JavaScript-runtime code the build, test, and scaffold skills gener
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1. Spec | One spec file per agent and skill, the source of truth for the build | Complete |
-| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 202 skills |
+| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 201 skills |
 | 3. Harness | Autonomous orchestration with feedback loops, self-improvement, and parallel execution | Available, the spgr-run-harness PDCA driver |
 
 ## Conventions and contributing

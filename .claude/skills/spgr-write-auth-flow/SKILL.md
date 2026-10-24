@@ -1,6 +1,7 @@
 ---
 name: spgr-write-auth-flow
 description: Produce an auth-flow artifact that specifies each authentication flow (login, logout, token refresh, password reset, OAuth callback, MFA) at the sequence level with every failure path, plus a Mermaid sequence diagram per flow. Use when the Auth Agent must define the flow specification before any auth code is written.
+disable-model-invocation: true
 ---
 
 # write-auth-flow

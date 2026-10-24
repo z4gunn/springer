@@ -1,6 +1,7 @@
 ---
 name: spgr-scaffold-webhook-delivery
 description: Scaffold the outbound webhook delivery system as source code, covering event fan-out, asynchronous HMAC-signed HTTPS delivery with exponential-backoff retry, a per-delivery log, and single-event replay. Use when the Async Infrastructure agent implements outbound webhooks from a confirmed event taxonomy and endpoint registration model.
+disable-model-invocation: true
 ---
 
 # scaffold-webhook-delivery

@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-docstrings
 description: Write inline docstrings for public APIs, exported functions, classes, and complex logic, documenting the caller-facing contract in the language's native convention, with a CI gate that fails on undocumented exported symbols. Use when the Documentation, developer, QA, or code-reviewer agent needs docstrings added in the same commit as the code.
+disable-model-invocation: true
 ---
 
 # generate-docstrings

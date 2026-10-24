@@ -1,6 +1,7 @@
 ---
 name: spgr-scaffold-feature
 description: Generate the boilerplate file set for one new feature (route, controller, service, model, migration, and test stubs) following the project's conventions, with acceptance criteria pre-filled as TODO comments. Use when a backend or frontend developer agent picks up a confirmed user story and needs a starting point before writing feature logic.
+disable-model-invocation: true
 ---
 
 # scaffold-feature

@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-system-diagram
 description: Produce a system-diagram artifact holding C4 Level 1 context and Level 2 component diagrams in Mermaid, showing users, external systems, internal components, and their relationships. Use when the Architect Agent needs a shared structural view of an approved architecture, or when an architectural change must update the diagram in the same commit.
+disable-model-invocation: true
 ---
 
 # generate-system-diagram

@@ -1,6 +1,7 @@
 ---
 name: spgr-analyze-query-plan
 description: Produce a query-analysis report from execution plans, slow query logs, and schema, with per-query findings, ranked optimization recommendations, and ready-to-use index DDL. Use when the Performance Agent must diagnose a slow query or audit a query workload, or when a backend agent needs query-plan evidence for an index or rewrite.
+disable-model-invocation: true
 ---
 
 # analyze-query-plan

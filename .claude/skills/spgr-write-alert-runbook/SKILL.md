@@ -1,6 +1,7 @@
 ---
 name: spgr-write-alert-runbook
 description: Produce an alert-runbook artifact per alert, the investigation and remediation guide an on-call engineer follows when the alert fires, covering triage steps, common causes, per-cause remediation, and escalation path. Use when the Observability Agent writes the runbook at alert-design time or absorbs a post-incident lesson.
+disable-model-invocation: true
 ---
 
 # write-alert-runbook

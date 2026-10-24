@@ -1,6 +1,7 @@
 ---
 name: spgr-prioritize-backlog
 description: Order a product backlog by business value and core-value-prop impact, assigning a priority tier and per-story rationale, with explicit slots for tech debt and recorded deferrals. Use when the PM agent orders stories before development planning, or when a backlog must be re-prioritized after new research or a scope change.
+disable-model-invocation: true
 ---
 
 # prioritize-backlog

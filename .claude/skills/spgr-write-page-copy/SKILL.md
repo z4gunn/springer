@@ -1,6 +1,7 @@
 ---
 name: spgr-write-page-copy
 description: Produce a page-copy artifact for a brochure page or a saas marketing page, with headline, subheadline, call to action, sourced proof, section copy in the users' own vocabulary, and a [NEED] row for every missing fact, linted against the copy standards. Use after the PRD is confirmed and before the build unit for any public page.
+disable-model-invocation: true
 ---
 
 # write-page-copy

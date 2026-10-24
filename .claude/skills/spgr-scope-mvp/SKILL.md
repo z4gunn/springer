@@ -1,6 +1,7 @@
 ---
 name: spgr-scope-mvp
 description: Produce an MVP scope artifact that cuts the backlog to the smallest feature set needed to test the core value proposition, with in-scope and deferred lists, the core user journey, and validation criteria. Use when a Product Manager agent has a PRD-derived backlog and must define the MVP before the go/no-go decision at the end of discovery.
+disable-model-invocation: true
 ---
 
 # scope-mvp

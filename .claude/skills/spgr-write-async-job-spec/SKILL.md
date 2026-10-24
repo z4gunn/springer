@@ -1,6 +1,7 @@
 ---
 name: spgr-write-async-job-spec
 description: Produce an async-job-spec artifact that specifies one background job before it is built, covering trigger, payload schema, idempotency, retry cap with dead letter queue, SLA targets, and required metrics. Use when the Async Infrastructure Agent must specify a job ahead of implementation, or a backend or QA agent needs the job contract settled.
+disable-model-invocation: true
 ---
 
 # write-async-job-spec

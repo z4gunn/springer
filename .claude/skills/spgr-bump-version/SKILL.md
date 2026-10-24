@@ -1,6 +1,7 @@
 ---
 name: spgr-bump-version
 description: Increment the project version following semantic versioning, update every version reference across the codebase atomically, and land it as a dedicated chore(release) commit. Use when the DevOps Agent prepares a release and needs the version raised with the bump type derived from the CHANGELOG.md unreleased section.
+disable-model-invocation: true
 ---
 
 # bump-version

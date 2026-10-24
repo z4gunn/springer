@@ -1,6 +1,7 @@
 ---
 name: spgr-git-commit
 description: Stage explicitly named files and create one atomic Conventional Commits commit that passes pre-commit hooks (lint, format, test, commitlint) with no bypass. Use when a developer or DevOps agent has completed one logical change, or when any agent that modified files must commit them under Springer commit discipline.
+disable-model-invocation: true
 ---
 
 # git-commit

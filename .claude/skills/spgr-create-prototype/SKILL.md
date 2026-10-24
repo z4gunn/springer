@@ -1,6 +1,7 @@
 ---
 name: spgr-create-prototype
 description: Produce a clickable prototype artifact covering the user flows needed for usability testing, with hotspot interactions, simulated loading, error, and empty states, a testing script, and a findings rubric that gates developer handoff. Use when the Design Agent must validate approved screen specs against real users before handoff.
+disable-model-invocation: true
 ---
 
 # create-prototype

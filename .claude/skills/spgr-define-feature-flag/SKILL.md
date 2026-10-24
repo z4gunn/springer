@@ -1,6 +1,7 @@
 ---
 name: spgr-define-feature-flag
 description: Produce a feature-flag spec artifact fixing a flag's key, type, per-environment defaults, target audience, lifecycle milestones with a retirement date, and rollback procedure before the flag is created in the flag platform. Use when the Feature Flag Agent must specify a flag before creation so it does not become permanent technical debt.
+disable-model-invocation: true
 ---
 
 # define-feature-flag

@@ -1,6 +1,7 @@
 ---
 name: spgr-read-file
 description: Read a repository file as line-numbered text with binary, size, and missing-path handling. Use when an agent needs to read existing source, config, or artifact files before analyzing or editing them, or as the read side of the read-before-write contract.
+disable-model-invocation: true
 ---
 
 # read-file

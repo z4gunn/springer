@@ -1,6 +1,7 @@
 ---
 name: spgr-create-design-system
 description: Produce a design-system artifact from the selected design direction, with named color, typography, and spacing tokens, a component library documenting all eight states per component, and accessibility guidelines. Use when the Design Agent has an approved direction and must settle the shared visual language before screen specs.
+disable-model-invocation: true
 ---
 
 # create-design-system

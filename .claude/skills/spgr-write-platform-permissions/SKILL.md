@@ -1,6 +1,7 @@
 ---
 name: spgr-write-platform-permissions
 description: Implement mobile platform permission request flows as source code, one handler per required permission, with a pre-prompt rationale screen, grant and graceful-denial handling, and a settings-redirect path. Use when the Mobile Developer agent has confirmed permission requirements and a platform target and must build the flow test-first.
+disable-model-invocation: true
 ---
 
 # write-platform-permissions

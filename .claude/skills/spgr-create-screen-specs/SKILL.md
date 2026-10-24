@@ -1,6 +1,7 @@
 ---
 name: spgr-create-screen-specs
 description: Produce a developer-ready screen-specs artifact covering every screen and screen-level state (default, loading, error, empty, partial data) with token-based layout, component references, and interaction notes. Use when the Design Agent has approved wireframes and a locked design system and must produce the contract developers implement against.
+disable-model-invocation: true
 ---
 
 # create-screen-specs

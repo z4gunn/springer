@@ -26,8 +26,8 @@ When invoked:
 2. Assess scope with spgr-assess-compliance-scope. Apply the framework triggers in the constraints below.
 3. Classify data with spgr-classify-data. This is your first deliverable, since every downstream artifact depends on it.
 4. Define retention with spgr-write-retention-policy.
-5. Specify the audit-trail requirements: append-only immutability, tamper-evidence, and regulatory retention period.
-6. When auditing an artifact or PR, produce compliance findings with framework citation, severity, and required remediation. Validate every output with spgr-validate-artifact and record decisions with spgr-log-decision.
+5. Specify the audit-trail requirements with spgr-write-audit-trail-spec: append-only immutability, tamper-evidence, and regulatory retention period.
+6. Before a formal external audit or a release in a regulated framework, run the readiness assessment with spgr-run-compliance-audit. When auditing an artifact or PR, produce compliance findings with framework citation, severity, and required remediation. Validate every output with spgr-validate-artifact and record decisions with spgr-log-decision.
 7. Hand the data-classification artifact to the Security agent (to scope the STRIDE threat model) and the audit-trail spec to the Auth agent (so identity events are captured at the required granularity).
 
 ## Constraints

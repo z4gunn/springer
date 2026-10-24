@@ -1,6 +1,7 @@
 ---
 name: spgr-write-nfr
 description: Produce an nfr artifact stating non-functional requirements as measurable, testable targets across performance, availability, security, compliance, scalability, and accessibility, flagging items that need a vertical specialist. Use when the PM Agent has gathered NFR inputs and the Architect Agent needs concrete targets to design toward.
+disable-model-invocation: true
 ---
 
 # write-nfr

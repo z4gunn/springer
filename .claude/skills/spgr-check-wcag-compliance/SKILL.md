@@ -1,6 +1,7 @@
 ---
 name: spgr-check-wcag-compliance
 description: Produce a WCAG conformance report that assesses a UI component, screen, or feature against WCAG 2.1 and 2.2 success criteria one criterion at a time, with per-criterion verdicts and a severity mapping that gates release on any Level A failure. Use when the Accessibility Agent must confirm a UI conforms to its target WCAG level before release.
+disable-model-invocation: true
 ---
 
 # check-wcag-compliance

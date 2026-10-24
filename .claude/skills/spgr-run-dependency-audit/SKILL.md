@@ -1,6 +1,7 @@
 ---
 name: spgr-run-dependency-audit
 description: Produce a dependency-audit report that scans direct and transitive dependencies for known CVEs, returning a PASS or GATE verdict that blocks release on any unremediated Critical or High CVE in a direct dependency. Use when the Security Agent runs a pre-release dependency scan or the DevOps Agent wires dependency scanning into CI.
+disable-model-invocation: true
 ---
 
 # run-dependency-audit
@@ -14,6 +15,7 @@ Scan the project's locked dependency tree for known vulnerabilities and produce 
 | Field | Description |
 |-------|-------------|
 | `lockfiles` | One or more package lock files (`package-lock.json`, `yarn.lock`, `Pipfile.lock`, `go.sum`, and the like), read via spgr-read-file. Lockfiles are required so the scan resolves exact pinned versions across the full transitive tree. |
+| `images` | Optional built container images. Their OS packages are dependencies too and are scanned in step 2. |
 | `accepted-exceptions` | Previously accepted vulnerability exceptions, each with a justification and an expiry date, read via spgr-read-artifact when a prior audit exists. |
 
 ## Outputs
@@ -26,7 +28,7 @@ Scan the project's locked dependency tree for known vulnerabilities and produce 
 
 1. Confirm the inputs. Read each lockfile via spgr-read-file and the prior exceptions via spgr-read-artifact. If no lockfile is present, or a declared dependency is not pinned to an exact version, stop and call spgr-escalate, because dependency pinning is required to prevent supply-chain substitution where a new version is published between CI and deploy.
 
-2. Run the scanner that matches each ecosystem. Use `npm audit` for npm, `pip-audit` for Python, `govulncheck` for Go, or Snyk across all ecosystems for one consistent CVSS-scored output with upgrade paths. Resolve findings against both direct and transitive dependencies.
+2. Run the scanner that matches each ecosystem. Use `npm audit` for npm, `pip-audit` for Python, `govulncheck` for Go, or Snyk across all ecosystems for one consistent CVSS-scored output with upgrade paths. Resolve findings against both direct and transitive dependencies. For each image in `images`, scan the OS packages of the runtime image with Trivy or Grype and treat each package as a direct dependency.
 
 3. Read GitHub's Dependabot alerts as a second source when the project is hosted on GitHub. Run `gh api repos/<owner>/<repo>/dependabot/alerts --paginate -q '.[] | select(.state=="open")'` and merge each open alert with the scanner findings by package name and advisory id (GHSA or CVE), so one vulnerability appears once with both sources named. Dependabot sees the repository's manifests and lockfiles on the default branch and surfaces advisories the local scanner's database may lag on. When the API answers that Dependabot alerts are disabled for the repository, record one Medium finding whose remediation is to enable them (the enable call lives in spgr-write-ci-pipeline), never a silent skip. The read needs the `security_events` scope, which the `repo` scope includes.
 

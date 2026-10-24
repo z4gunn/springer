@@ -1,6 +1,7 @@
 ---
 name: spgr-write-api-design-standards
 description: Produce an api-design-standards artifact that fixes the project-level conventions every endpoint must follow, covering naming, verb semantics, response envelopes, pagination, status codes, and reusable OpenAPI component templates. Use when the API Design Agent sets the API constitution before any endpoint is specified or built.
+disable-model-invocation: true
 ---
 
 # write-api-design-standards

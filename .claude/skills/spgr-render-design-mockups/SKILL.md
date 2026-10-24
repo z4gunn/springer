@@ -1,6 +1,7 @@
 ---
 name: spgr-render-design-mockups
 description: Turn a design-directions artifact into at least three clickable multi-screen HTML mockups under docs/design/, one folder per direction, with an index.html entry point. Use when the Design Agent has generated design directions and the human needs to compare the layouts in a browser before selecting a direction.
+disable-model-invocation: true
 ---
 
 # render-design-mockups
