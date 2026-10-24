@@ -55,8 +55,27 @@
           "requires_human_promotion": {
                 "type": "boolean",
                 "description": "True when applying this learning would change a rule (WIP limit, gate set, routing policy). Such learnings are applied only through a human gate."
+              },
+              "remedy": {
+                "type": "string",
+                "enum": ["check", "reference", "none"],
+                "description": "Where the fix lands. check: a mistake a script can see in a file, a diff, or an output, fixed by a validator rule, hook, test, or schema constraint named in remedy_target. reference: a judgment call, fixed by reference text that names the rule it displaces. none: an observation with no rule change."
+              },
+              "remedy_target": {
+                "type": "string",
+                "minLength": 1,
+                "description": "For a check remedy, the script, hook, test, or schema that will catch the mistake."
+              },
+              "displaces": {
+                "type": "string",
+                "minLength": 1,
+                "description": "For a reference remedy, the existing rule the new text removes or merges, per the rule budget."
               }
-            }
+            },
+            "allOf": [
+              { "if": { "properties": { "remedy": { "const": "check" } }, "required": ["remedy"] }, "then": { "required": ["remedy_target"] } },
+              { "if": { "properties": { "remedy": { "const": "reference" } }, "required": ["remedy"] }, "then": { "required": ["displaces"] } }
+            ]
           }
         },
         "metrics": {

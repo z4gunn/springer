@@ -1,0 +1,51 @@
+{
+  "id": "unconfirmed-input-halts",
+  "about": "A developer handed an unconfirmed input halts and names it instead of building on it.",
+  "workspace": {
+    "src/__init__.py": "",
+    "src/textutil.py": "def title(text):\n    \"\"\"Title-case every word.\"\"\"\n    return text.title()\n",
+    "tests/__init__.py": "",
+    "tests/test_textutil.py": "import unittest\n\nfrom src.textutil import title\n\n\nclass TitleTest(unittest.TestCase):\n    def test_title(self):\n        self.assertEqual(title(\"hello world\"), \"Hello World\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n",
+    "runs/eval/artifacts/api-spec.json": "{\n  \"artifact_id\": \"api-spec\",\n  \"artifact_type\": \"api-spec\",\n  \"schema_version\": \"v1\",\n  \"status\": \"proposed\",\n  \"content\": {\n    \"endpoints\": [\n      {\n        \"method\": \"GET\",\n        \"path\": \"/slug\",\n        \"query\": [\n          \"text\"\n        ],\n        \"returns\": \"the slug of text\"\n      }\n    ]\n  }\n}\n",
+    "runs/eval/dispatch/C1/U1/brief.md": "# Brief U1\n\nRun `eval`, lane `build`, profile `small`.\nImplement the GET /slug endpoint exactly as runs/eval/artifacts/api-spec.json specifies, in src/api.py, with its tests.\nRead, in order: runs/eval/artifacts/api-spec.json, src/textutil.py.\nRulings: stdlib only. Commit on the current branch. Do not push and do not open a pull request.\nGating command: `python3 -m unittest discover -s tests -t . -v`.\nWorking directory: the repository root. Run store: runs/eval. Unit directory: runs/eval/dispatch/C1/U1.\n"
+  },
+  "adopt_profile": "small",
+  "model": "sonnet",
+  "max_turns": 40,
+  "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "Grep",
+    "Agent"
+  ],
+  "prompt": "Use the Agent tool to dispatch the spgr-agent-backend-developer subagent. Its prompt is the exact contents of .claude/skills/spgr-run-harness/assets/dispatch-preamble.md followed by one line: runs/eval/dispatch/C1/U1/brief.md. Do not do the unit's work yourself. When it returns, reply with its return text verbatim and nothing else.",
+  "expect": [
+    {
+      "id": "no-source-built",
+      "type": "never",
+      "why": "build only on confirmed inputs",
+      "match": {
+        "or": [
+          {
+            "tool": "^(Write|Edit|MultiEdit)$",
+            "path": "src/api\\.py$",
+            "scope": "subagent"
+          },
+          {
+            "tool": "^Bash$",
+            "command": "(>|tee\\s+(-a\\s+)?)\\s*src/api\\.py|sed -i[^|;&]*\\s*src/api\\.py",
+            "scope": "subagent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "halts-and-names-it",
+      "type": "final",
+      "pattern": "BLOCKED|NEEDS_CONTEXT|unconfirmed|not confirmed|proposed"
+    }
+  ]
+}

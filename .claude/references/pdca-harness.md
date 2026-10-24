@@ -390,14 +390,11 @@ log could not tell a finished agent from a running one.
 
 ## Token economy and dispatch efficiency
 
-Session limits are account-wide and rolling: every subagent's spend counts
-against the same window as the main session, so a story driven gate-to-gate in
-one sitting can exhaust the window even when no single agent is oversized. The
-reference case is one story in a test-bed run: roughly 3.7M subagent tokens and
-two session-limit terminations, where the two most expensive dispatches were
-resumed agents doing small fixes. A +18/-6 source fix cost 322k tokens because
-resuming the implementation agent re-paid its ~300k transcript before any work
-began. These rules keep a run inside its window without lowering the quality bar.
+Session limits are account-wide and rolling, so every subagent's spend counts
+against the main session's window. In the reference case a +18/-6 fix cost
+322k tokens because resuming the implementation agent re-paid its ~300k
+transcript first. These rules keep a run inside its window without lowering
+the quality bar.
 
 1. Fresh-by-default for bounded fixes. A bounded fix or follow-up dispatches a
    NEW agent carrying a tight prompt, the finding text, and artifact refs.
@@ -424,11 +421,9 @@ began. These rules keep a run inside its window without lowering the quality bar
    model. Full effort is reserved for design, implementation, adversarial
    review, and vertical sign-off, where the depth has repeatedly paid for
    itself. The dispatch-tier table below is the operative assignment.
-5. Recovery from a session-limit death. Resume the dead agent in place only if
-   it held substantial un-persisted progress. Otherwise re-dispatch fresh under
-   rule 1. When limits recur within a run, serialize the heavy units across
-   ticks rather than stacking them in one parallel batch, and let the run span
-   windows instead of forcing it through one.
+5. Recovery from a session-limit death is the transient class in Failure
+   classes. When limits recur within a run, serialize the heavy units across
+   ticks rather than stacking them in one parallel batch.
 6. Artifact diet. A producing agent writes what downstream consumers need and
    links the rest by reference. Folded-in history belongs to the archived prior
    version, not the operative artifact. An operative artifact is capped at
@@ -463,39 +458,31 @@ unit is fresh every time under rule 1 and never inherits a transcript.
 
 ## Dispatch contract
 
-Every unit prompt carries the same things, and every unit report answers the
-same things. The prompt names the files to read in order, the rulings
-that bind, the check command that gates the work, the working directory (the
-unit's worktree path, or the main checkout) with the absolute run-store path,
-and the report format. The unit runs every gating command after committing,
-through `scripts/receipt.py run <unit-dir> --name <name> -- <command>`,
-which writes a receipt with the exit code, the number of tests that ran,
-the commit, and a tree fingerprint. A green exit that ran no tests is
-`zero-run`, a fail. The report lists the files written with line counts,
-names its receipts, quotes verbatim every obligation it could not satisfy
-with the reason, lists each default taken as one defaults-ledger line, and
-never fills a gap with an unrecorded assumption. A claim with no receipt is
-unverified, and Check reads receipts with `receipt.py verify`, never the
-report's prose, so a receipt for another commit or a moved tree is stale.
+Every dispatch prompt is `assets/dispatch-preamble.md` (relative to the
+spgr-run-harness skill) pasted byte for byte, then one line naming the
+unit's brief. The preamble is the unit-facing contract: read order, binding
+rulings, receipts for every gating command, no edits to check config, the
+defaults ledger, the unit result file, and the fifteen-line return. Every fact that
+changes between dispatches (run id, cycle, unit directory, gate state,
+autonomy, rulings, interfaces) lives in the brief, never in the preamble,
+so dispatches of one agent share a cached prompt prefix. A claim with no
+receipt is unverified, and Check reads receipts with `receipt.py verify`,
+never the result file's prose, so a receipt for another commit or a moved tree
+is stale.
 
 The contract travels in files, not in the prompt and not in the return value,
 so neither the task text nor the diff transits the main session.
 
-- The brief. For each routed unit the harness writes
-  `runs/<run-id>/dispatch/<cycle-id>/<unit-id>/brief.md`: one line of
-  context, the files to read in order (the story brief first), the rulings
-  that bind, the interfaces the unit consumes from earlier units and produces
-  for later ones with exact names and signatures, the check command, the
-  working directory and run-store path, and the report path. The dispatch
-  prompt is a few lines that name the brief as the unit's requirements. A
-  unit reads its brief, never the whole plan or the whole corpus.
-- The report. The unit writes `report.md` beside its brief with the full
-  contract above, and returns under fifteen lines: a status, the commits, a
-  one-line test summary, and concerns. The status is one of `DONE`,
-  `DONE_WITH_CONCERNS`, `BLOCKED`, or `NEEDS_CONTEXT`. The harness reads the
-  return, and opens the report only for the section Check needs, which is the
-  pasted verification output. A `BLOCKED` or `NEEDS_CONTEXT` return names
-  what is missing, and routes as an escalation.
+- The brief, `runs/<run-id>/dispatch/<cycle-id>/<unit-id>/brief.md`: one
+  line of context, the files to read in order, the binding rulings, the
+  interfaces consumed and produced with exact names and signatures, the
+  gating commands, the working directory, the run-store path, and the unit
+  directory. A unit reads its brief, never the whole plan or the corpus.
+- The return and the result. The harness saves the return as `return.txt`
+  in the unit directory, reads its status, and opens `result.md` only for a
+  section Check needs. The name is not `report.md`, because Claude Code
+  refuses a subagent's write to a file named like a report. A `BLOCKED` or
+  `NEEDS_CONTEXT` return routes as an escalation.
 - The review package. Before a review unit the harness runs
   `scripts/review-package.py <base> <head> --out <dir>/review.md`, which
   refuses a head that does not descend from the base and writes the commit
@@ -515,9 +502,21 @@ so neither the task text nor the diff transits the main session.
 The `dispatch/` directory is run-store history like the cycle log. The
 store-reading scripts do not scan it, and it is never an artifact.
 
+### Failure classes
+
+A failed unit is classified before it is retried, with
+`scripts/classify-failure.py <unit-dir> --run-dir <run-dir>` over the saved
+return text (`return.txt`), the result file, and the receipts, and the cycle
+record carries the class in `check.failures`. A `transient` platform failure
+is redispatched unchanged after a pause, and three in a row on one unit pause
+the run. A `context` overflow is split or given a narrower brief. A `blocked`
+return routes as an escalation. An `environment` failure runs preflight and
+fixes the tool or asks the human. None of these spends a retry. Only a
+`defect`, including a failed or zero-run receipt, enters the fix loop below.
+
 ### Bounded fix loop
 
-Review is one pass and one re-review, and a unit gets two bounded retries.
+Review is one pass and one re-review, and a defect gets two bounded retries.
 Those counts stay. The loop inside them has a fixed shape.
 
 1. A fix dispatch carries the finding text verbatim, the lines it names, and
@@ -861,13 +860,12 @@ architecture.
 
 ## Rule budget and the outcome figure
 
-This reference is capped at its length when the budget opened, 1000 lines,
-and the project CLAUDE.md template at 60. A change that adds a rule removes
-or merges one of equal weight in the same change and names it in the
-commit. A retrospective learning may propose a removal, and the
-run-retrospective lists the rules no cycle in the run exercised. Every rule
-here was added after a run that hurt, and the runs since hurt in new ways,
-because process answered process.
+This reference is capped at 1000 lines and the project CLAUDE.md template at
+60. A change that adds a rule removes or merges one of equal weight and
+names it in the commit. The run-retrospective lists the rules no cycle in
+the run exercised, as candidates for removal. Every rule here was added after
+a run that hurt, and the runs since hurt in new ways, because process
+answered process.
 
 The harness is measured by one figure: product checks passed per hundred
 agent dispatches, on the dashboard beside the token and cost lines. A change
@@ -887,6 +885,12 @@ consult it, under three rules that prevent silent drift. See ADR-004.
 - Human-promoted rules. A learning that would change a rule (a WIP limit, the gate
   set, a routing policy) carries requires_human_promotion true and is applied only
   through a human gate, never by the loop.
+- Mechanical fixes become checks. A learning about a mistake a script can see
+  in a file, a diff, or an output carries remedy `check` and names the
+  validator rule, hook, test, or schema constraint that will catch it. Only a
+  judgment call takes remedy `reference`, and it names the rule it
+  displaces. This is how the rule budget stays honest: a repeated mistake
+  adds a check, not a paragraph.
 - Provenance travels with the learning. Each one records its `source`
   (observed, user-stated, inferred) and the `files` it concerns. A run cites
   a learning from another project only when its source is user-stated, and
@@ -961,6 +965,8 @@ These scripts keep the deterministic work out of the model.
   `dispositions <tags> <review>` fails a review that left a tag unanswered.
 - `scripts/receipt.py run|verify` records a gating command's evidence and
   refuses a failed, zero-run, or stale receipt.
+- `scripts/classify-failure.py <unit-dir>` names a failed unit's class and
+  whether a retry is spent.
 - `scripts/product-check.py <run-dir> --touches <paths>` runs the project's
   product checks from `runs/_product-check.json` against the real product
   and records each result as a `product_check` event, plus a `product`

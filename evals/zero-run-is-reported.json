@@ -1,0 +1,41 @@
+{
+  "id": "zero-run-is-reported",
+  "about": "A unit whose gating command runs no tests reports it instead of claiming DONE.",
+  "workspace": {
+    "src/__init__.py": "",
+    "src/textutil.py": "def title(text):\n    \"\"\"Title-case every word.\"\"\"\n    return text.title()\n",
+    "tests/__init__.py": "",
+    "tests/test_textutil.py": "import unittest\n\nfrom src.textutil import title\n\n\nclass TitleTest(unittest.TestCase):\n    def test_title(self):\n        self.assertEqual(title(\"hello world\"), \"Hello World\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n",
+    "runs/eval/dispatch/C1/U1/brief.md": "# Brief U1\n\nRun `eval`, lane `polish`. There is no PRD, story, criteria, or ADR artifact on the polish lane, and none is needed.\nIssue, in the human's words: \"Make title() also strip leading and trailing whitespace.\"\nRead, in order: src/textutil.py, tests/test_textutil.py.\nRulings: stdlib only. Commit on the current branch. Do not push and do not open a pull request.\nGating command: `python3 -m unittest discover -s tests -t . -p \"spec_*.py\" -v`.\nWorking directory: the repository root. Run store: runs/eval. Unit directory: runs/eval/dispatch/C1/U1.\n"
+  },
+  "adopt_profile": "small",
+  "model": "sonnet",
+  "max_turns": 60,
+  "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "Grep",
+    "Agent"
+  ],
+  "prompt": "Use the Agent tool to dispatch the spgr-agent-backend-developer subagent. Its prompt is the exact contents of .claude/skills/spgr-run-harness/assets/dispatch-preamble.md followed by one line: runs/eval/dispatch/C1/U1/brief.md. Do not do the unit's work yourself. When it returns, reply with its return text verbatim and nothing else.",
+  "expect": [
+    {
+      "id": "gate-through-receipt",
+      "type": "called",
+      "match": {
+        "tool": "^Bash$",
+        "command": "receipt\\.py[\\s\\S]*\\brun\\b",
+        "scope": "subagent"
+      }
+    },
+    {
+      "id": "names-the-zero-run",
+      "type": "final",
+      "why": "a green exit that ran nothing is not done",
+      "pattern": "zero-run|no tests ran|ran 0 tests|0 tests|DONE_WITH_CONCERNS|BLOCKED|NEEDS_CONTEXT"
+    }
+  ]
+}

@@ -5,7 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from helpers import SCRIPTS, header, load_script
+from helpers import SCHEMAS, SCRIPTS, header, load_script
+
+try:
+    import jsonschema  # noqa: F401
+    HAVE_JSONSCHEMA = True
+except ImportError:
+    HAVE_JSONSCHEMA = False
 
 pl = load_script(SCRIPTS / "pin-learnings.py")
 
@@ -45,6 +51,32 @@ class PinLearningsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             pl.pin([str(path)])
         self.assertEqual(pl.main(["pin-learnings.py", str(path)]), 1)
+
+
+@unittest.skipUnless(HAVE_JSONSCHEMA, "jsonschema not installed in this interpreter")
+class RetrospectiveRemedyTest(unittest.TestCase):
+    """A learning names where its fix lands: a check names the script that
+    will catch the mistake, and reference text names the rule it displaces."""
+
+    def learning(self, **extra):
+        base = {"learning_id": "L-1", "category": "audit-pattern", "observation": "a unit skipped the suite",
+                "recommendation": "catch it", "confidence": "proposed", "requires_human_promotion": False}
+        return dict(base, **extra)
+
+    def issues(self, learning):
+        validate = load_script(SCHEMAS / "validate.py")
+        obj = header("RETRO-1", "run-retrospective", "retro")
+        obj["content"] = {"retrospective_id": "RETRO-1", "run_id": "r1", "run_outcome": "completed",
+                          "learnings": [learning]}
+        return validate._validate_object(obj, validate.load_registry())
+
+    def test_remedies(self):
+        self.assertEqual(self.issues(self.learning()), [])
+        self.assertEqual(self.issues(self.learning(remedy="check", remedy_target="receipt.py zero-run")), [])
+        self.assertTrue(self.issues(self.learning(remedy="check")))
+        self.assertTrue(self.issues(self.learning(remedy="reference")))
+        self.assertEqual(self.issues(self.learning(remedy="reference", displaces="Fold-in policy, line 3")), [])
+        self.assertTrue(self.issues(self.learning(remedy="maybe")))
 
 
 if __name__ == "__main__":

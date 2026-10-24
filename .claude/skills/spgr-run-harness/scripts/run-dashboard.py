@@ -232,6 +232,7 @@ def aggregate_project(project_root):
         "usd_estimated": False,
         "outcomes_passed": 0,
         "outcomes_total": 0,
+        "failures": {},
     }
     pattern = os.path.join(project_root, "runs", "*", "events.jsonl")
     for path in sorted(glob.glob(pattern)):
@@ -249,6 +250,9 @@ def aggregate_project(project_root):
                 stats["outcomes_total"] += 1
                 if ev.get("result") == "pass":
                     stats["outcomes_passed"] += 1
+            elif kind == "unit_failure":
+                cls = ev.get("class") or "unknown"
+                stats["failures"][cls] = stats["failures"].get(cls, 0) + 1
             elif kind in ("agent_completed", "agent_joined", "agent_abandoned"):
                 stats["completions"] += 1
                 metrics = ev.get("metrics") or {}
@@ -280,6 +284,19 @@ def outcome_line(stats):
         f"  outcomes {BOLD}{passed}/{total}{RESET} product checks passed"
         f"   {BOLD}{per_hundred:.1f}{RESET} per 100 dispatches"
     )
+
+
+def failure_line(stats):
+    """The failure mix from classify-failure.py. Only a defect spends a
+    retry, so a run whose failures are mostly transient or environment is
+    losing budget to the platform or the machine, not to the code."""
+    failures = stats.get("failures") or {}
+    if not failures:
+        return None
+    order = ["defect", "transient", "context", "environment", "blocked"]
+    parts = [f"{k} {failures[k]}" for k in order if failures.get(k)]
+    parts += [f"{k} {v}" for k, v in sorted(failures.items()) if k not in order]
+    return f"  failures {BOLD}{sum(failures.values())}{RESET}   {DIM}{', '.join(parts)}{RESET}"
 
 
 def pair_events(events):
@@ -563,6 +580,8 @@ def render(run_dir, project_root, width):
             summary += f"   subagent cost {BOLD}{mark}{fmt_usd(stats['usd'])}{RESET}"
         lines.append(clip(summary, width))
         lines.append(clip(outcome_line(stats), width))
+        if failure_line(stats):
+            lines.append(clip(failure_line(stats), width))
         split = [
             f"{label} {fmt_tokens(stats['tokens'][key])}"
             for key, label in (
