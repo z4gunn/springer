@@ -43,19 +43,21 @@ Produce one ordered backlog whose sequence reflects where the product delivers t
 
 5. Enforce dependency ordering. If story B depends on story A, place A before B regardless of relative score, and set `dependencies_met` on B only when every dependency precedes it. When a higher-scored story depends on a lower-scored one, the dependency wins the order.
 
-6. Break ties by observable user value. When two stories share a score, place the one that delivers more visible user value first, since it builds momentum and trust.
+6. Keep each feature contiguous. Order features by score and dependency, then order the items inside a feature, so the orchestrator can finish one feature before the next. Carry `epic_id`, `feature_id`, and `work_type` on every entry, and list each feature with its outcome and product check in `features`.
 
-7. Reserve explicit `tech_debt_slots` at concrete positions in the order for tech debt and infrastructure work. Each slot names a position and a reason, with a story_id when one exists or null when the slot is held for work not yet written. Do not treat these as optional.
+7. Break ties by observable user value. When two stories share a score, place the one that delivers more visible user value first, since it builds momentum and trust.
 
-8. Record each story moved out of the current release in `deferred_stories` with a deferral reason and a revisit condition.
+8. Reserve explicit `tech_debt_slots` at concrete positions in the order for tech debt and infrastructure work. Each slot names a position and a reason, with a story_id when one exists or null when the slot is held for work not yet written. Do not treat these as optional.
 
-9. Write a one-line rationale per story stating why it sits in its position, referencing the factors that drove its score.
+9. Record each story moved out of the current release in `deferred_stories` with a deferral reason and a revisit condition.
 
-10. Escalate through spgr-escalate rather than guessing when an input is missing or contradictory. Trigger on a story ID that does not resolve, a dependency cycle, a dependency on a story absent from `story_set`, a story that requires a skill `team_context` says the team lacks, or a PRD goal order that conflicts with the supplied business context. Return the precise list of what is missing or in conflict.
+10. Write a one-line rationale per story stating why it sits in its position, referencing the factors that drove its score.
 
-11. Log any consequential ordering choice through spgr-log-decision, in particular a case where a dependency overrode score or a tie was broken on observable value, so the order is not re-litigated later.
+11. Escalate through spgr-escalate rather than guessing when an input is missing or contradictory. Trigger on a story ID that does not resolve, a dependency cycle, a dependency on a story absent from `story_set`, a story that requires a skill `team_context` says the team lacks, or a PRD goal order that conflicts with the supplied business context. Return the precise list of what is missing or in conflict.
 
-12. Write the artifact through spgr-write-artifact, which runs inline validation before the write completes.
+12. Log any consequential ordering choice through spgr-log-decision, in particular a case where a dependency overrode score or a tie was broken on observable value, so the order is not re-litigated later.
+
+13. Write the artifact through spgr-write-artifact, which runs inline validation before the write completes.
 
 ## Notes
 

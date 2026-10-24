@@ -26,7 +26,7 @@ class DeriveReadyQueueTest(unittest.TestCase):
     def test_api_profile_defaults_to_standard_autonomy(self):
         self.assertEqual(drq.DEFAULT_AUTONOMY["api"], "standard")
         self.assertEqual(drq.resolve_autonomy({"profile": "api", "flags": {}}), "standard")
-        self.assertEqual(drq.resolve_autonomy({"profile": "api", "flags": {"autonomy": "autopilot"}}), "standard")
+        self.assertEqual(drq.resolve_autonomy({"profile": "api", "flags": {"autonomy": "autopilot"}}), "autopilot")
 
     def test_empty_store_is_not_blocked(self):
         snap = self.snapshot()
@@ -153,9 +153,16 @@ class DeriveReadyQueueTest(unittest.TestCase):
         opted = RunStore(self.tmp.name, run_id="opted", profile="saas", autonomy="supervised")
         self.assertEqual(drq.derive(opted.run_dir)["autonomy"], "supervised")
 
-    def test_autopilot_falls_back_to_standard_outside_brochure_and_small(self):
+    def test_complete_follows_the_last_cycle(self):
+        self.assertFalse(self.snapshot()["complete"])
+        self.store.add_cycle(transition="advance")
+        self.assertFalse(self.snapshot()["complete"])
+        self.store.add_cycle(transition="complete")
+        self.assertTrue(self.snapshot()["complete"])
+
+    def test_autopilot_is_allowed_on_every_profile(self):
         store = RunStore(self.tmp.name, run_id="big", profile="saas", autonomy="autopilot")
-        self.assertEqual(drq.derive(store.run_dir)["autonomy"], "standard")
+        self.assertEqual(drq.derive(store.run_dir)["autonomy"], "autopilot")
         small = RunStore(self.tmp.name, run_id="sm", profile="small", autonomy="autopilot")
         self.assertEqual(drq.derive(small.run_dir)["autonomy"], "autopilot")
 
