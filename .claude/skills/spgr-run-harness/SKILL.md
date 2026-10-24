@@ -114,10 +114,11 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    committing through `scripts/receipt.py run <unit-dir> --name <name> --
    <command>` and quotes any unmet obligation verbatim, per the dispatch
    contract in the reference. A claim with no receipt is unverified. Write the brief to
-   `runs/<run-id>/dispatch/<cycle-id>/<unit-id>/brief.md` and point the
-   prompt at it, require the full report in `report.md` beside the brief and
-   a return under fifteen lines carrying a status of DONE,
-   DONE_WITH_CONCERNS, BLOCKED, or NEEDS_CONTEXT, and before any review unit
+   `runs/<run-id>/dispatch/<cycle-id>/<unit-id>/brief.md`, carrying every
+   fact that changes between dispatches, and make the dispatch prompt
+   `assets/dispatch-preamble.md` pasted unchanged followed by one line with
+   the brief's path, so repeat dispatches share a cached prefix. Save each
+   return as `return.txt` in the unit directory. Before any review unit
    cut the diff with `scripts/review-package.py <base> <head> --out
    <unit-dir>/review.md --touch-paths <story paths>` so the reviewer reads the
    package, gate-integrity tags first, and this session never reads the diff. The turn boundary is the fork-join barrier, and because all run-state
@@ -180,10 +181,14 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    it through a haiku unit in this cycle or defer it, per the fold-in policy in
    the reference. Keep the cycle record to roughly 2k tokens. Then take the
    transition: advance and loop, retry, escalate by routing per the orchestrator
-   rules, or pause. On a fail verdict, retry by filing a bug report with
-   spgr-write-bug-report and a regression test, then routing the fix to the
-   developer agent that owns the artifact. Bound retries: after two failed retries
-   on the same unit, stop retrying and escalate to the human rather than looping.
+   rules, or pause. On a fail verdict, first run `scripts/classify-failure.py
+   <unit-dir> --run-dir <run-dir>` and record the class in `check.failures`.
+   A transient, context, blocked, or environment failure takes its own
+   policy from Failure classes in the reference and spends no retry. A
+   defect is retried by filing a bug report with spgr-write-bug-report and a
+   regression test, then routing the fix to the developer agent that owns the
+   artifact. Bound retries: after two failed defect retries on the same unit,
+   stop retrying and escalate to the human rather than looping.
    The first retry is a fresh agent at the unit's tier, the second a fresh
    agent one tier up that is told a prior implementer attempted the fix.
    Bound review the same way: one review pass and one scoped re-review that
@@ -232,8 +237,10 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    story to the done column, which carries the issue to Done the same way.
 7. Complete. When the orchestrator reports no further work, write the
    run-retrospective summarizing the run's learnings, each tagged with its
-   category, its evidence cycle refs, and a requires_human_promotion flag that is
-   true for any learning that would change a rule. Under autopilot, send the
+   category, its evidence cycle refs, a requires_human_promotion flag that is
+   true for any learning that would change a rule, and its remedy: `check`
+   with the script, hook, test, or schema that will catch a mechanical
+   mistake, or `reference` with the rule a judgment-call text displaces. Under autopilot, send the
    completion notice through spgr-notify-human with every open line of
    `pending-defaults.md` as a numbered list. Set the final cycle transition to
    complete, and stop.

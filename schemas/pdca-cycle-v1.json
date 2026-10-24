@@ -250,6 +250,19 @@
               ],
               "description": "Whether the actual outcome matched the expected_outcome from Plan."
             },
+            "failures": {
+              "type": "array",
+              "description": "Each failed unit as classify-failure.py named it. Only a defect spends a bounded retry.",
+              "items": {
+                "type": "object",
+                "required": ["unit_id", "class"],
+                "properties": {
+                  "unit_id": { "type": "string", "minLength": 1 },
+                  "class": { "type": "string", "enum": ["transient", "context", "blocked", "environment", "defect"] },
+                  "evidence": { "type": "string" }
+                }
+              }
+            },
             "product_check": {
               "type": [
                 "object",

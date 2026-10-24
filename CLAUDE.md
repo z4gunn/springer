@@ -40,8 +40,9 @@ springer/
     project-CLAUDE.md    the tailored CLAUDE.md a project instance receives
     project-settings.json the instance settings: harness permission allowlist plus the event hooks
   schemas/               artifact JSON Schemas, built first (see Build Order)
-  scripts/               repo tooling (new-project.sh instantiates a project instance, update-project.py brings one up to a newer runtime, validate-repo.py enforces the hard rules below)
-  tests/                 unittest suite for the harness scripts, the hooks, and the validator, run by CI
+  scripts/               repo tooling (new-project.sh instantiates a project instance, update-project.py brings one up to a newer runtime or adopts an existing repository, validate-repo.py enforces the hard rules below, eval-skills.py runs the behavioral evals)
+  evals/                 behavioral eval scenarios, one JSON per behavior an agent must show in a real transcript
+  tests/                 unittest suite for the harness scripts, the hooks, the validator, and the eval checker, run by CI
   .github/workflows/     CI: the repo validator, the schema self-check, and the test suite on every push and PR
   runs/                  the run store where a project's artifacts accumulate (gitignored)
   brand/                 brand assets (avatars, favicon, social preview)
@@ -119,6 +120,7 @@ Run this checklist on every artifact before it is committed. The shape rules in 
 - [ ] The spec's contracts, methodology rules, and escalation triggers are all mapped
 - [ ] No em-dashes, semicolons, body-text bold, italics, or banned filler words
 - [ ] Scripts, if any, are tested by running them
+- [ ] A change to a procedure an `evals/` scenario measures is run with `python3 scripts/eval-skills.py run <scenario> --runs 3` before it merges, and a new rule a model must follow comes with a scenario that shows it does
 
 ### Generated Code Standards
 

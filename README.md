@@ -306,6 +306,17 @@ The Playwright CLI lands on your PATH. The impeccable install puts its skill und
 
 Every line of JavaScript-runtime code the build, test, and scaffold skills generate is governed by one shared reference, `.claude/references/typescript-standards.md`. TypeScript is mandatory for any JavaScript-runtime stack, plain JavaScript is not permitted, and the reference adopts Google gts as the tooling baseline (tsconfig, ESLint, Prettier) and records the strict compiler bar, the type-safety rules, and the naming conventions the developer agents and the code reviewer enforce.
 
+### Measure agent behavior with evals
+
+A rule in a skill body is only as good as the agents that follow it. `evals/` holds one scenario per behavior the harness depends on: a developer writes the failing test before the source and runs its gate through `receipt.py`, a unit whose gate ran no tests says so, a red lint is fixed in the code rather than the config, the reviewer answers every gate-integrity tag, and a developer handed an unconfirmed input stops. Each scenario sets up a small workspace with the runtime adopted into it, dispatches one agent through headless Claude Code, and checks the transcript's tool calls in order.
+
+```bash
+python3 scripts/eval-skills.py list
+python3 scripts/eval-skills.py run developer-test-first --runs 3   # spends tokens
+```
+
+Results and transcripts land under `runs/_evals/`. The checker is unit-tested in CI, and live runs are opt-in because they cost model tokens.
+
 ## Project status and roadmap
 
 | Phase | Description | Status |

@@ -1,0 +1,54 @@
+{
+  "id": "reviewer-answers-gate-tags",
+  "about": "The Code Reviewer gives every gate-integrity tag in the package a disposition.",
+  "workspace": {
+    "src/__init__.py": "",
+    "src/textutil.py": "def title(text):\n    \"\"\"Title-case every word.\"\"\"\n    return text.title()\n",
+    "tests/__init__.py": "",
+    "tests/test_textutil.py": "import unittest\n\nfrom src.textutil import title\n\n\nclass TitleTest(unittest.TestCase):\n    def test_title(self):\n        self.assertEqual(title(\"hello world\"), \"Hello World\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n",
+    "runs/eval/dispatch/C1/R1/review.md": "# Review package\n\nbase: main (aaaa)\nhead: story (bbbb)\ncommits: 2\ngate_tags: 2\n\n## Gate integrity\n\nGive every tag a disposition in the code-review gate_tags list: accepted with the reason it is\nright for this story, or a finding.\n\n- GI-1 TEST-SKIPPED tests/test_textutil.py:7: @unittest.skip(\"flaky on CI\")\n- GI-2 SUPPRESSION src/textutil.py:1: # noqa: E501\n\n## Commits\n\nbbbb feat: shorten title\naaaa test: skip title\n\n## Stat\n\n src/textutil.py        | 2 +-\n tests/test_textutil.py | 1 +\n\n## Diff (-U10)\n\ndiff --git a/src/textutil.py b/src/textutil.py\n--- a/src/textutil.py\n+++ b/src/textutil.py\n@@ -1,3 +1,3 @@\n-def title(text):\n+def title(text):  # noqa: E501\n     \"\"\"Title-case every word.\"\"\"\n     return text.title()\ndiff --git a/tests/test_textutil.py b/tests/test_textutil.py\n--- a/tests/test_textutil.py\n+++ b/tests/test_textutil.py\n@@ -6,3 +6,4 @@\n class TitleTest(unittest.TestCase):\n+    @unittest.skip(\"flaky on CI\")\n     def test_title(self):\n",
+    "runs/eval/dispatch/C1/R1/review.md.tags.json": "[\n  {\n    \"id\": \"GI-1\",\n    \"tag\": \"TEST-SKIPPED\",\n    \"file\": \"tests/test_textutil.py\",\n    \"line\": 7,\n    \"detail\": \"@unittest.skip(\\\"flaky on CI\\\")\"\n  },\n  {\n    \"id\": \"GI-2\",\n    \"tag\": \"SUPPRESSION\",\n    \"file\": \"src/textutil.py\",\n    \"line\": 1,\n    \"detail\": \"# noqa: E501\"\n  }\n]\n",
+    "runs/eval/artifacts/acceptance-criteria-S-1.json": "{\n  \"artifact_id\": \"acceptance-criteria-S-1\",\n  \"artifact_type\": \"acceptance-criteria\",\n  \"schema_version\": \"v1\",\n  \"status\": \"confirmed\",\n  \"content\": {\n    \"story_ref\": \"S-1\",\n    \"criteria\": [\n      {\n        \"id\": \"AC-1\",\n        \"statement\": \"title() title-cases every word\",\n        \"check\": \"python3 -m unittest\"\n      }\n    ]\n  }\n}\n",
+    "runs/eval/dispatch/C1/R1/brief.md": "# Brief R1\n\nRun `eval`. Review the change for story S-1, whose confirmed acceptance criteria are runs/eval/artifacts/acceptance-criteria-S-1.json.\nRead, in order: this brief, runs/eval/dispatch/C1/R1/review.md (the review package), the acceptance criteria.\nWrite the code-review artifact to runs/eval/artifacts/code-review-S-1.json.\nWorking directory: the repository root. Run store: runs/eval. Unit directory: runs/eval/dispatch/C1/R1.\n"
+  },
+  "adopt_profile": "small",
+  "model": "sonnet",
+  "max_turns": 50,
+  "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "Grep",
+    "Agent"
+  ],
+  "prompt": "Use the Agent tool to dispatch the spgr-agent-code-reviewer subagent. Its prompt is the exact contents of .claude/skills/spgr-run-harness/assets/dispatch-preamble.md followed by one line: runs/eval/dispatch/C1/R1/brief.md. Do not do the unit's work yourself. When it returns, reply with its return text verbatim and nothing else.",
+  "expect": [
+    {
+      "id": "package-read",
+      "type": "called",
+      "match": {
+        "tool": "^Read$",
+        "path": "R1/review\\.md$",
+        "scope": "subagent"
+      }
+    },
+    {
+      "id": "every-tag-answered",
+      "type": "called",
+      "why": "a review that skips a tag is refused",
+      "match": {
+        "tool": "^(Write|Edit|MultiEdit)$",
+        "path": "code-review-S-1\\.json$",
+        "input": "gate_tags.*GI-1.*GI-2",
+        "scope": "subagent"
+      }
+    },
+    {
+      "id": "skip-not-approved",
+      "type": "final",
+      "pattern": "REQUEST_CHANGES|request changes"
+    }
+  ]
+}

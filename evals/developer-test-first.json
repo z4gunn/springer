@@ -1,0 +1,83 @@
+{
+  "id": "developer-test-first",
+  "about": "A developer unit writes the failing test before the source and runs its gate through receipt.py.",
+  "workspace": {
+    "src/__init__.py": "",
+    "src/textutil.py": "def title(text):\n    \"\"\"Title-case every word.\"\"\"\n    return text.title()\n",
+    "tests/__init__.py": "",
+    "tests/test_textutil.py": "import unittest\n\nfrom src.textutil import title\n\n\nclass TitleTest(unittest.TestCase):\n    def test_title(self):\n        self.assertEqual(title(\"hello world\"), \"Hello World\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n",
+    "runs/eval/dispatch/C1/U1/brief.md": "# Brief U1\n\nRun `eval`, lane `polish`. There is no PRD, story, criteria, or ADR artifact on the polish lane, and none is needed.\nIssue, in the human's words: \"Add slugify(text) to src/textutil.py. Lowercase, runs of spaces and punctuation become one hyphen, no leading or trailing hyphen.\"\nRead, in order: src/textutil.py, tests/test_textutil.py.\nRulings: stdlib only. Commit on the current branch. Do not push and do not open a pull request, this repository has no remote.\nGating command: `python3 -m unittest discover -s tests -t . -v`.\nWorking directory: the repository root. Run store: runs/eval. Unit directory: runs/eval/dispatch/C1/U1.\n"
+  },
+  "adopt_profile": "small",
+  "model": "sonnet",
+  "max_turns": 60,
+  "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "Grep",
+    "Agent"
+  ],
+  "prompt": "Use the Agent tool to dispatch the spgr-agent-backend-developer subagent. Its prompt is the exact contents of .claude/skills/spgr-run-harness/assets/dispatch-preamble.md followed by one line: runs/eval/dispatch/C1/U1/brief.md. Do not do the unit's work yourself. When it returns, reply with its return text verbatim and nothing else.",
+  "expect": [
+    {
+      "id": "test-before-source",
+      "type": "before",
+      "why": "test-first",
+      "first": {
+        "or": [
+          {
+            "tool": "^(Write|Edit|MultiEdit)$",
+            "path": "tests/test_[^/]*\\.py$",
+            "scope": "subagent"
+          },
+          {
+            "tool": "^Bash$",
+            "command": "(>|tee\\s+(-a\\s+)?)\\s*tests/test_|sed -i[^|;&]*\\s*tests/test_",
+            "scope": "subagent"
+          }
+        ]
+      },
+      "then": {
+        "or": [
+          {
+            "tool": "^(Write|Edit|MultiEdit)$",
+            "path": "src/textutil\\.py$",
+            "scope": "subagent"
+          },
+          {
+            "tool": "^Bash$",
+            "command": "(>|tee\\s+(-a\\s+)?)\\s*src/textutil\\.py|sed -i[^|;&]*\\s*src/textutil\\.py",
+            "scope": "subagent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gate-through-receipt",
+      "type": "called",
+      "why": "evidence is a receipt",
+      "match": {
+        "tool": "^Bash$",
+        "command": "receipt\\.py[\\s\\S]*\\brun\\b",
+        "scope": "subagent"
+      }
+    },
+    {
+      "id": "result-written",
+      "type": "called",
+      "match": {
+        "tool": "^(Write|Edit|MultiEdit)$",
+        "path": "U1/result\\.md$",
+        "scope": "subagent"
+      }
+    },
+    {
+      "id": "done",
+      "type": "final",
+      "pattern": "\\bDONE\\b"
+    }
+  ]
+}
