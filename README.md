@@ -277,6 +277,14 @@ python3 scripts/update-project.py update ~/path/to/my-saas-app   # apply it
 
 A runtime file the instance never edited is replaced, one it edited is kept and listed, one it added is left alone, and a template-rendered file (CLAUDE.md, the settings, the gitignore) that was edited gets its new rendering written under `.claude/springer-update/` for a hand merge. The update refuses to run while a harness holds a live lock on a run in the instance.
 
+To bring Springer to a repository that already exists, adopt it instead:
+
+```bash
+python3 scripts/update-project.py adopt ~/path/to/existing-app --profile small
+```
+
+Adoption writes the runtime beside the repository's own files and never replaces one. A runtime path that already holds different content refuses the adoption until it is moved aside or `--force` is passed. An existing `CLAUDE.md` keeps its text and gains one import line for the Springer rules, which render to `.claude/springer-rules.md`. An existing settings file gains only the permissions and hooks it lacks, and an existing gitignore only the lines it lacks. The default lane of an adopted repository is `polish`, because the product already exists, so a run takes one issue to one pull request. Later updates work the same as on any instance.
+
 One skill family needs a one-time setup, and it is optional. The diagram skills render Mermaid and PlantUML sources. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, and make the Mermaid CLI available through `npx`. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
 
 A few skills have optional external dependencies, none bundled with Springer. `spgr-render-diagram-excalidraw` builds on the third-party `excalidraw-diagram` skill by Cole Medin. Install it separately only if you want polished Excalidraw output:
