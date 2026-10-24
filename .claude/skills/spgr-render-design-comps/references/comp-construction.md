@@ -12,6 +12,7 @@ How spgr-render-design-comps builds `tokens.css` and each comp page. Read before
 - [Browser surfaces](#browser-surfaces)
 - [Fonts and imagery](#fonts-and-imagery)
 - [Linking from the mockup index](#linking-from-the-mockup-index)
+- [Route variants](#route-variants)
 - [What not to do](#what-not-to-do)
 
 ## Goal
@@ -142,6 +143,17 @@ Set these from tokens on every comp, because their defaults are the first thing 
 ## Linking from the mockup index
 
 When `direction` mode runs, add a "View hero comp" link per direction to `docs/design/index.html` next to the "Start flow" link, so the human reaches structure and identity from one page. When `system` mode runs, add a "Comps" section to the same index pointing at the selected direction's folder. Keep the index itself in the mockup stylesheet. It is a menu, not a comp.
+
+## Route variants
+
+When the product's UI already runs, a direction is judged where it will live: on the real route, with the product's real data, density, and navigation, instead of on a standalone page that flatters it.
+
+- Work on a throwaway branch, `design/variants-<run-id>`, in its own worktree. It is never merged. The selected direction is implemented later by the Frontend Developer from the confirmed tokens, and the branch is deleted after the selection.
+- Add one switch, read from the `variant` query parameter, that applies a direction's `tokens.css` and its layout changes to the route. With no parameter the route renders as it does today, so the current product is always the baseline the human compares against.
+- Change only what a direction changes. Reuse the product's components and copy. A variant that rewrites the screen wholesale is a new product, not a direction.
+- Keep each variant's tokens in `docs/design/comps/<slug>/tokens.css` as in a standalone comp, and import them from the switch, so the token table stays the one source of raw values.
+- Capture with the route URL and `--variants`, for example `capture-comps.py http://localhost:3000/dashboard --out docs/design/comps/route/shots --variants current,quiet,editorial`, which writes one row of the matrix per variant.
+- Link each variant URL and its captures from `docs/design/index.html`, next to the structural mockups.
 
 ## What not to do
 

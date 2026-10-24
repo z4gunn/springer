@@ -14,7 +14,7 @@ An architecture-first AI software development team, from idea to production.
 
 Springer is an AI software development team, built as a library of Claude Code agents and skills. Each agent models a role from a traditional product and engineering organization, from discovery and product management through architecture, design, development, QA, and DevOps, plus the cross-cutting specialties that span those roles. Together they carry a greenfield SaaS or mobile application across the full software lifecycle, from a raw problem statement to production, with a human entering only at deliberate checkpoints.
 
-This repository is the working build of that team: 27 agents and 201 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
+This repository is the working build of that team: 27 agents and 202 skills, implemented as Claude Code artifacts that load automatically in any session opened here.
 
 ## Contents
 
@@ -114,7 +114,7 @@ Twenty-seven agents in three groups. Horizontal agents own a lifecycle phase. Un
 
 ## The skills
 
-A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Agents name the skills they use in their workflow steps and read each one by path, so only the nine skills the main session starts itself (the harness, gate notification, validation, doc rendering, branch and PR creation, escalation, bug reports, and document ingest) carry a description into every session. The rest are marked `disable-model-invocation: true`, and a person can still start any of them by name. The validator keeps that catalog under a count and character budget and fails any skill that no agent, reference, or reachable skill names. The 201 skills group as follows.
+A skill is a single-responsibility capability that an agent invokes, such as writing a PRD, generating an ERD, running a SAST scan, or building a sequence diagram. Agents name the skills they use in their workflow steps and read each one by path, so only the nine skills the main session starts itself (the harness, gate notification, validation, doc rendering, branch and PR creation, escalation, bug reports, and document ingest) carry a description into every session. The rest are marked `disable-model-invocation: true`, and a person can still start any of them by name. The validator keeps that catalog under a count and character budget and fails any skill that no agent, reference, or reachable skill names. The 202 skills group as follows.
 
 ### Shared and product
 
@@ -124,7 +124,7 @@ A skill is a single-responsibility capability that an agent invokes, such as wri
 | Artifact plumbing | 6 | write-artifact, read-artifact, validate-artifact, diff-artifact, version-artifact |
 | Analysis and research | 5 | competitive-analysis, build-persona, build-icp, market-sizing, go-no-go |
 | User-feedback research | 6 | mine-ugc-forums, mine-app-store-reviews, mine-review-platforms, synthesize-painpoints |
-| Product and planning | 9 | write-prd, write-user-story, write-acceptance-criteria, write-nfr, prioritize-backlog, scope-mvp, write-page-copy |
+| Product and planning | 10 | write-prd, write-user-story, write-acceptance-criteria, write-nfr, prioritize-backlog, scope-mvp, write-page-copy, check-buildability |
 
 ### Architecture, design, and diagramming
 
@@ -173,7 +173,7 @@ springer/
   CLAUDE.md              the operative ruleset for AI agents, loaded every session
   .claude/
     agents/<name>.md         the 27 agents, auto-loaded in this repo
-    skills/<name>/SKILL.md    the 201 skills, auto-loaded in this repo
+    skills/<name>/SKILL.md    the 202 skills, auto-loaded in this repo
     references/<name>.md      shared cross-skill references (for example diagram-standards, typescript-standards)
   schemas/               JSON Schemas for the typed artifacts that flow between agents
   scripts/               repo tooling: new-project.sh and the repo validator
@@ -277,6 +277,13 @@ python3 scripts/update-project.py update ~/path/to/my-saas-app   # apply it
 
 A runtime file the instance never edited is replaced, one it edited is kept and listed, one it added is left alone, and a template-rendered file (CLAUDE.md, the settings, the gitignore) that was edited gets its new rendering written under `.claude/springer-update/` for a hand merge. The update refuses to run while a harness holds a live lock on a run in the instance.
 
+Springer also installs as a Claude Code plugin. The plugin loads one skill and nothing else into your sessions, and that skill creates, adopts, or updates an instance from the plugin's copy of the runtime:
+
+```
+/plugin install springer --marketplace z4gunn/springer
+/springer:spgr-install-runtime
+```
+
 To bring Springer to a repository that already exists, adopt it instead:
 
 ```bash
@@ -322,7 +329,7 @@ Results and transcripts land under `runs/_evals/`. The checker is unit-tested in
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1. Spec | One spec file per agent and skill, the source of truth for the build | Complete |
-| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 201 skills |
+| 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 202 skills |
 | 3. Harness | Autonomous orchestration with feedback loops, self-improvement, and parallel execution | Available, the spgr-run-harness PDCA driver |
 
 ## Conventions and contributing

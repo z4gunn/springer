@@ -126,6 +126,16 @@ class ValidateRepoTest(unittest.TestCase):
         self.skill("spgr-entry", GOOD_SKILL.format(name="spgr-entry").replace("Do the thing.", "Run spgr-mid."))
         self.assertNotIn("skill-reachability", run_validator(self.root)[1])
 
+    def test_plugin_skills_take_the_shape_rules_but_not_the_catalog(self):
+        plugin = self.root / "plugin" / "skills" / "spgr-install-x"
+        plugin.mkdir(parents=True)
+        (plugin / "SKILL.md").write_text(GOOD_SKILL.format(name="spgr-install-x").replace("---\n\n#", "tools: Bash\n---\n\n#"))
+        out = run_validator(self.root)[1]
+        self.assertIn("plugin/skills/spgr-install-x", out)
+        self.assertNotIn("skill-reachability", out)
+        (plugin / "SKILL.md").write_text(GOOD_SKILL.format(name="spgr-install-x"))
+        self.assertEqual(run_validator(self.root)[0], 0)
+
     def test_longer_skill_name_does_not_reach_its_prefix(self):
         self.hidden("spgr-load")
         self.hidden("spgr-load-plan")

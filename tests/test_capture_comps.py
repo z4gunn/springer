@@ -146,6 +146,25 @@ class CaptureCompsTest(unittest.TestCase):
         self.assertEqual(pages, [("app-settings", "http://localhost:3000/app/settings")])
         self.assertEqual(cc.resolve_pages("http://localhost:3000/")[1][0][0], "page")
 
+    def test_variants_expand_a_route_into_one_page_each(self):
+        pages = cc.expand_variants([("app", "http://localhost:3000/app?tab=1&variant=old")], ["quiet", "loud"])
+        self.assertEqual(pages, [("app-quiet", "http://localhost:3000/app?tab=1&variant=quiet"),
+                                 ("app-loud", "http://localhost:3000/app?tab=1&variant=loud")])
+        self.assertEqual(cc.expand_variants([("home", "file:///x/home.html")], ["a"]),
+                         [("home", "file:///x/home.html")])
+        write_exec(self.bin / "playwright-cli", FAKE_CLI)
+        os.environ["PATH"] = f"{self.bin}:{self.old_path}"
+        rc, _ = self.run_script("http://localhost:3000/", "--out", "shots", "--widths", "375",
+                                "--schemes", "light", "--variants", "quiet,loud", "--no-detect")
+        self.assertEqual(rc, 0)
+        rep = self.report("shots")
+        self.assertEqual((rep["pages"], rep["variants"]), (["page-quiet", "page-loud"], ["quiet", "loud"]))
+        self.assertIn("open http://localhost:3000/?variant=loud", (self.root / "cli.log").read_text())
+
+    def test_variants_need_a_url_target(self):
+        rc, _ = self.run_script(str(self.comps), "--out", "shots", "--variants", "a")
+        self.assertEqual(rc, 2)
+
     def test_missing_target_exits_two(self):
         os.environ["PATH"] = str(self.bin)
         rc, _ = self.run_script(str(self.root / "nope"), "--out", "shots")

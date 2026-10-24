@@ -108,10 +108,15 @@ class Report:
         return 1 if total else 0
 
 
-def check_skills(root, report):
-    skills_dir = root / ".claude" / "skills"
+def check_skills(root, report, rel_dir=".claude/skills"):
+    """The shape rules for every skill under rel_dir. The plugin's own
+    skills under plugin/skills take the same rules and stay out of the
+    catalog and reachability checks, which describe the runtime."""
+    skills_dir = root / rel_dir
+    if not skills_dir.is_dir():
+        return
     for skill_dir in sorted(p for p in skills_dir.iterdir() if p.is_dir()):
-        rel = f".claude/skills/{skill_dir.name}"
+        rel = f"{rel_dir}/{skill_dir.name}"
         skill_md = skill_dir / "SKILL.md"
         if not skill_md.exists():
             report.fail("skill-frontmatter", rel, "SKILL.md is missing")
@@ -291,6 +296,7 @@ def check_voice(root, report):
         if (root / name).exists():
             candidates.append(root / name)
     candidates.extend((root / "templates").glob("*.md"))
+    candidates.extend((root / "plugin").rglob("*.md"))
     for path in sorted(candidates):
         text = path.read_text()
         if EM_DASH in text:
@@ -305,6 +311,7 @@ def main(argv):
         return 1
     report = Report()
     check_skills(root, report)
+    check_skills(root, report, "plugin/skills")
     check_routing(root, report)
     check_catalog(root, report)
     check_reachability(root, report)

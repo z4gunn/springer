@@ -1,0 +1,16 @@
+{
+  "name": "springer",
+  "owner": {
+    "name": "z4gunn"
+  },
+  "metadata": {
+    "description": "The Springer AI software development team for Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "springer",
+      "source": "./",
+      "description": "Installs the Springer AI software development team into a project: a new instance, an existing repository, or an update to a newer runtime."
+    }
+  ]
+}

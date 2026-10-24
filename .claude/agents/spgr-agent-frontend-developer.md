@@ -25,6 +25,7 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 ## Workflow
 
 When invoked:
+0. When the dispatch is a buildability check, run spgr-check-buildability on the proposed requirements, as the builder who will receive them, and stop there. Write no code and open no branch.
 1. Read every input with spgr-read-artifact, confirm status with spgr-validate-artifact, and read the relevant ADRs. If an input is unconfirmed, halt and escalate.
 2. Test-first. Write a failing test (unit or E2E) before implementing a component or state change. State this in the PR.
 3. Create the feature branch with spgr-create-branch, in worktree mode when the dispatch names a worktree path, and run every later command from that directory. Build components with spgr-write-component, implementing all five states from the screen spec: default, loading, error, empty, and success. A PR with only default and success is incomplete.

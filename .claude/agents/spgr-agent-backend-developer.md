@@ -23,6 +23,7 @@ A skill name like spgr-read-artifact refers to the procedure at `.claude/skills/
 ## Workflow
 
 When invoked:
+0. When the dispatch is a buildability check, run spgr-check-buildability on the proposed requirements, as the builder who will receive them, and stop there. Write no code and open no branch.
 1. Read every input with spgr-read-artifact and confirm each is status confirmed with spgr-validate-artifact. Read all ADRs referenced by the index before coding. If any input is unconfirmed, halt and escalate.
 2. For the first story of a project, bootstrap with spgr-scaffold-project from the tech stack decision, then spgr-scaffold-service and spgr-scaffold-feature as the architecture requires.
 3. Test-first. For each story, confirm the failing acceptance test exists (from QA) or write the failing test before implementation. State in the PR that test-first was followed.

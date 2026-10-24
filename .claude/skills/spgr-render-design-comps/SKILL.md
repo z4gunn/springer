@@ -10,7 +10,7 @@ disable-model-invocation: true
 
 Springer's pipeline moves from gray structural mockups to a token table to screen specs to code, and nobody looks at a rendered high-fidelity surface until production code exists. Visual identity is decided there or nowhere, so this skill renders it early. It builds real HTML comps from the proposed tokens, captures them with a headless browser, and critiques the captures against `.claude/references/design-quality.md` in a bounded loop. The comp is a throwaway selection and verification aid in the same spirit as spgr-render-design-mockups, not a maintained deliverable and not application code. What survives is the token set it validated, the critique record, and the captures the human sees at the next gate.
 
-The skill has two modes. In `direction` mode it renders one hero comp per direction at the selection gate so the human compares identity alongside the structural mockups. In `system` mode it renders the key screens of the selected direction from the proposed design-system tokens and iterates the tokens until the comps pass, before the tokens are locked and before screen specs begin.
+The skill has two modes. In `direction` mode it renders one hero comp per direction at the selection gate so the human compares identity alongside the structural mockups. When the product's UI already runs (an adopted repository, a polish run, or a reference implementation in the repo), `direction` mode renders each direction as a variant on the product's real route instead, so the human judges it against the real data and the current design. In `system` mode it renders the key screens of the selected direction from the proposed design-system tokens and iterates the tokens until the comps pass, before the tokens are locked and before screen specs begin.
 
 ## Inputs
 
@@ -22,6 +22,7 @@ The skill has two modes. In `direction` mode it renders one hero comp per direct
 | `story_backlog_path` | The confirmed backlog, read to pick the one or two screens that carry the most identity, usually the entry screen and the screen where the primary job happens. |
 | `brand_constraints` | Optional. Palette, typeface, logo, and tone constraints that fix axes the choice test must not touch. |
 | `docs_path` | Optional. The comps root, default `docs/design/comps/`. |
+| `route` | Optional, `direction` mode. The URL of a running route of the existing product and the command that serves it. When given, every direction renders as a `?variant=` on that route. |
 
 ## Outputs
 
@@ -45,7 +46,7 @@ The skill has two modes. In `direction` mode it renders one hero comp per direct
 
 5. Render `tokens.css` from the token table. Every token becomes a custom property under `:root`, with the dark layer under a `[data-theme="dark"]` selector and a `prefers-color-scheme` fallback. Font families the direction sources are declared here and loaded by a `<link>` in the page head or a self-hosted `@font-face`. Nothing else in the comp carries a raw color, size, or family. The construction rules, the page skeleton, and the token naming are in [references/comp-construction.md](references/comp-construction.md). Read it before writing a page.
 
-6. Write each screen as one complete HTML page that references `tokens.css` and renders real copy from the brief, real structure from the direction's information architecture, and the hover, focus, active, disabled, loading, error, and empty states where the screen has them, each reachable without a build step. Draw the browser surfaces the reference names: selection, caret, focus ring, scrollbar, form accent color. Use labeled placeholder boxes only for imagery the brief does not supply, and name what each stands for.
+6. With a `route`, follow Route variants in the construction reference instead of steps 6 and 7: build each direction as a variant on the real route on a throwaway branch, serve it, and capture with `--variants`, the current design first. Then continue at step 8. Without a `route`, write each screen as one complete HTML page that references `tokens.css` and renders real copy from the brief, real structure from the direction's information architecture, and the hover, focus, active, disabled, loading, error, and empty states where the screen has them, each reachable without a build step. Draw the browser surfaces the reference names: selection, caret, focus ring, scrollbar, form accent color. Use labeled placeholder boxes only for imagery the brief does not supply, and name what each stands for.
 
 7. Capture. Run the capture script with the comp directory as the target and the `shots/` folder as the output:
 

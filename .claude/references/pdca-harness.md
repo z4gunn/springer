@@ -747,12 +747,17 @@ or a logged default settles without a sitting of its own.
 
 Under standard and autopilot the PRD approval, the intake questions, the
 architecture option, and the design direction are one sitting. When the PM
-unit validates, the orchestrator routes the architecture-options unit and the
-design-directions unit in the same batch, both reading the PRD and backlog at
-proposed status. When both return, the harness fires one direction-review
-checkpoint whose decisions list carries every question, the PRD approval, the
+unit validates, the orchestrator routes the architecture-options unit, the
+design-directions unit, and a buildability-check unit in the same batch, all
+reading the PRD and backlog at proposed status. The buildability check is
+the developer who will build first reading the requirements cold with
+spgr-check-buildability: its `minor` questions become defaults-ledger lines,
+its `human` questions join the gate, and its `answered` ones go nowhere.
+When all three return, the harness fires one direction-review checkpoint
+whose decisions list carries every question, the PRD approval, the
 architecture options, the design directions, and any open defaults. It holds
-all work past requirements until answered.
+all work past requirements until answered. Under supervised the check runs
+before prd-approval, and on the polish lane it does not run.
 
 On the response, the PRD and backlog are confirmed with the human's edits, the
 selected option and direction are recorded, and both downstream sets start in
@@ -760,10 +765,6 @@ one batch. When the response edits the PRD in a way that invalidates an
 option or a direction, the invalidated unit is re-routed once against the
 confirmed PRD and its choice comes back as a follow-up decision at the next
 gate that fires, not as a new sitting of its own.
-
-The reference run spent a separate sitting each on the PRD, the architecture
-options, the architecture confirmation, and the design direction. Under
-standard those four are one.
 
 ## Gates hold only dependent work
 
@@ -988,11 +989,7 @@ superseded artifact cannot resurrect a gate or a block.
 
 ## Increment status
 
-Everything in this reference is live. Parallel Do, the learnings loop, and
-the Linear projection came first. Profiles, the mechanical Check, the review
-bound, autonomy levels, the defaults ledger, and the direction review came
-from the brochure reference run (nine gates and about 55 idle hours of 70
-for one page). Lanes, the reference implementation, the walking skeleton,
-the product check, the vertical budget, and the rule budget came from the
-saas reference instance (767 dispatches and four months before the product
-showed a candidate's name that a five-week hand-built POC already showed).
+Everything in this reference is live. Most rules trace to two reference
+runs: a brochure page that took nine gates and about 55 idle hours of 70,
+and a saas instance that took 767 dispatches and four months to show a
+candidate's name that a five-week hand-built POC already showed.
