@@ -30,8 +30,9 @@ When invoked:
 
 ## How to read the inputs
 
-- The report is the implementer grading itself. Read it for what was done and what was verified, and take its pasted output as evidence of exactly the command it shows. A rationale in the report never downgrades a finding, and a claim with no pasted output is unverified. Grade the package, not the report.
-- A test the report evidences with pasted output is not re-run for reassurance. Run a command only when a finding needs it.
+- The report is the implementer grading itself. Read it for what was done, and take a receipt it names as evidence of exactly the command the receipt records. The harness verifies receipts by script before you are dispatched. A rationale in the report never downgrades a finding, and a claim with no receipt is unverified. Grade the package, not the report.
+- A test a receipt covers is not re-run for reassurance. Run a command only when a finding needs it.
+- The package opens with gate-integrity tags. Give every tag an entry in the artifact's `gate_tags` list: `accepted` with the reason the change is right for this story, or `finding` with the finding raised for it. A skipped or removed test, lost assertions, or a loosened check config with no reason the story gives is a P1 on the `xp` axis. The harness refuses a review that leaves a tag without an entry.
 - The story and its criteria describe what a reasonable user of this product expects. A correctness defect that user would hit is a finding even when no criterion names it, graded by its effect on that user. Silence in the spec is not permission to break the obvious path. A missing test for behavior no criterion names stays off the list, as the false-findings list below says.
 - A check the package cannot answer, because it needs execution, a live service, or a file outside the diff, is returned in the artifact's `cannot_verify` list with the command that would answer it. It is never raised as a finding on suspicion and never dropped.
 - Every behavior in the diff you looked at and set aside goes in the artifact's `declined_to_judge` list with the reason, so nothing leaves the review silently.

@@ -110,17 +110,17 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    check command, the working directory (the unit's own worktree under
    `.worktrees/` whenever the batch holds more than one build unit, created
    by spgr-create-branch in worktree mode) with the absolute run-store path,
-   and the report format, and every report pastes its
-   verification output and quotes any unmet obligation verbatim, per the
-   dispatch contract in the reference. A report that describes a check rather
-   than pasting it counts as unverified. Write the brief to
+   and the report format. Every unit runs its gating commands after
+   committing through `scripts/receipt.py run <unit-dir> --name <name> --
+   <command>` and quotes any unmet obligation verbatim, per the dispatch
+   contract in the reference. A claim with no receipt is unverified. Write the brief to
    `runs/<run-id>/dispatch/<cycle-id>/<unit-id>/brief.md` and point the
    prompt at it, require the full report in `report.md` beside the brief and
    a return under fifteen lines carrying a status of DONE,
    DONE_WITH_CONCERNS, BLOCKED, or NEEDS_CONTEXT, and before any review unit
    cut the diff with `scripts/review-package.py <base> <head> --out
-   <unit-dir>/review.md` so the reviewer reads the package and this session
-   never reads the diff. The turn boundary is the fork-join barrier, and because all run-state
+   <unit-dir>/review.md --touch-paths <story paths>` so the reviewer reads the
+   package, gate-integrity tags first, and this session never reads the diff. The turn boundary is the fork-join barrier, and because all run-state
    writes happen here in the main session after the barrier, there is a single
    writer. Collect the artifacts each agent wrote. Agents never write run state.
    Dispatch under the token-economy rules and the dispatch-tier table in
@@ -134,20 +134,24 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 4. Check, mechanical first. Validate every produced artifact by running
    `python3 schemas/validate.py <artifact>` directly, and open
    spgr-validate-artifact only when the script reports a failure, so the green
-   path costs no model tokens. Run the project check script or the scoped test
-   files the unit named, and read CI on the PR head. Do not re-run an agent's
-   verification by hand, re-derive a finding it reported, or open artifacts to
-   re-read claims a script covers. A claim no script can check is recorded as
-   unverified. Run each command in a code-review artifact's `cannot_verify`
+   path costs no model tokens. Run `scripts/receipt.py verify <unit-dir>
+   --require test` and read CI on the PR head. A failed, zero-run, or stale
+   receipt fails the unit, and a claim no receipt backs is unverified. Do not
+   re-run an agent's verification by hand, re-derive a finding it reported,
+   or open artifacts to re-read claims a script covers. Run
+   `scripts/review-package.py dispositions <unit-dir>/review.md.tags.json
+   <code-review>` on every review, and treat a tag left unanswered as an
+   incomplete review. Run each command in a code-review artifact's `cannot_verify`
    list and fold the result into the verdict. Dispatch a vertical audit only when the diff touches that
    vertical's surface, at most two per PR, as read-only subagents in parallel, and wait for all to
    return. A vertical finding holds the merge only when it is Critical in
    that vertical's own domain. Every other finding is a follow-up issue.
    For every unit whose diff touches UI, a pipeline, or user-visible data,
    run `scripts/product-check.py <run-dir> --touches <changed paths> --cycle
-   <cycle-id>` and record its result in `check.product_check`. Exit 3 means
-   the project has no checks: the unit is unverified, never pass, and does
-   not reach a pr-merge gate until a check exists. On brochure and small, the Code Reviewer carries the Accessibility
+   <cycle-id> --unit <unit-dir>`, record its result in
+   `check.product_check`, and verify the unit with `--require product` as
+   well. A unit no check watches gets a zero-run product receipt and does not
+   reach a pr-merge gate until a check exists. On brochure and small, the Code Reviewer carries the Accessibility
    checklist in its pass and Accessibility is dispatched only to re-check a
    fix by execution. A change touching only `runs/`, `docs/`, or the run ledgers gets no
    review and no audit. Compare the actual
@@ -204,7 +208,7 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    on a brochure or small profile, or the run is on autopilot, a Code Reviewer
    APPROVE plus fully green required checks merges the PR with
    `gh pr merge --squash` and the run advances without a gate, unless the PR
-   carries a `TODO(DEF-<n>)` placeholder or an open blocking question. Otherwise, for a pr-merge gate, first publish: once all automated sign-offs pass, commit
+   carries a `TODO(DEF-<n>)` placeholder or an open blocking question. Before either path, `receipt.py verify` over every unit in the PR at the PR head and the review's `dispositions` check must pass, per the pr-merge gate rule in the reference. Otherwise, for a pr-merge gate, first publish: once all automated sign-offs pass, commit
    the change on its story branch, push to origin, and open the PR with
    spgr-create-pr against the protected base. Then wait for the remote CI checks
    on the PR head and confirm every required check passes BEFORE writing the

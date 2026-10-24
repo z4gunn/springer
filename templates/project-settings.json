@@ -71,6 +71,15 @@
             "command": "if [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-no-verify.py\" ]; then python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-no-verify.py\"; fi"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-check-config.py\" ]; then python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-check-config.py\"; fi"
+          }
+        ]
       }
     ],
     "PostToolUse": [

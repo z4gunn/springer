@@ -295,3 +295,61 @@ class BlockNoVerifyTest(unittest.TestCase):
         proc = subprocess.run([sys.executable, str(HOOKS / "block-no-verify.py")], input="not json",
                               capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0)
+
+
+class ProtectCheckConfigTest(unittest.TestCase):
+    """protect-check-config.py refuses an edit to an existing file that sets a
+    check's bar, passes new files and ordinary source, and honors an unlock
+    the harness recorded with a reason."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.project = Path(self.tmp.name)
+        for rel in ("tsconfig.json", "eslint.config.mjs", ".claude/settings.json", ".claude/hooks/h.py",
+                    "tests/fixtures/real/resume.txt", "src/app.ts", ".github/workflows/ci.yml",
+                    "runs/_product-check.json", "packages/web/vitest.config.ts"):
+            path = self.project / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("x\n")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def edit(self, file_path, tool="Edit"):
+        key = "notebook_path" if tool == "NotebookEdit" else "file_path"
+        return run_hook("protect-check-config.py",
+                        {"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": {key: file_path}},
+                        self.project)
+
+    def test_existing_check_config_is_refused(self):
+        for rel in ("tsconfig.json", "eslint.config.mjs", ".claude/settings.json", ".claude/hooks/h.py",
+                    "tests/fixtures/real/resume.txt", "packages/web/vitest.config.ts"):
+            for path in (rel, str(self.project / rel)):
+                rc, _, err = self.edit(path, "Write")
+                self.assertEqual(rc, 2, path)
+                self.assertIn("report it as a concern", err)
+
+    def test_new_files_source_ci_and_product_checks_pass(self):
+        for rel in ("src/app.ts", ".github/workflows/ci.yml", "runs/_product-check.json",
+                    "packages/api/tsconfig.json", "tests/fixtures/real/new.txt", "../outside/tsconfig.json"):
+            rc, _, _ = self.edit(rel)
+            self.assertEqual(rc, 0, rel)
+
+    def test_unlock_needs_a_reason_and_cannot_be_written_by_an_agent(self):
+        unlock = self.project / "runs" / "_config-unlock.json"
+        unlock.write_text(json.dumps({"paths": [{"path": "tsconfig.json", "reason": ""}]}))
+        self.assertEqual(self.edit("tsconfig.json")[0], 2)
+        unlock.write_text(json.dumps({"paths": [{"path": "tsconfig.json", "reason": "ADR-004 path alias"}]}))
+        self.assertEqual(self.edit("tsconfig.json")[0], 0)
+        self.assertEqual(self.edit("eslint.config.mjs")[0], 2)
+        rc, _, err = self.edit("runs/_config-unlock.json", "Write")
+        self.assertEqual(rc, 2)
+        self.assertIn("rulings", err)
+
+    def test_other_tools_and_bad_payloads_pass(self):
+        rc, _, _ = run_hook("protect-check-config.py",
+                            {"tool_name": "Bash", "tool_input": {"command": "cat tsconfig.json"}}, self.project)
+        self.assertEqual(rc, 0)
+        proc = subprocess.run([sys.executable, str(HOOKS / "protect-check-config.py")], input="not json",
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0)

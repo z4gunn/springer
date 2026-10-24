@@ -48,6 +48,24 @@ class ProductCheckTest(unittest.TestCase):
              "command": "echo no names >&2; exit 1", "touches": ["worker/"]},
         ])
 
+    def unit_receipt(self, unit):
+        with open(os.path.join(unit, "receipts", "product-check.json")) as fh:
+            return json.load(fh)
+
+    def test_unit_receipt_records_pass_fail_and_zero_run(self):
+        unit = os.path.join(self.run_dir, "dispatch", "C1", "U1")
+        self.two_checks()
+        self.run_cmd("--touches", "web/x.ts", "--unit", unit)
+        r = self.unit_receipt(unit)
+        self.assertEqual((r["kind"], r["result"], r["tests_ran"]), ("product", "pass", 1))
+        self.run_cmd("--unit", unit)
+        self.assertEqual(self.unit_receipt(unit)["result"], "fail")
+        self.run_cmd("--touches", "docs/readme.md", "--unit", unit)
+        self.assertEqual(self.unit_receipt(unit)["result"], "zero-run")
+        os.remove(os.path.join(self.runs, "_product-check.json"))
+        self.assertEqual(self.run_cmd("--unit", unit)[0], 3)
+        self.assertEqual(self.unit_receipt(unit)["result"], "zero-run")
+
     def test_pass_and_fail_are_recorded_as_events_and_a_results_file(self):
         self.two_checks()
         code, out = self.run_cmd("--cycle", "CYCLE-0007")

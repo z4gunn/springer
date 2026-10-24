@@ -13,7 +13,7 @@ Stdlib only.
 
 Usage:
     python3 product-check.py <run-dir> [--touches <path>...] [--only <id>...]
-                             [--cycle <cycle-id>] [--list] [--timeout <s>]
+                             [--cycle <cycle-id>] [--unit <unit-dir>] [--list] [--timeout <s>]
 
 Config, `runs/_product-check.json` beside the run directories:
     {"checks": [{"id": "names-on-leaderboard",
@@ -33,6 +33,13 @@ the tail of each command's output, and appends one `product_check` event per
 check to `runs/<run-id>/events.jsonl`, which is where the dashboard's outcome
 figure comes from. Prints one line per check and a summary.
 
+With `--unit` it also writes a `product` receipt to <unit-dir>/receipts/
+through receipt.py, carrying the commit and tree fingerprint, so the
+pr-merge gate can require a fresh passing product check by script. A unit
+whose changed paths no check watches, or a project with no config, gets a
+`zero-run` receipt, which verify refuses: a user-visible change with no
+product check is unverified, never passed.
+
 Exit 0 when every selected check passed, 1 when any failed or errored, 2 on
 usage, a missing or malformed config, or no check selected when the diff
 touched a watched path. Exit 3 when the project has no config at all, so the
@@ -45,6 +52,9 @@ import os
 import subprocess
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import receipt  # noqa: E402  the sibling script, for the shared receipt format
 
 CONFIG_NAME = "_product-check.json"
 OUTPUT_TAIL = 2000
@@ -159,12 +169,26 @@ def record(run_dir, cycle_id, results, selected_by):
     return path
 
 
+def write_unit_receipt(unit_dir, project_root, results, note=""):
+    """The product receipt: a pass only when at least one check ran and every
+    one passed. tests_ran is the number of checks run."""
+    if not unit_dir:
+        return
+    passed = all(r["result"] == "pass" for r in results)
+    exit_code = 0 if passed else 1
+    output = note or "\n".join(f"{r['result']} {r['check_id']}: {r['expect']}" for r in results)
+    body = receipt.make_receipt("product-check", "product", "product-check.py", project_root,
+                                exit_code, len(results), output, sum(r["duration_s"] for r in results),
+                                now_iso())
+    receipt.write_receipt(unit_dir, "product-check", body)
+
+
 def main(argv):
     args = argv[1:]
     if not args or args[0].startswith("-"):
         return usage()
     run_dir = os.path.abspath(args[0])
-    touches, only, cycle_id, list_only, timeout = None, [], None, False, DEFAULT_TIMEOUT
+    touches, only, cycle_id, list_only, timeout, unit_dir = None, [], None, False, DEFAULT_TIMEOUT, None
     i = 1
     while i < len(args):
         a = args[i]
@@ -173,6 +197,9 @@ def main(argv):
         elif a == "--cycle" and i + 1 < len(args):
             i += 1
             cycle_id = args[i]
+        elif a == "--unit" and i + 1 < len(args):
+            i += 1
+            unit_dir = os.path.abspath(args[i])
         elif a == "--timeout" and i + 1 < len(args):
             i += 1
             timeout = int(args[i])
@@ -201,6 +228,7 @@ def main(argv):
         return 2
     if checks is None:
         print(f"no product checks: {config_path} does not exist. The unit is unverified, not passed.")
+        write_unit_receipt(unit_dir, project_root, [], f"no product check config at {config_path}")
         return 3
 
     selected = select(checks, touches, only)
@@ -212,6 +240,7 @@ def main(argv):
     if not selected:
         if touches is not None:
             print("no product check watches the changed paths, nothing to run")
+            write_unit_receipt(unit_dir, project_root, [], "no product check watches the changed paths")
             return 0
         print("no product check selected")
         return 2
@@ -219,6 +248,7 @@ def main(argv):
     results = [run_check(c, project_root, run_dir, timeout) for c in selected]
     selected_by = {"only": only} if only else {"touches": touches}
     path = record(run_dir, cycle_id, results, selected_by)
+    write_unit_receipt(unit_dir, project_root, results)
     for r in results:
         print(f"{r['result'].upper():5} {r['check_id']}  ({r['duration_s']}s)  expect: {r['expect']}")
         if r["result"] != "pass":

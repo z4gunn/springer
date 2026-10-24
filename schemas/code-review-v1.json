@@ -75,6 +75,19 @@
             }
           }
         },
+        "gate_tags": {
+          "type": "array",
+          "description": "One disposition per gate-integrity tag in the review package (a removed or skipped test, lost assertions, a check-config or suppression change, an edited fixture or snapshot, an out-of-scope file, source before its test). review-package.py dispositions refuses a review that leaves a tag unanswered.",
+          "items": {
+            "type": "object",
+            "required": ["id", "disposition", "reason"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^GI-[0-9]+$" },
+              "disposition": { "type": "string", "enum": ["accepted", "finding"] },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
         "summary": { "type": "string", "minLength": 1 },
         "verdict": { "type": "string", "enum": ["APPROVE", "REQUEST_CHANGES", "COMMENT"] }
       }

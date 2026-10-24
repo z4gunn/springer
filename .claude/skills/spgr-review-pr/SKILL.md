@@ -23,7 +23,7 @@ Review one pull request and record the result as a code-review artifact the auth
 
 | Artifact | Description |
 |----------|-------------|
-| `code-review` | Envelope artifact validated against the registered `code-review` schema, carrying pr_ref, story_ref, axes_checked, findings with per-finding file, line, severity, axis, description, and remediation, a `declined_to_judge` list, a `cannot_verify` list, a summary, and the verdict |
+| `code-review` | Envelope artifact validated against the registered `code-review` schema, carrying pr_ref, story_ref, axes_checked, findings with per-finding file, line, severity, axis, description, and remediation, a `declined_to_judge` list, a `cannot_verify` list, a `gate_tags` list with one disposition per gate-integrity tag in the package, a summary, and the verdict |
 
 ## Procedure
 
@@ -49,7 +49,7 @@ Review one pull request and record the result as a code-review artifact the auth
 
 11. Compute the review coverage metric and record it in the summary: the percentage of changed lines that received a finding or comment. Very low coverage signals the diff was glossed over and warrants a second pass. Very high coverage signals the PR is too large, which step 2 should already have caught.
 
-12. Fill the two lists that keep the review honest. `declined_to_judge` names every behavior in the diff that was looked at and set aside, with the reason. `cannot_verify` names every check the package could not answer (execution, a live service, a file outside the diff) with the command that would answer it, and the harness runs those in Check. Neither list is optional when it has members.
+12. Fill the two lists that keep the review honest. `declined_to_judge` names every behavior in the diff that was looked at and set aside, with the reason. `cannot_verify` names every check the package could not answer (execution, a live service, a file outside the diff) with the command that would answer it, and the harness runs those in Check. Neither list is optional when it has members. Then answer every gate-integrity tag at the top of the package in `gate_tags`: its id, `accepted` or `finding`, and the reason. A review that leaves a tag unanswered is refused by `review-package.py dispositions`.
 
 13. Set the verdict. REQUEST_CHANGES if any P0 or P1 finding exists. APPROVE if only P2 or P3 findings remain and every acceptance criterion is tested, including an APPROVE with no findings at all, which is the expected result on a small, tested diff. COMMENT when the review raises only questions that may or may not lead to a change. Set each axes_checked boolean from the work actually done, not from intent.
 

@@ -218,12 +218,10 @@ Each tick runs four phases in order.
 ## Mechanical Check
 
 Check is mechanical first. It runs `schemas/validate.py` on every produced
-artifact, runs the project check script or the scoped test files the unit
-named, and reads CI on the PR head. The main session never re-runs an agent's
-verification by hand, never re-derives a finding an agent reported, and never
-opens an artifact to re-read a claim the check script already covers. A claim
-that no script or CI job can check is recorded as unverified. It is not
-verified by the harness reading files. When a code-review artifact carries a
+artifact, `receipt.py verify` on the unit's receipts, and reads CI on the PR
+head. The main session never re-runs an agent's verification by hand or
+re-reads a claim a script covers, and a claim no receipt or CI job backs is
+unverified. When a code-review artifact carries a
 `cannot_verify` list, Check runs each named command and folds the result into
 the verdict, so a check the reviewer could not run from the package is
 answered by execution rather than by the implementer's word. The reviewer's
@@ -259,12 +257,14 @@ a command that drives the real product on real inputs (the fixtures under
 `tests/fixtures/real/`, the deployed staging host, the human's own sample
 files) and exits 0 when a human would see the promised outcome. It records
 every result under `runs/<run-id>/product-checks/` and as `product_check`
-events, which feed the dashboard's outcome figure.
+events, which feed the dashboard's outcome figure, and with `--unit` writes
+the unit a `product` receipt, `zero-run` when no check watches its paths.
 
 - Check runs it for every unit whose diff touches UI, a pipeline, or
   user-visible data. The cycle record carries the result in
-  `check.product_check`. Such a unit with no product check is unverified,
-  never pass, and an unverified unit does not reach a pr-merge gate.
+  `check.product_check`. Such a unit's receipts are verified with
+  `--require product`, so a unit with no product check does not reach a
+  pr-merge gate.
 - The expected outcome in Plan for such a unit is what a human sees, in one
   sentence, and the check that proves it is named in the dispatch brief. A
   unit that cannot name its check names the fixture it is missing, and
@@ -456,7 +456,7 @@ unit is fresh every time under rule 1 and never inherits a transcript.
 
 | Tier | Runs as | Units |
 |------|---------|-------|
-| Deterministic | Bash, no model | `schemas/validate.py`, `rebuild-projection.py`, `derive-ready-queue.py`, `pin-learnings.py`, `linear-sync.ts`, `capture-comps.py` (the comp and PR screenshot matrix plus the slop detector), `review-package.py`, `floor_guard.py` (the diff-scoped scan for a lowered quality bar) |
+| Deterministic | Bash, no model | `schemas/validate.py`, `rebuild-projection.py`, `derive-ready-queue.py`, `pin-learnings.py`, `linear-sync.ts`, `capture-comps.py` (the comp and PR screenshot matrix plus the slop detector), `review-package.py`, `receipt.py`, `floor_guard.py` (the diff-scoped scan for a lowered quality bar) |
 | Mechanical | haiku subagent, fresh each time | spgr-version-artifact, spgr-archive-artifact, spgr-render-doc, story-brief refresh, spgr-write-bug-report from a captured failure, spgr-create-pr from a finished branch, chore commits, artifact transcription |
 | Pinned agent | the agent's own `model` | every domain-agent unit at full effort: design including the comp critique, implementation, adversarial review, vertical sign-off |
 | Inline main session | the session model, kept minimal | orchestrator dispatch, the Check comparison of expected versus actual, the verdict and transition, spgr-notify-human, run-state writes |
@@ -467,19 +467,16 @@ Every unit prompt carries the same things, and every unit report answers the
 same things. The prompt names the files to read in order, the rulings
 that bind, the check command that gates the work, the working directory (the
 unit's worktree path, or the main checkout) with the absolute run-store path,
-and the report format. The report lists the files written with line counts,
-pastes the verification output rather than describing it, stamps that
-output with the commit it ran on (`git rev-parse HEAD`) and a working-tree
-fingerprint (`git status --porcelain | shasum`) taken right after the run, quotes verbatim
-every obligation it could not satisfy with the reason, lists each default
-taken as one defaults-ledger line, and never fills a gap with an unrecorded
-assumption. In the reference run this contract produced honest gap lists from
-every unit, where the earlier cycles had produced overstated claims the
-harness then re-verified by hand. A report that describes a check instead of
-pasting it is treated as unverified. So is a paste whose commit is not the
-PR head or whose fingerprint no longer matches the tree, because the tree
-moved after the check ran. Check re-derives both and marks the paste stale
-rather than trusting it.
+and the report format. The unit runs every gating command after committing,
+through `scripts/receipt.py run <unit-dir> --name <name> -- <command>`,
+which writes a receipt with the exit code, the number of tests that ran,
+the commit, and a tree fingerprint. A green exit that ran no tests is
+`zero-run`, a fail. The report lists the files written with line counts,
+names its receipts, quotes verbatim every obligation it could not satisfy
+with the reason, lists each default taken as one defaults-ledger line, and
+never fills a gap with an unrecorded assumption. A claim with no receipt is
+unverified, and Check reads receipts with `receipt.py verify`, never the
+report's prose, so a receipt for another commit or a moved tree is stale.
 
 The contract travels in files, not in the prompt and not in the return value,
 so neither the task text nor the diff transits the main session.
@@ -503,8 +500,14 @@ so neither the task text nor the diff transits the main session.
   `scripts/review-package.py <base> <head> --out <dir>/review.md`, which
   refuses a head that does not descend from the base and writes the commit
   list, the stat, and the diff with ten lines of context under a header that
-  records both SHAs and whether the tree was dirty. The reviewer reads the
-  brief, the report, and the package. The main session never reads the diff.
+  records both SHAs and whether the tree was dirty. Pass the story's touch
+  paths with `--touch-paths`. The package opens with the gate-integrity
+  tags (removed or skipped tests, lost assertions, check-config and
+  suppression changes, edited fixtures or snapshots, out-of-scope files,
+  source before its test), and the reviewer gives each a disposition in the
+  code-review `gate_tags` list, which `review-package.py dispositions`
+  checks before the verdict counts. The reviewer reads the brief, the
+  report, and the package. The main session never reads the diff.
   The reviewer prompt never caps a severity, excludes an area, or says what
   not to flag. Pre-judging a finding is the harness grading the work itself,
   and the reviewer is told to ignore such a sentence and note it.
@@ -808,35 +811,30 @@ that lists them.
 
 ### pr-merge gate: publish before pausing
 
-The pr-merge gate is reached by remote pull request, never a local-only branch.
-Before pausing at a pr-merge checkpoint the harness MUST, once all automated
-sign-offs pass (Code Reviewer APPROVE with no open P0 or P1, and every triggered
-vertical gate signed off): commit the change on its story branch, push the branch
-to origin, and open a pull request via spgr-create-pr against the protected base.
-Only then does it write the pr-merge hil-checkpoint (pipeline_status paused,
-carrying the PR URL in the checkpoint) and fire spgr-notify-human. The run stays
-paused until a human merges the PR. On the next entry the harness reads the merge
-as the checkpoint response, stamps it resumed, and continues from the pending
-batch. Outside auto-merge the harness pushes and opens the PR but never merges
-it, and it never bypasses protection, because the human merge is the gate. This is the default for every
-story PR. A local-only, unpushed branch is used only when a human explicitly
-requests it for a specific change.
+The pr-merge gate is reached by remote pull request, never a local-only branch,
+unless a human asks for one for a specific change. Once every automated
+sign-off passes (Code Reviewer APPROVE with no open P0 or P1, every triggered
+vertical signed off), the harness commits on the story branch, pushes, and
+opens the PR with spgr-create-pr against the protected base. Only then does it
+write the pr-merge hil-checkpoint carrying the PR URL and fire
+spgr-notify-human. On the next entry it reads the merge as the response and
+continues from the pending batch. Outside auto-merge it never merges and never
+bypasses protection, because the human merge is the gate.
 
-Verify CI green before pausing. After opening or updating the PR, the harness
-MUST wait for the remote CI checks on the PR head to complete and confirm every
-required check passes before it writes the paused pr-merge checkpoint. A green
-local suite is NOT sufficient, because CI runs the live-DB, integration, and any
-other jobs the local Check necessarily skips (for example DB-gated D-suites that
-skip without a live Postgres), and those jobs are the real gate on that work. If
-any required check fails, the harness treats it as a Check failure on this cycle:
-diagnose the failure from the CI logs, decide whether it is a product defect or a
-test-construction defect, route the fix as a bounded retry to the owning agent
-(the same two-retry bound applies, then escalate), push, and re-verify CI. Only a
-fully green required-check set permits the pause. The harness never pauses at a
-pr-merge checkpoint, nor reports the story as ready to merge, while a required
-check is failing or still pending. Non-required or advisory checks that fail are
-recorded in the checkpoint rather than blocking, and the harness says so
-explicitly instead of implying all of CI is green.
+Verify the evidence before publishing. `receipt.py verify` over every unit
+in the PR, at the PR head, with `--require test` and, for a user-visible
+unit, `--require product`, exits 0, and `review-package.py dispositions`
+passes on the review. Either failing is a Check failure, and auto-merge
+never runs past one.
+
+Verify CI green before pausing. A green local suite is not sufficient, because
+CI runs the live-DB, integration, and other jobs the local Check skips, and
+those jobs are the real gate on that work. A failing required check is a Check
+failure on this cycle: diagnose it from the CI logs, route the fix as a bounded
+retry to the owning agent (two retries, then escalate), push, and re-verify.
+The harness never pauses at a pr-merge checkpoint, or reports a story ready,
+while a required check is failing or pending. A failing advisory check is
+recorded in the checkpoint and named, never implied green.
 
 ## Escalations
 
@@ -957,13 +955,16 @@ These scripts keep the deterministic work out of the model.
   intake, and never treats Linear as the database.
 - `scripts/claim-run.py <run-dir> claim|release|status [<session-id>]` holds
   the single-writer lock on a run with a heartbeat.
-- `scripts/review-package.py <base> <head> --out <file>` writes the commit
-  list, stat, and diff a reviewer reads, and refuses a range whose head does
-  not descend from its base. The diff never enters the main session.
+- `scripts/review-package.py <base> <head> --out <file> [--touch-paths ...]`
+  writes the gate-integrity tags, commit list, stat, and diff a reviewer
+  reads, and refuses a range whose head does not descend from its base.
+  `dispositions <tags> <review>` fails a review that left a tag unanswered.
+- `scripts/receipt.py run|verify` records a gating command's evidence and
+  refuses a failed, zero-run, or stale receipt.
 - `scripts/product-check.py <run-dir> --touches <paths>` runs the project's
   product checks from `runs/_product-check.json` against the real product
-  and records each result as a `product_check` event. Exit 3 means the
-  project has no checks and the unit is unverified.
+  and records each result as a `product_check` event, plus a `product`
+  receipt with `--unit`. Exit 3 means the project has no checks.
 - `scripts/preflight.py [--profile <profile>]` checks once at run open that
   the interpreter, the venv, git identity, gh auth, node, npx, and a headless
   Chromium-family browser actually work, and prints the table the harness
