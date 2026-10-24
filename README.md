@@ -6,7 +6,7 @@
 
 An architecture-first AI software development team, from idea to production.
 
-[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-C26A3C?style=flat-square)](https://claude.com/claude-code) ![Agents](https://img.shields.io/badge/agents-27-7A715F?style=flat-square) ![Skills](https://img.shields.io/badge/skills-197-7A715F?style=flat-square) ![Build](https://img.shields.io/badge/build-complete-C26A3C?style=flat-square) [![License: MIT](https://img.shields.io/badge/license-MIT-7A715F?style=flat-square)](LICENSE)
+[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-C26A3C?style=flat-square)](https://claude.com/claude-code) ![Agents](https://img.shields.io/badge/agents-27-7A715F?style=flat-square) ![Skills](https://img.shields.io/badge/skills-202-7A715F?style=flat-square) ![Build](https://img.shields.io/badge/build-complete-C26A3C?style=flat-square) [![License: MIT](https://img.shields.io/badge/license-MIT-7A715F?style=flat-square)](LICENSE)
 
 </div>
 
@@ -45,13 +45,13 @@ The second position is architecture first. Architecture is the most consequentia
 
 Structured artifact contracts. Every handoff is a typed, versioned artifact with enumerated required fields, per-section rationale, and an explicit confidence signal of confirmed, proposed, or needs-human-input. The receiving agent validates the artifact against its JSON Schema before acting on it. The schemas live in `schemas/`.
 
-Minimal human-in-the-loop. The only required gates are architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Work between these gates flows from agent to agent without a person in the path. A run's autonomy level (`supervised`, `standard`, `autopilot`) sets how many sittings those decisions take. Under `standard` the PRD, the questions the run needs answered, the architecture option, and the design direction are one direction review, reversible decisions are taken by default and reviewed in a batch, and an open gate holds only the work that depends on it.
+Minimal human-in-the-loop. The only required gates are architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change. Work between these gates flows from agent to agent without a person in the path. A run's autonomy level (`supervised`, `standard`, `autopilot`) sets how many sittings those decisions take. Under `standard`, the default on every profile, the PRD, the questions the run needs answered, the architecture option, and the design direction are one direction review, reversible decisions are taken by default and reviewed in a batch, and an open gate holds only the work that depends on it. Before that review, the developer who will build first reads the draft requirements cold and sorts every question it would ask, so only the ones that need you reach the gate. Under `autopilot`, allowed on every profile, a pull request merges on its own when a script scores it low or medium risk, and only a high-risk change (auth, the data model, billing, a new vendor, infra and CI, secrets, an open Critical or High finding) or a production deploy waits for you.
 
 Escalation is a feature, not a failure. An agent that refuses to proceed on incomplete or contradictory input, and returns a precise list of what is missing, is doing its job. Agents do not fill gaps with assumptions.
 
 Always-on verticals. Cross-cutting concerns such as auth, security, compliance, observability, performance, and accessibility are not bound to a single phase. A vertical agent acts as a consultant when tagged for a question, as an auditor on a scheduled sweep, and as a gate whose sign-off is required before certain artifacts can be marked confirmed.
 
-Creative latitude for design, held to a bar. Design agents receive the problem and the personas, not wireframes, and produce several distinct directions, each rendered as a structural mockup and a high-fidelity hero comp. A human selects one direction, and the agent then executes it with precision. Every direction, token set, and UI pull request is held to the design-quality reference, which names the defaults a generated interface converges on and refuses them on any axis the brief left free, so the output reads as designed for this product rather than assembled from the usual kit.
+Creative latitude for design, held to a bar. Design agents receive the problem and the personas, not wireframes, and produce several distinct directions, each rendered as a structural mockup and a high-fidelity hero comp. When the product's UI already runs, each direction is rendered as a variant on the real page instead, so it is judged against real data and the current design. A human selects one direction, and the agent then executes it with precision. Every direction, token set, and UI pull request is held to the design-quality reference, which names the defaults a generated interface converges on and refuses them on any axis the brief left free, so the output reads as designed for this product rather than assembled from the usual kit.
 
 ## Methodology
 
@@ -174,11 +174,16 @@ springer/
   .claude/
     agents/<name>.md         the 27 agents, auto-loaded in this repo
     skills/<name>/SKILL.md    the 202 skills, auto-loaded in this repo
-    references/<name>.md      shared cross-skill references (for example diagram-standards, typescript-standards)
+    references/<name>.md      shared cross-skill references (for example pdca-harness, design-quality, typescript-standards)
+    hooks/                    the event logger, the session-usage sensor, the design detector, and the git and config guards
+  .claude-plugin/        the plugin and marketplace manifests, so Springer installs with /plugin
+  plugin/skills/         the plugin's one skill, spgr-install-runtime
   schemas/               JSON Schemas for the typed artifacts that flow between agents
-  scripts/               repo tooling: new-project.sh and the repo validator
-  tests/                 unittest suite for the harness scripts, hooks, and validator, run by CI
-  templates/             golden starters for authoring a new skill or agent
+  scripts/               new-project.sh, update-project.py (update or adopt an instance), validate-repo.py, eval-skills.py
+  evals/                 behavioral eval scenarios, one per behavior an agent must show in a real transcript
+  tests/                 unittest suite for the harness scripts, hooks, validator, and eval checker, run by CI
+  templates/             golden starters for a new skill or agent, plus the project CLAUDE.md and settings an instance receives
+  .github/workflows/     CI: the validator, the schema self-check, and the test suite
   brand/                 logo, social-preview, and favicon assets
   runs/                  the run store where a project's artifacts accumulate
 ```
@@ -187,15 +192,19 @@ springer/
 
 Open this repository in Claude Code. The agents in `.claude/agents/` and the skills in `.claude/skills/` load automatically, so no install step is needed for the core team.
 
-To run a project, drive it end to end with the PDCA harness described below, which loops the orchestrator and the domain agents autonomously and pauses only at the human gates. You can also invoke a specific agent for a specific phase, such as Discovery to start research or Architect to produce options, when you want to run one step by hand. Either way the agents pause only at the human checkpoints: architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change, combined into fewer sittings by the run's autonomy level. Artifacts accumulate in `runs/` and validate against the schemas in `schemas/` as they pass between agents.
+To run a project, drive it end to end with the PDCA harness described below, which loops the orchestrator and the domain agents autonomously and pauses only at the human gates. You can also invoke a specific agent for a specific phase, such as Discovery to start research or Architect to produce options, when you want to run one step by hand. Either way the agents pause only at the human checkpoints: architecture approval, design-direction selection, pull-request merge, a security or compliance flag, and a scope change, combined into fewer sittings by the run's autonomy level. Under `autopilot` the pull-request checkpoint fires only for a high-risk change, and a run can continue unattended for hours, as described below. Artifacts accumulate in `runs/` and validate against the schemas in `schemas/` as they pass between agents.
 
 ### Pick a run profile
 
 Every run declares a profile on a `profile:` line in its problem statement, and the profile scales the process to the product: which phases run, how many stories the backlog may hold, whether a full ADR set or a single architecture note is written, how acceptance criteria are written, and what one pull request covers. There are five. `brochure` is a static site, landing page, or docs site with no backend. `small` is one service or app with a user interface, user accounts allowed, no tenancy and no billing. `saas` charges money or serves more than one tenant. `mobile` is distributed through an app store, and may add `size: small` for a utility app with no backend of its own. `api` is headless: a backend API, an integration service, a CLI, or a library, with no design phase. Pick it with four questions, first yes wins: app store, money or tenants, user interface, otherwise `api`. A statement with no profile line is not an error, the harness answers the four questions itself and puts the choice in front of you at the first gate. `scripts/new-project.sh` takes the default profile as its second argument. The full table and the rules each profile carries are in `.claude/references/pdca-harness.md` under Run profiles.
 
+### Pick a lane
+
+A lane says what kind of change a run makes. `build` takes a product that does not exist yet through the profile's lifecycle. `polish` takes one issue in your own words to one pull request, checked by code review, the verticals the diff touches, and the product check, with no PRD, story, or ADR artifact. With no `lane:` line the harness asks one question, whether the product already runs where a user can reach it, and opens `polish` on yes. A `build` run converges on `polish` once its walking skeleton, the primary flow end to end on staging with a passing product check, has landed: every later story runs at polish ceremony unless it touches auth, billing, tenancy, the data model, or anything irreversible. A `reference:` line names a POC or earlier version the run treats as its spec, so its features are transcribed into the backlog and parity with it is part of done.
+
 ### Drive a run with the PDCA harness
 
-The harness automates the loop a person otherwise runs by hand. The orchestrator decides the next unit of work and then stops. The `spgr-run-harness` skill is the loop around it. It reads run state, asks the orchestrator what runs next, dispatches the work, checks the result, records the tick, and repeats, pausing only at the human gates. It models the cycle as Plan-Do-Check-Act. Plan is the orchestrator routing the next batch of work. Do is each domain agent producing its artifact. Check is schema validation, the read-only vertical audits, and evidence a script can hold: every gating command a unit runs writes a receipt with its exit code, the number of tests that ran, and the commit and tree it ran on, and a pull request does not reach its merge gate while a receipt is failed, stale, or zero-run. The reviewer reads a package that opens with every change that eases a gate (a skipped or removed test, a loosened check config, an edited real fixture, a file outside the story) and answers each one, and an instance hook refuses an agent edit to an existing check config outright. Act records the transition and then advances, retries a failure, routes an escalation, or pauses at a gate. The harness dispatches under a token-economy rule set: bounded fixes go to fresh agents, mechanical units go to the smallest model tier, and each story carries a compact context brief so units read a projection instead of the full artifact corpus.
+The harness automates the loop a person otherwise runs by hand. The orchestrator decides the next unit of work and then stops. The `spgr-run-harness` skill is the loop around it. It reads run state, asks the orchestrator what runs next, dispatches the work, checks the result, records the tick, and repeats, pausing only at the human gates. It models the cycle as Plan-Do-Check-Act. Plan is the orchestrator routing the next batch of work. Do is each domain agent producing its artifact. Check is schema validation, the read-only vertical audits, and evidence a script can hold: every gating command a unit runs writes a receipt with its exit code, the number of tests that ran, and the commit and tree it ran on, and a pull request does not reach its merge gate while a receipt is failed, stale, or zero-run. The reviewer reads a package that opens with every change that eases a gate (a skipped or removed test, a loosened check config, an edited real fixture, a file outside the story) and answers each one, and an instance hook refuses an agent edit to an existing check config outright. Act records the transition and then advances, retries a failure, routes an escalation, or pauses at a gate. A failure is classified before it is retried: a platform glitch, a context overflow, an agent that stopped to ask, and a broken tool each get their own response, and only a real defect spends one of the two bounded retries. The harness dispatches under a token-economy rule set: every dispatch opens with the same fixed contract so repeat dispatches reuse a cached prompt prefix, bounded fixes go to fresh agents, mechanical units go to the smallest model tier, and each story carries a compact context brief so units read a projection instead of the full artifact corpus. At the end of a run the retrospective records what it learned, and a mistake a script could catch must name the check that will catch it next time rather than add a paragraph of rules.
 
 To start a run, open this repository in Claude Code and ask for the harness by name, giving it a run id and a one-paragraph problem statement:
 
@@ -236,7 +245,7 @@ The backlog is an epic, feature, then story, task, or bug hierarchy, and the orc
 
 An opt-in terminal dashboard shows a run while it executes: the active phase and cycle count, open gates and escalations with how long each has waited, the WIP board, the agents in flight with elapsed time, recent completions with duration and token counts, a token rollup for the watched run, and project-to-date totals across every run. It is read-only and needs nothing beyond Python 3.
 
-Three pieces feed it. A hook registered in `.claude/settings.json` records every subagent dispatch and completion, with the model it ran on and token metrics when available, to `runs/<run-id>/events.jsonl`. A second hook reads the main session's own transcript and records its context size and cumulative tokens, and warns the harness once when the context passes 60 percent of the window and again at 80 percent, so a run ends at a clean cycle boundary instead of a session-limit death. The dashboard prices both feeds from a list-price table in the run-harness skill's assets and shows the cost per run, per session, and project to date. The hooks load when a Claude Code session starts, so they take effect the first session after checkout. The dashboard polls the feeds plus the run store once per second and redraws.
+Three pieces feed it. A hook registered in `.claude/settings.json` records every subagent dispatch and completion, with the model it ran on and token metrics when available, to `runs/<run-id>/events.jsonl`. A second hook reads the main session's own transcript and records its context size and cumulative tokens, and warns the harness once when the context passes 60 percent of the window and again at 80 percent, so a run ends at a clean cycle boundary instead of a session-limit death. Under the unattended driver the 60 percent warning is the stop, and the next session starts on its own. The dashboard also shows the mix of failure classes, so a run losing time to the platform or the machine rather than the code is visible. The dashboard prices both feeds from a list-price table in the run-harness skill's assets and shows the cost per run, per session, and project to date. The hooks load when a Claude Code session starts, so they take effect the first session after checkout. The dashboard polls the feeds plus the run store once per second and redraws.
 
 The dashboard is off by default. Turn it on by asking in chat:
 
@@ -289,13 +298,6 @@ python3 scripts/update-project.py update ~/path/to/my-saas-app   # apply it
 
 A runtime file the instance never edited is replaced, one it edited is kept and listed, one it added is left alone, and a template-rendered file (CLAUDE.md, the settings, the gitignore) that was edited gets its new rendering written under `.claude/springer-update/` for a hand merge. The update refuses to run while a harness holds a live lock on a run in the instance.
 
-Springer also installs as a Claude Code plugin. The plugin loads one skill and nothing else into your sessions, and that skill creates, adopts, or updates an instance from the plugin's copy of the runtime:
-
-```
-/plugin install springer --marketplace z4gunn/springer
-/springer:spgr-install-runtime
-```
-
 To bring Springer to a repository that already exists, adopt it instead:
 
 ```bash
@@ -303,6 +305,13 @@ python3 scripts/update-project.py adopt ~/path/to/existing-app --profile small
 ```
 
 Adoption writes the runtime beside the repository's own files and never replaces one. A runtime path that already holds different content refuses the adoption until it is moved aside or `--force` is passed. An existing `CLAUDE.md` keeps its text and gains one import line for the Springer rules, which render to `.claude/springer-rules.md`. An existing settings file gains only the permissions and hooks it lacks, and an existing gitignore only the lines it lacks. The default lane of an adopted repository is `polish`, because the product already exists, so a run takes one issue to one pull request. Later updates work the same as on any instance.
+
+Springer also installs as a Claude Code plugin. The plugin loads one skill and nothing else into your sessions, and that skill creates, adopts, or updates an instance from the plugin's copy of the runtime:
+
+```
+/plugin install springer --marketplace z4gunn/springer
+/springer:spgr-install-runtime
+```
 
 One skill family needs a one-time setup, and it is optional. The diagram skills render Mermaid and PlantUML sources. To use them, install Graphviz, place a PlantUML jar at `~/.plantuml/plantuml.jar`, and make the Mermaid CLI available through `npx`. The shared diagram conventions and exact render commands are in `.claude/references/diagram-standards.md`.
 
@@ -343,6 +352,7 @@ Results and transcripts land under `runs/_evals/`. The checker is unit-tested in
 | 1. Spec | One spec file per agent and skill, the source of truth for the build | Complete |
 | 2. Build | Implement the agents and skills as working Claude Code artifacts | Complete, 27 agents and 202 skills |
 | 3. Harness | Autonomous orchestration with feedback loops, self-improvement, and parallel execution | Available, the spgr-run-harness PDCA driver |
+| 4. Autonomy | Unattended runs across sessions and usage limits, risk-tiered auto-merge, script-held evidence, behavioral evals, adopt and plugin install | Available, first unattended production run pending |
 
 ## Conventions and contributing
 
