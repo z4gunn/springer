@@ -147,6 +147,16 @@ class UpdateProjectTest(unittest.TestCase):
         self.assertFalse((self.target / ".claude" / "skills" / "spgr-two" / "SKILL.md").exists())
         self.assertTrue((self.target / ".claude" / "references" / "ref.md").exists())
 
+    def test_removing_a_whole_skill_removes_its_folder(self):
+        shutil.rmtree(self.source / ".claude" / "skills" / "spgr-two")
+        cache = self.target / ".claude" / "skills" / "spgr-two" / "__pycache__"
+        cache.mkdir()
+        (cache / "x.pyc").write_bytes(b"0")
+        code, out, _ = run_main("update", str(self.target))
+        self.assertEqual(code, 0)
+        self.assertFalse((self.target / ".claude" / "skills" / "spgr-two").exists())
+        self.assertTrue((self.target / ".claude" / "skills").is_dir())
+
     def test_instance_only_file_is_kept(self):
         (self.target / ".claude" / "skills" / "local-skill").mkdir()
         (self.target / ".claude" / "skills" / "local-skill" / "SKILL.md").write_text("mine\n")
