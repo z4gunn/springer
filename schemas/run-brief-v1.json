@@ -31,7 +31,7 @@
             "autonomy": {
               "type": "string",
               "enum": ["supervised", "standard", "autopilot"],
-              "description": "Which gates pause the run and which decisions are taken by default and reviewed in a batch. Defaults to standard on every profile, supervised is opt-in. autopilot is allowed on brochure and small only. See Autonomy levels in .claude/references/pdca-harness.md."
+              "description": "Which gates pause the run and which decisions are taken by default and reviewed in a batch. Defaults to standard on every profile, supervised is opt-in, autopilot is allowed on every profile. See Autonomy levels in .claude/references/pdca-harness.md."
             },
             "size": {
           "type": "string",
@@ -41,7 +41,7 @@
         "auto_merge_on_green": {
               "type": "boolean",
               "default": false,
-              "description": "brochure and small only. Code Reviewer APPROVE plus fully green required checks merges the PR without a human pause. A human decision recorded in the project CLAUDE.md. Implied true under autonomy autopilot."
+              "description": "Any profile. Once Code Reviewer APPROVE and fully green required checks are in, pr-risk.py decides: low and medium merge without a human pause, high fires a pr-merge gate holding only dependent work. Implied true under autonomy autopilot."
             },
             "docs_render": {
               "type": "string",

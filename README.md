@@ -220,6 +220,18 @@ What a run leaves behind, all under `runs/<run-id>/`:
 
 The loop rules, the rehydration algorithm, the parallel barrier, and the advisory-learnings model are in `.claude/references/pdca-harness.md`.
 
+### Leave a run going unattended
+
+Start the run with `autonomy: autopilot` in the problem statement and answer the one direction review. Then, from a terminal in the project:
+
+```bash
+python3 .claude/skills/spgr-run-harness/scripts/run-unattended.py acme-1
+```
+
+The driver runs the harness in back-to-back headless sessions, each starting with a fresh context, so a full context window never waits for you. It sleeps through a usage limit until the reset, and stops after three failed or two idle sessions so a stuck run does not burn a night. Under autopilot, `pr-risk.py` scores every pull request once the reviewer approves and CI is green. Low and medium risk merge on their own. High risk waits for you: auth, the data model or a destructive migration, billing, a new vendor, CI and infra, secrets, an open Critical or High finding, or a placeholder for a fact only you have. A high-risk PR holds only the work that depends on it. Production deploys always wait. When the run completes or every remaining item waits on you, the driver posts to the Slack incoming webhook in `SPRINGER_SLACK_WEBHOOK_URL` (set it in `.env`). It falls back to a macOS notification and always writes `runs/<run-id>/unattended-status.md`. Tools are allowed by the instance settings allowlist, with edits accepted, so a command outside the list is refused rather than left waiting at a prompt.
+
+The backlog is an epic, feature, then story, task, or bug hierarchy, and the orchestrator finishes a whole feature, product check included, before it starts the next.
+
 ### Watch a run on the live dashboard
 
 An opt-in terminal dashboard shows a run while it executes: the active phase and cycle count, open gates and escalations with how long each has waited, the WIP board, the agents in flight with elapsed time, recent completions with duration and token counts, a token rollup for the watched run, and project-to-date totals across every run. It is read-only and needs nothing beyond Python 3.

@@ -19,7 +19,7 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 - Parallel Do: the barrier and disjoint scheduling
 - Token economy and dispatch efficiency
 - Dispatch contract
-- Main-session budget
+- Main-session budget and unattended runs
 - Fold-in policy
 - Docs rendering policy
 - Vertical budget
@@ -180,6 +180,12 @@ product check passing. The orchestrator routes no other story into
 development until it has landed. Every later batch is ordered by the gap
 the product check and the human's use of the skeleton show, not by backlog
 position, and the orchestrator names the observed gap each unit closes.
+
+The backlog is a hierarchy: epic, feature, then story, task, or bug. A bug a
+check or QA finds joins the feature it breaks. After the skeleton the
+orchestrator finishes one feature, every item in it merged and its product
+check passing on the deployed result, before it starts the next, unless the
+WIP limit has room for both, and an epic is done when its features are.
 
 Once the skeleton has landed, the product exists, and every later story
 runs at polish ceremony: one implementing unit that writes the failing test
@@ -367,26 +373,20 @@ alone does not enforce the barrier. `derive-ready-queue.py` reads
 `events.jsonl`, reports `unjoined_dispatches`, and sets blocked while any exist.
 The check keys on unmatched dispatch ids, never on elapsed time. When a dispatch
 is known dead (a session-limit death, a killed agent), the harness appends an
-`agent_abandoned` event carrying the same tool_use_id to release it. The
-reference case planned a cycle against a tree that a fifty-minute unit from the
-prior cycle was still writing, then blamed a different agent for the writes.
+`agent_abandoned` event carrying the same tool_use_id to release it.
 
 The run is single-writer at the session level too. On entry the harness
 claims the run with `claim-run.py <run-dir> claim <session-id>` and re-claims
 at every tick as a heartbeat, and `derive-ready-queue.py --session <id>` sets
 blocked while another session's live lock exists. On exit the harness releases
-it. A lock not refreshed for thirty minutes is stale and is taken over. In the
-reference run a second session branched and committed from under a live loop
-session, and nothing detected it.
+it. A lock not refreshed for thirty minutes is stale and is taken over.
 
 Dispatch in the foreground. Several Agent calls in one turn already run in
 parallel, and a foreground call returns when its agent finishes, so the hook's
 completion event is a real join. A background dispatch (`run_in_background`)
 returns at once, the hook logs it as `agent_backgrounded`, and it stays
 un-joined until the harness appends `agent_joined` with its tool_use_id when
-the task notification arrives. The reference run dispatched every unit in the
-background, so every dispatch showed a completion two seconds later and the
-log could not tell a finished agent from a running one.
+the task notification arrives.
 
 ## Token economy and dispatch efficiency
 
@@ -538,39 +538,40 @@ Those counts stay. The loop inside them has a fixed shape.
    from diff`) is the harness's to resolve by running the named check, never
    the implementer's to argue away and never silently dropped.
 
-## Main-session budget
+## Main-session budget and unattended runs
 
 The main session runs the harness on sonnet by default. It writes run state and
 the cycle record, dispatches, and reads script output. The cycle record is
 capped at roughly 2k tokens: the batch, the verdicts, the transition, and the
 pending batch. A human ruling is recorded as the human's own words plus a
-one-line list of the artifacts it changes. The harness never writes a findings
-narrative longer than the diff it describes. In the reference case the main
+one-line list of the artifacts it changes. In the reference case the main
 session issued 771 shell commands and 2.26M output tokens on opus, more than
-all 71 subagents combined, while the dispatch-tier table said it was kept
-minimal.
+all 71 subagents combined.
 
-The budget has a sensor. The `session-usage.py` hook, registered for
-PostToolUse and Stop in the instance settings, reads the session transcript
-incrementally and writes the main session's context size, cumulative tokens,
-and model to `runs/_dashboard/sessions/<session-id>.json`. The dashboard shows
-that line next to the subagent figures and prices both from
-`assets/model-pricing.json` in the run-harness skill. When the context passes
-60 percent of the window the hook injects one advisory telling the harness to
-end the loop at the next clean Act. At 80 percent it injects one instruction to
-finish the current Act, release the lock, and resume in a fresh session. Each
-tier fires once per session. The hook observes and never blocks. Every
-dispatch event also records the model the unit ran on, from the per-dispatch
-override or the agent's frontmatter, so the cost figures are priced per tier
-rather than guessed.
+The `session-usage.py` hook is the sensor. It writes the main session's
+context and tokens to `runs/_dashboard/sessions/<session-id>.json` for the
+dashboard, and at 60 percent of the window it tells the harness to end at the
+next clean Act, at 80 percent to finish the current Act, release the lock, and
+stop. It never blocks. Every dispatch event records the model it ran on, so
+cost is priced per tier.
 
-The instance settings installed by `new-project.sh` from
-`templates/project-settings.json` carry a permission allowlist for the
-commands the harness runs itself (validate, the harness scripts, the project
-verification scripts, git add, commit, push, branch, and the gh pr commands)
-and a denylist for the destructive git forms. Without it a run stalls at a
-permission prompt on every commit, and the page batch in the reference run
-stalled three times on its own commit, its CLAUDE.md note, and its hook sync.
+A stopped session no longer waits for a human. `scripts/run-unattended.py
+<run-id>` runs the harness in a loop of headless sessions, each with a fresh
+context that rehydrates from the store. Under it the 60 percent warning is the
+stop, AskUserQuestion is disallowed, and edits are accepted while every other
+tool is allowed only by the instance allowlist, so an unlisted command is
+refused, never prompted. A usage limit sleeps until its reset. A dispatch the
+exited session left un-joined is marked abandoned. The loop stops and
+notifies through the Slack webhook in `SPRINGER_SLACK_WEBHOOK_URL` (macOS
+notification as fallback, `unattended-status.md` always) when the run
+completes, when a gate holds all remaining work, after three failed sessions,
+or after two sessions that add no cycle.
+
+The instance settings from `templates/project-settings.json` carry the
+allowlist for the commands the harness runs (validate, the harness scripts,
+the project verification scripts, git, and the gh pr commands) and a denylist
+for the destructive git forms. Without it a run stalls at a permission prompt
+on every commit.
 
 ## Fold-in policy
 
@@ -654,16 +655,15 @@ always rules on a security or compliance flag.
 | architecture option | architecture-options-selection | inside direction-review | inside direction-review |
 | architecture confirmation | architecture-confirmation | none, selection confirms | none, selection confirms |
 | design direction | design-direction-selection | inside direction-review | inside direction-review |
-| pr-merge | per PR unit | per PR unit, or auto-merge when `auto_merge_on_green` | auto-merge on approval plus green CI |
+| pr-merge | per PR unit | per PR unit, or by risk when `auto_merge_on_green` | by risk: low and medium merge, high gates |
 | security-compliance-flag | blocks | blocks | blocks |
 | scope-change | blocks | blocks beyond the profile cap or on a profile change, a default within the cap | same as standard |
 | deferrable decisions | each ruled in-cycle by the specialist, a human-constraint change escalates | defaults ledger, reviewed at the next gate that fires | defaults ledger, reviewed in the completion notice |
 
 Default: standard on every profile, because the blocking classes below
 hold at every level and supervised only multiplies the sittings. supervised
-is opt-in. autopilot is allowed on brochure and small only, and a brief that
-names it elsewhere runs at standard. Changing the level mid-run is a human instruction
-recorded as a pinned ruling, not a gate.
+is opt-in, and autopilot is allowed on every profile. Changing the level
+mid-run is a human instruction recorded as a pinned ruling, not a gate.
 
 Under standard and autopilot, the architecture downstream set is confirmed
 without a second sitting when it validates and every routed gate vertical
@@ -796,18 +796,21 @@ for about 55 of the run's 70 hours, because every open gate stopped all work.
 
 The pr-merge gate fires per batch, where a batch is the set of stories the
 orchestrator co-scheduled onto one branch, or the whole page on brochure. It
-does not fire per story when several stories land in one PR. The reference case
-opened five PRs and five gates for six kilobytes of code.
+does not fire per story when several stories land in one PR.
 
-A run may set `auto_merge_on_green: true` in its run brief. Under that flag, on
-brochure and small only, a Code Reviewer APPROVE plus a fully green
-required-check set merges the PR with `gh pr merge --squash`, and the human
-reviews the deployed result instead of each PR. The harness records the merge in
-the cycle artifact. The flag defaults to false, is a human decision recorded in
-the project CLAUDE.md, and never applies to saas or mobile. Autonomy autopilot
-implies it. Under either, a PR that carries a `TODO(DEF-<n>)` placeholder or an
-open blocking question is never auto-merged and goes to a human pr-merge gate
-that lists them.
+Risk, not the profile, decides who merges. Under autopilot, or with
+`auto_merge_on_green: true` in the run brief, the harness runs
+`scripts/pr-risk.py <base> <head> --tags <tags> --review <code-review>
+--audit <vertical artifacts>` once the merge bar holds (Code Reviewer
+APPROVE, receipts verified, dispositions answered, required CI green). Low
+and medium merge with `gh pr merge --squash` and the run proceeds. High is
+any change to auth, the data model or a destructive migration, billing, a
+new vendor, CI, IaC, deploy config, or secrets, an open Critical or High
+finding, or a `TODO(DEF-<n>)` placeholder. It fires a pr-merge gate that
+holds only the items depending on that PR, and the rest of the run keeps
+going. A project adds or exempts paths in `runs/_risk.json`. The cycle
+record carries the risk and its reasons for every merge. A production deploy
+is never a PR and stays a blocking decision at every level.
 
 ### pr-merge gate: publish before pausing
 
@@ -968,6 +971,8 @@ These scripts keep the deterministic work out of the model.
   refuses a failed, zero-run, or stale receipt.
 - `scripts/classify-failure.py <unit-dir>` names a failed unit's class and
   whether a retry is spent.
+- `scripts/pr-risk.py <base> <head>` scores a PR low, medium, or high and
+  exits 1 on high. `scripts/run-unattended.py <run-id>` is the session loop.
 - `scripts/product-check.py <run-dir> --touches <paths>` runs the project's
   product checks from `runs/_product-check.json` against the real product
   and records each result as a `product_check` event, plus a `product`

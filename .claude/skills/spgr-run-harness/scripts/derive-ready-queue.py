@@ -82,13 +82,10 @@ DEFAULT_AUTONOMY = {"brochure": "standard", "small": "standard", "api": "standar
 
 def resolve_autonomy(brief):
     """Return the run's autonomy level: the brief's flag, else the profile
-    default, else supervised. autopilot outside brochure and small falls back
-    to standard, because the schema allows it on those profiles only."""
+    default, else supervised. autopilot is allowed on every profile, because
+    pr-risk.py, not the profile, decides which PR waits for the human."""
     profile = brief.get("profile")
-    level = brief.get("flags", {}).get("autonomy") or DEFAULT_AUTONOMY.get(profile, "supervised")
-    if level == "autopilot" and profile not in ("brochure", "small"):
-        level = "standard"
-    return level
+    return brief.get("flags", {}).get("autonomy") or DEFAULT_AUTONOMY.get(profile, "supervised")
 
 
 def open_defaults(run_dir):
@@ -255,6 +252,8 @@ def derive(run_dir, session_id=None):
         "lock": lock,
         "blocked": blocked,
         "blocking_reason": reason,
+        "complete": bool(cycles) and
+        (cycles[-1].get("content", {}).get("act") or {}).get("transition") == "complete",
         "read_errors": read_errors,
     }
 

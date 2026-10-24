@@ -21,13 +21,29 @@
         "scoring_caveat": { "type": "string" },
         "epics": {
           "type": "array",
-          "description": "Optional epic grouping. The board projection uses epic_id to name an issue's parent grouping.",
+          "description": "The top of the work hierarchy: epic, feature, then story, task, or bug. The board projection uses epic_id to name an issue's parent grouping.",
           "items": {
             "type": "object",
             "required": ["epic_id", "name"],
             "properties": {
               "epic_id": { "type": "string", "minLength": 1 },
-              "name": { "type": "string", "minLength": 1 }
+              "name": { "type": "string", "minLength": 1 },
+              "outcome": { "type": "string", "minLength": 1, "description": "What a user can do when every feature in the epic is done." }
+            }
+          }
+        },
+        "features": {
+          "type": "array",
+          "description": "The middle of the hierarchy. A feature is done when every item in it is done and its product check passes on the deployed result. The orchestrator finishes a feature before it starts the next one unless capacity allows both.",
+          "items": {
+            "type": "object",
+            "required": ["feature_id", "epic_id", "name", "outcome"],
+            "properties": {
+              "feature_id": { "type": "string", "pattern": "^FEAT-[0-9]+$" },
+              "epic_id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "outcome": { "type": "string", "minLength": 1, "description": "What a human sees when the feature is done, in one sentence." },
+              "product_check": { "type": "string", "minLength": 1, "description": "The id of the product check in runs/_product-check.json that proves the outcome." }
             }
           }
         },
@@ -45,9 +61,11 @@
             "required": ["story_id", "title"],
             "properties": {
               "position": { "type": "integer", "minimum": 1 },
-              "story_id": { "type": "string", "pattern": "^STORY-[0-9]{4}-[0-9]+$" },
+              "story_id": { "type": "string", "pattern": "^(STORY|TASK|BUG)-[0-9]{4}-[0-9]+$", "description": "The item id. A story references a user-story artifact. A task is technical work with no user-facing behavior. A bug references the bug-report artifact that found it." },
+              "work_type": { "type": "string", "enum": ["story", "task", "bug"], "description": "Defaults to story." },
               "title": { "type": "string", "minLength": 1 },
               "epic_id": { "type": ["string", "null"] },
+              "feature_id": { "type": ["string", "null"], "description": "The feature this item belongs to. A bug or task found later joins the feature it fixes." },
               "priority_tier": { "type": "string" },
               "priority_score": { "type": "number" },
               "estimated_size": { "type": "string" },

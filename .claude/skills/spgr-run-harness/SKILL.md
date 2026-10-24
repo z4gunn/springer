@@ -23,7 +23,7 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
 | `run_id` | The run to drive. A new run-id creates the store, an existing one resumes it |
 | `problem_statement` | Required only when creating a new run, the seed the first phase consumes |
 | `mode` | `run` drives until a gate or completion, `tick` runs one cycle and returns |
-| `autonomy` | Optional on a new run. `supervised`, `standard`, or `autopilot`, recorded in the run brief `flags.autonomy`. Defaults to standard on every profile. supervised is opt-in. See Autonomy levels in the reference |
+| `autonomy` | Optional on a new run. `supervised`, `standard`, or `autopilot`, recorded in the run brief `flags.autonomy`. Defaults to standard on every profile. supervised is opt-in, and autopilot, allowed on every profile, merges low and medium risk PRs on its own. Use autopilot with `run-unattended.py` for a run nobody watches. See Autonomy levels in the reference |
 | `profile` | On a new run, one of `brochure`, `small`, `saas`, `mobile`, `api`, from the problem statement's `profile:` line. Scales the phase set, the story and criteria caps, and the PR unit per the run-profiles table in the reference. Recorded in the run brief and read from there on resume. When the line is missing or names something else, answer the four questions in the reference from the statement, open on the profile they give, record a DEF line with the answers, and carry it to the first gate as a default-review decision. Under supervised, ask before opening |
 | `size` | Optional on a new `mobile` run, from a `size:` line. `small` keeps the store lifecycle at the small profile's ceremony. Recorded in the run brief `flags.size` and ignored on other profiles |
 | `lane` | Optional on a new run, from a `lane:` line. With no line, open `polish` when the product already runs where a user can reach it and `build` otherwise, falling back to the project CLAUDE.md default, and record a DEF line. `build` runs the profile's lifecycle. `polish` takes one issue in the human's words to one PR with review, the verticals the diff touches, and the product check, and writes no PRD, story, criteria, or ADR artifact. Recorded in `flags.lane`. See Lanes in the reference |
@@ -211,11 +211,13 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    transition to pause and terminate cleanly. Resuming is step 1 on the next
    entry. Render `docs/` for the artifacts this gate reads, and only those,
    through a haiku spgr-render-doc unit. A pr-merge gate fires once per batch
-   or per page, not per story. When the run brief sets `auto_merge_on_green`
-   on a brochure or small profile, or the run is on autopilot, a Code Reviewer
-   APPROVE plus fully green required checks merges the PR with
-   `gh pr merge --squash` and the run advances without a gate, unless the PR
-   carries a `TODO(DEF-<n>)` placeholder or an open blocking question. Before either path, `receipt.py verify` over every unit in the PR at the PR head and the review's `dispositions` check must pass, per the pr-merge gate rule in the reference. Otherwise, for a pr-merge gate, first publish: once all automated sign-offs pass, commit
+   or per page, not per story. When the run is on autopilot or the run brief
+   sets `auto_merge_on_green`, on any profile, run `scripts/pr-risk.py <base>
+   <head> --tags <tags> --review <code-review> --audit <vertical artifacts>`
+   once a Code Reviewer APPROVE and fully green required checks are in. Exit 0
+   (low or medium) merges with `gh pr merge --squash` and the run advances
+   without a gate. Exit 1 (high) fires a pr-merge gate that holds only the
+   items depending on that PR. Record the risk and its reasons in the cycle. Before either path, `receipt.py verify` over every unit in the PR at the PR head and the review's `dispositions` check must pass, per the pr-merge gate rule in the reference. Otherwise, for a pr-merge gate, first publish: once all automated sign-offs pass, commit
    the change on its story branch, push to origin, and open the PR with
    spgr-create-pr against the protected base. Then wait for the remote CI checks
    on the PR head and confirm every required check passes BEFORE writing the
@@ -252,7 +254,10 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    `tick` mode return after one Act. Release the run with
    `scripts/claim-run.py <run-dir> release <session-id>` before terminating at
    a gate, at completion, or on any exit. Never exceed a WIP limit to make
-   progress.
+   progress. When the prompt says the session is unattended (the
+   `run-unattended.py` driver), never ask a question, treat the first
+   context warning as the stop, and leave every gate as a checkpoint, because
+   the driver notifies the human and starts the next session.
 
 ## Notes
 

@@ -15,7 +15,11 @@ dying mid-cycle. Never blocks a tool call: always exits 0.
 
 Context size is the last assistant message's input plus cache-read plus
 cache-creation tokens, which is what the next request will carry. The window
-comes from the model name: 200k for haiku, 1M otherwise."""
+comes from the model name: 200k for haiku, 1M otherwise.
+
+Under run-unattended.py (SPRINGER_UNATTENDED=1) a fresh session costs
+nothing a human waits on, so the 60 percent tier carries the critical text:
+the session stops early and the driver starts the next one."""
 
 import datetime
 import json
@@ -128,7 +132,14 @@ def main():
         return
     fraction = state.get("context_tokens", 0) / state["window"]
     warned = set(state.get("warned") or [])
-    for threshold, tier, text in reversed(TIERS):
+    tiers = TIERS
+    if os.environ.get("SPRINGER_UNATTENDED") == "1":
+        tiers = [(0.6, "critical",
+                  "Main-session context is past 60 percent of the window and this session is "
+                  "unattended. Finish the current Act now, write the cycle record, release the run "
+                  "lock with claim-run.py, and stop. Dispatch nothing new. The unattended driver "
+                  "starts the next session.")]
+    for threshold, tier, text in reversed(tiers):
         if fraction >= threshold and tier not in warned:
             warned.add(tier)
             state["warned"] = sorted(warned)

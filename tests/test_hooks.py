@@ -114,10 +114,10 @@ class SessionUsageTest(unittest.TestCase):
         with open(self.transcript, "a") as fh:
             fh.write(json.dumps(entry) + "\n")
 
-    def call(self, event="PostToolUse"):
+    def call(self, event="PostToolUse", env=None):
         payload = {"hook_event_name": event, "session_id": "sess", "cwd": str(self.project),
                    "transcript_path": str(self.transcript)}
-        code, out, _ = run_hook("session-usage.py", payload, self.project)
+        code, out, _ = run_hook("session-usage.py", payload, self.project, env=env)
         self.assertEqual(code, 0)
         return json.loads(out) if out.strip() else None
 
@@ -159,6 +159,14 @@ class SessionUsageTest(unittest.TestCase):
         self.append(10, 840_000, 0, 10)
         self.assertIsNone(self.call())
         self.assertEqual(self.state()["warned"], ["advisory", "critical"])
+
+    def test_unattended_session_stops_at_sixty_percent(self):
+        self.append(10, 640_000, 12_000, 2_200)
+        out = self.call(env={"SPRINGER_UNATTENDED": "1"})
+        text = out["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("60 percent", text)
+        self.assertIn("unattended driver", text)
+        self.assertEqual(self.state()["warned"], ["critical"])
 
     def test_stop_event_records_but_never_warns(self):
         self.append(10, 900_000, 0, 10)
