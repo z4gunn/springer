@@ -1,6 +1,7 @@
 ---
 name: spgr-assess-compliance-scope
 description: Produce a compliance-scope artifact that names which regulatory frameworks apply to the project and which do not, with rationale, a priority order, and a requirements summary per applicable framework. Use when the Compliance Agent starts a project, or when changed requirements force a scope re-evaluation.
+disable-model-invocation: true
 ---
 
 # assess-compliance-scope

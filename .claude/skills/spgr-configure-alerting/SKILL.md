@@ -1,6 +1,7 @@
 ---
 name: spgr-configure-alerting
 description: Configure alert rules as source code that page on-call when an SLO is at risk, with multi-window burn-rate alerts, severity routing, and a runbook link in every alert annotation. Use when the DevOps agent wires alerting from a confirmed SLO spec, or when the Observability vertical needs the alert layer built before a release.
+disable-model-invocation: true
 ---
 
 # configure-alerting

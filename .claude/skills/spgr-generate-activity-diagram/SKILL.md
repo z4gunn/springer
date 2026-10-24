@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-activity-diagram
 description: Produce a UML activity diagram or flowchart (Mermaid flowchart by default, PlantUML activity for swimlanes) showing the control flow of a workflow, algorithm, or business process. Use when the Architect, Product Manager, or Backend Developer agent must make a process flow explicit, not for message sequences, entity lifecycles, or data models.
+disable-model-invocation: true
 ---
 
 # generate-activity-diagram

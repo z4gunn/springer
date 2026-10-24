@@ -1,6 +1,7 @@
 ---
 name: spgr-write-aria-spec
 description: Produce an aria-spec artifact that assigns each interactive component its ARIA role, properties, state transitions, live-region configuration, and focus-management rules, plus a generated Storybook a11y-addon config. Use when the Accessibility Agent must define the screen-reader contract before a component is built.
+disable-model-invocation: true
 ---
 
 # write-aria-spec

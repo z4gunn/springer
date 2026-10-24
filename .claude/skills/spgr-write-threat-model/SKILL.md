@@ -1,6 +1,7 @@
 ---
 name: spgr-write-threat-model
 description: Produce a threat-model artifact that decomposes the system, draws trust boundaries, enumerates STRIDE threats per component and data flow, rates each by likelihood times impact, and maps an owned mitigation to each threat. Use when the Security Agent must establish the threat model before downstream security work or after an architecture change.
+disable-model-invocation: true
 ---
 
 # write-threat-model

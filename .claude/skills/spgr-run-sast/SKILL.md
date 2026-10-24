@@ -1,6 +1,7 @@
 ---
 name: spgr-run-sast
-description: Produce a SAST findings report that runs static analysis against the codebase or a PR diff, triages each finding, and returns a PASS or GATE verdict that blocks merge or release on any unresolved confirmed Critical or High finding. Use when the Security Agent runs a full-codebase scan before a release or the DevOps Agent wires SAST into CI.
+description: Produce a SAST findings report that runs static analysis and secrets scanning on the codebase or a PR diff, triages each finding, and returns a PASS or GATE verdict blocking merge or release on an unresolved Critical or High. Use when the Security Agent or QA gates a PR or release, or the DevOps Agent wires SAST into CI.
+disable-model-invocation: true
 ---
 
 # run-sast
@@ -13,7 +14,8 @@ Run static application security testing against source code and produce one tria
 
 | Field | Description |
 |-------|-------------|
-| `scan-target` | The codebase for a full release scan, or a PR diff for a CI merge gate, read via spgr-read-file. The target selects the gate behavior in step 8. |
+| `scan-target` | The codebase for a full release scan, or a PR diff for a CI merge gate, read via spgr-read-file. The target selects the gate behavior in step 9. |
+| `trigger` | `pr`, `release`, `scheduled`, or `pre-commit`. `pre-commit` runs the secrets scan in step 4 only. |
 | `ruleset` | The SAST tool configuration: OWASP Top 10 rules, language-specific security rulesets, and the project's custom rule registry, read via spgr-read-file. |
 | `suppressions` | Known false-positive suppressions from prior scans, each tied to a specific rule ID with a justification comment, read via spgr-read-artifact when a prior scan exists. |
 
@@ -31,17 +33,19 @@ Run static application security testing against source code and produce one tria
 
 3. Read GitHub's own scanning alerts as a second source when the project is hosted on GitHub. Run `gh api repos/<owner>/<repo>/code-scanning/alerts --paginate -q '.[] | select(.state=="open")'` and `gh api repos/<owner>/<repo>/secret-scanning/alerts --paginate -q '.[] | select(.state=="open")'`. Merge each open code-scanning alert with the local findings by rule id, file path, and line, so one defect appears once with both sources named. Map every open secret-scanning alert to a confirmed Critical finding at the reported location, because a committed credential is exploitable the moment the repository is readable, and name the secret type without reproducing the value. When either API answers that the feature is disabled or has no analysis yet, record one Medium finding whose remediation is to enable it (the enable calls live in spgr-write-ci-pipeline), never a silent skip. Both reads need the `security_events` scope, which the `repo` scope includes.
 
-4. Record each finding with severity (Critical, High, Medium, Low), file path, line number, rule ID, and description. Capture the tool name and ruleset version on the report so the scan is reproducible.
+4. Scan for committed secrets with GitLeaks or TruffleHog over the scan target and its history range. A verified credential is a confirmed Critical at its location, named by secret type and never reproduced. On `pre-commit` this is the only step, and a verified credential blocks the commit so no secret reaches the remote.
 
-5. Triage every finding. Classify each as confirmed, false positive, or needs-investigation. Do not treat a raw scanner hit as a confirmed vulnerability. A finding that requires judgment beyond this skill stays needs-investigation and is handed to the Security Agent via spgr-tag-vertical-agent.
+5. Record each finding with severity (Critical, High, Medium, Low), file path, line number, rule ID, and description. Capture the tool name and ruleset version on the report so the scan is reproducible.
 
-6. Honor suppressions only when each is tied to a specific rule ID with a justification comment at the finding location. Mass suppression of an entire rule category is not acceptable. Treat a category-wide suppression as invalid and report the underlying findings as open.
+6. Triage every finding. Classify each as confirmed, false positive, or needs-investigation. Do not treat a raw scanner hit as a confirmed vulnerability. A finding that requires judgment beyond this skill stays needs-investigation and is handed to the Security Agent via spgr-tag-vertical-agent.
 
-7. Encode new anti-patterns as custom rules. When a security issue is found and fixed, add a Semgrep rule for that anti-pattern to the custom rule registry so it cannot recur. This is the project-specific rule registry that step 2 applies on every later scan.
+7. Honor suppressions only when each is tied to a specific rule ID with a justification comment at the finding location. Mass suppression of an entire rule category is not acceptable. Treat a category-wide suppression as invalid and report the underlying findings as open.
 
-8. Decide the verdict. Return GATE if any confirmed Critical or High finding is neither remediated nor covered by a valid suppression. Critical and High confirmed findings block the merge on a PR diff and block the release checklist on a full scan. Medium findings are tracked in the security backlog and do not gate. Otherwise return PASS.
+8. Encode new anti-patterns as custom rules. When a security issue is found and fixed, add a Semgrep rule for that anti-pattern to the custom rule registry so it cannot recur. This is the project-specific rule registry that step 2 applies on every later scan.
 
-9. Write the report via spgr-write-artifact with inline spgr-validate-artifact. Log the verdict, the triage decisions, and any accepted suppression via spgr-log-decision. On a GATE verdict, call spgr-escalate so the blocking findings reach the release owner, and on a PR diff surface the findings at the file and line.
+9. Decide the verdict. Return GATE if any confirmed Critical or High finding is neither remediated nor covered by a valid suppression. Critical and High confirmed findings block the merge on a PR diff and block the release checklist on a full scan. Medium findings are tracked in the security backlog and do not gate. Otherwise return PASS.
+
+10. Write the report via spgr-write-artifact with inline spgr-validate-artifact. Log the verdict, the triage decisions, and any accepted suppression via spgr-log-decision. On a GATE verdict, call spgr-escalate so the blocking findings reach the release owner, and on a PR diff surface the findings at the file and line.
 
 ## Notes
 

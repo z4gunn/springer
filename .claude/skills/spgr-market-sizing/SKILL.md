@@ -1,6 +1,7 @@
 ---
 name: spgr-market-sizing
 description: Produce a market-sizing artifact estimating TAM, SAM, and SOM with a bottom-up calculation, a top-down cross-check, and a viability signal on whether the obtainable market justifies the build cost. Use when the Discovery Agent must ground the go/no-go decision in market economics, or when geography or business model changes force a re-estimate.
+disable-model-invocation: true
 ---
 
 # market-sizing

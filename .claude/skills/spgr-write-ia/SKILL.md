@@ -1,6 +1,7 @@
 ---
 name: spgr-write-ia
 description: Produce an information-architecture artifact fixing the complete screen inventory and navigation model, with a site map, per-screen purpose and entry and exit points, and every user story mapped to a screen. Use when the Design Agent has approved requirements and a selected design direction and must settle screen scope before wireframing begins.
+disable-model-invocation: true
 ---
 
 # write-ia

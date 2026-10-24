@@ -1,6 +1,7 @@
 ---
 name: spgr-run-smoke-test
 description: Run a minimal fast post-deployment check of the critical paths and return a GO or NO-GO verdict that gates the release, signaling automatic rollback on any failure. Use when the DevOps Agent needs a blocking gate after a staging or production deploy, or when the QA Agent authors or maintains the smoke test suite.
+disable-model-invocation: true
 ---
 
 # run-smoke-test

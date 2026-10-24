@@ -1,6 +1,7 @@
 ---
 name: spgr-scaffold-transactional-email
 description: Scaffold a project's transactional email system as source code, with provider integration, an async send job, template rendering, a non-production catching-inbox guard, unsubscribe and bounce hooks, and snapshot tests. Use when the Async Infrastructure or Backend Developer agent stands up the email foundation before wiring specific emails.
+disable-model-invocation: true
 ---
 
 # scaffold-transactional-email

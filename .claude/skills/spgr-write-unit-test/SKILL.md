@@ -1,6 +1,7 @@
 ---
 name: spgr-write-unit-test
 description: Write a unit test suite for one function, method, or class, covering happy path, error paths, boundaries, and edge cases, with every external dependency mocked at the unit boundary. Use when the QA or a developer agent needs unit tests for a unit of logic, test-first against a planned interface or alongside implementation.
+disable-model-invocation: true
 ---
 
 # write-unit-test

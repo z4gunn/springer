@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-readme
 description: Generate the project README.md, the entry-point document that gets a new developer from clone to running and contributing in under ten minutes, plus a PR-time freshness check that flags a stale README. Use when the Documentation Agent stands up or refreshes the README, or when a commit changes a config file the README describes.
+disable-model-invocation: true
 ---
 
 # generate-readme

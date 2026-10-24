@@ -1,6 +1,7 @@
 ---
 name: spgr-run-deployment
 description: Execute a staging or production deployment by following the release runbook step by step, enforcing every verification gate as a hard stop and executing the rollback plan the moment a gate fails. Use when the DevOps Agent has a confirmed runbook, rollback plan, release-readiness confirmation, and a versioned build artifact to ship.
+disable-model-invocation: true
 ---
 
 # run-deployment

@@ -13,8 +13,17 @@ Prints one line per violation, grouped by rule, and a summary. Exit 0 when
 clean, 1 when any rule fails.
 
 Rules checked (the guidance rules that need judgment are not here):
-  skill frontmatter   exactly `name` and `description`, name matches the dir
+  skill frontmatter   `name` and `description`, then optionally
+                      `disable-model-invocation: true` and nothing else, name
+                      matches the dir
   skill description   present, at most 350 characters
+  skill catalog       the skills the main session may invoke (those without
+                      the flag) stay within a count and a character budget,
+                      because each of their descriptions loads every session
+  skill reachability  every skill is named by an agent, a shared reference,
+                      the project CLAUDE.md template, a catalog skill, or a
+                      skill those name, because a hidden skill nothing names
+                      can never run
   skill body          under 500 lines after the frontmatter
   skill references    one level deep, a reference over 100 lines opens with
                       a Contents section
@@ -44,6 +53,14 @@ MODELS = {"haiku", "sonnet", "opus"}
 EM_DASH = "—"
 AUX_NAMES = re.compile(r"^(readme|changelog|install|installation|setup|contributing|process)(\..*)?$", re.I)
 SKILL_PATH_SENTENCE = ".claude/skills/<name>/SKILL.md"
+HIDDEN_KEY = "disable-model-invocation"
+# The catalog is the set of skills whose descriptions load into every main
+# session. Agents read their skills by path, so only the skills the main
+# session invokes itself belong here. A new catalog skill fits under these
+# caps or displaces one, the same rule the harness reference follows.
+CATALOG_COUNT_CAP = 10
+CATALOG_CHARS_CAP = 3000
+SKILL_NAME = re.compile(r"\bspgr-[a-z0-9]+(?:-[a-z0-9]+)*\b")
 
 
 def frontmatter(text):
@@ -104,9 +121,13 @@ def check_skills(root, report):
         if keys is None:
             report.fail("skill-frontmatter", rel, "no frontmatter block")
         else:
-            if keys != ["name", "description"]:
+            if keys not in (["name", "description"], ["name", "description", HIDDEN_KEY]):
                 report.fail("skill-frontmatter", rel,
-                            f"keys must be exactly name, description (found {', '.join(keys) or 'none'})")
+                            f"keys must be name, description, and optionally {HIDDEN_KEY} "
+                            f"(found {', '.join(keys) or 'none'})")
+            elif HIDDEN_KEY in keys and values.get(HIDDEN_KEY) != "true":
+                report.fail("skill-frontmatter", rel,
+                            f"{HIDDEN_KEY} must be true when present (found '{values.get(HIDDEN_KEY)}')")
             if values.get("name") != skill_dir.name:
                 report.fail("skill-frontmatter", rel,
                             f"name '{values.get('name')}' does not match the directory")
@@ -133,6 +154,63 @@ def check_skills(root, report):
                     if lines > TOC_THRESHOLD and not has_contents(ref.read_text()):
                         report.fail("skill-references", f"{rel}/references/{ref.name}",
                                     f"{lines} lines without a Contents section")
+
+
+def skill_frontmatters(root):
+    """Map each skill directory name to (frontmatter values, body)."""
+    out = {}
+    for skill_dir in sorted(p for p in (root / ".claude" / "skills").iterdir() if p.is_dir()):
+        skill_md = skill_dir / "SKILL.md"
+        if skill_md.exists():
+            _, values, body = frontmatter(skill_md.read_text())
+            out[skill_dir.name] = (values or {}, body)
+    return out
+
+
+def is_catalog(values):
+    return values.get(HIDDEN_KEY) != "true"
+
+
+def check_catalog(root, report):
+    """Every catalog description loads into every session, and the session
+    listing truncates a long catalog without warning, so the catalog is
+    budgeted as a whole and not only per description."""
+    catalog = {name: values.get("description", "")
+               for name, (values, _) in skill_frontmatters(root).items() if is_catalog(values)}
+    chars = sum(len(d) for d in catalog.values())
+    if len(catalog) > CATALOG_COUNT_CAP:
+        report.fail("skill-catalog", ".claude/skills",
+                    f"{len(catalog)} skills load into every session, cap is {CATALOG_COUNT_CAP}. "
+                    f"Mark agent-only skills {HIDDEN_KEY}: true")
+    if chars > CATALOG_CHARS_CAP:
+        report.fail("skill-catalog", ".claude/skills",
+                    f"catalog descriptions total {chars} characters, cap is {CATALOG_CHARS_CAP}")
+
+
+def check_reachability(root, report):
+    """A hidden skill is read by path from whoever names it. One that no
+    agent, reference, template, or reachable skill names is dead weight that
+    still claims a spec, so it fails. Catalog skills are roots because the
+    main session can invoke them by description."""
+    skills = skill_frontmatters(root)
+    roots = {name for name, (values, _) in skills.items() if is_catalog(values)}
+    sources = list((root / ".claude" / "agents").glob("*.md"))
+    sources += list((root / ".claude" / "references").glob("*.md"))
+    sources += [p for p in [root / "templates" / "project-CLAUDE.md"] if p.exists()]
+    for path in sources:
+        roots |= set(SKILL_NAME.findall(path.read_text())) & set(skills)
+    reached, frontier = set(), list(roots)
+    while frontier:
+        name = frontier.pop()
+        if name in reached or name not in skills:
+            continue
+        reached.add(name)
+        skill_dir = root / ".claude" / "skills" / name
+        text = "".join(p.read_text(errors="ignore") for p in skill_dir.rglob("*.md"))
+        frontier.extend(set(SKILL_NAME.findall(text)) - reached)
+    for name in sorted(set(skills) - reached):
+        report.fail("skill-reachability", f".claude/skills/{name}",
+                    "no agent, reference, template, or reachable skill names this skill")
 
 
 def description_tokens(text):
@@ -228,6 +306,8 @@ def main(argv):
     report = Report()
     check_skills(root, report)
     check_routing(root, report)
+    check_catalog(root, report)
+    check_reachability(root, report)
     check_agents(root, report)
     check_references(root, report)
     check_voice(root, report)

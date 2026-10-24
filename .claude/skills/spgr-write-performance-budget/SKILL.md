@@ -1,6 +1,7 @@
 ---
 name: spgr-write-performance-budget
 description: Produce a performance-budget artifact that sets pass/fail latency and throughput thresholds for each critical user journey, with a regression threshold and a CI benchmark gate that enforces it. Use when the Performance Agent must replace subjective speed judgments with measurable thresholds before load tests, SLOs, or release gating are written.
+disable-model-invocation: true
 ---
 
 # write-performance-budget

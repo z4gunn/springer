@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-design-pattern-diagram
 description: Produce a paired diagram of one Gang of Four pattern applied to real code, a structure class diagram plus a sequence diagram of the pattern's signature runtime scenario, in PlantUML by default. Use when the Architect, Code Reviewer, or Backend Developer agent must document a named GoF pattern, not a generic class or sequence diagram.
+disable-model-invocation: true
 ---
 
 # generate-design-pattern-diagram

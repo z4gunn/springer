@@ -1,6 +1,7 @@
 ---
 name: spgr-audit-resilience-coverage
 description: Produce a resilience-coverage audit report that checks every external dependency call site for timeout, retry, circuit breaker, and fallback coverage against the resilience spec, returning a PASS or GATE verdict that blocks release on any unguarded call in a critical path. Use when the Resilience Agent must confirm coverage before a release.
+disable-model-invocation: true
 ---
 
 # audit-resilience-coverage

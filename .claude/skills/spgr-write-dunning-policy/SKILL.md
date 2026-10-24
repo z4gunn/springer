@@ -1,6 +1,7 @@
 ---
 name: spgr-write-dunning-policy
 description: Produce a dunning-policy artifact defining the payment-failure recovery sequence for a SaaS subscription, covering the retry schedule, customer notifications, access degradation, and cancellation triggers. Use when the Billing Agent has a confirmed billing spec and must settle failed-payment recovery before billing goes live.
+disable-model-invocation: true
 ---
 
 # write-dunning-policy

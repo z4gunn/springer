@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-release-notes
 description: Produce user-facing release notes that translate the technical changelog into customer-benefit language across the in-app what's-new panel, email announcement, store notes, and help-center article. Use when the Documentation Agent prepares a release, or when a developer or PM agent needs customer-facing notes from the confirmed changelog.
+disable-model-invocation: true
 ---
 
 # generate-release-notes

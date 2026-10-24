@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-api-changelog
 description: Produce a consumer-facing API changelog artifact organized by release version, listing breaking changes first with migration guides, then new features, behavior changes, deprecations, and bug fixes. Use when the API Design Agent prepares a release and must give API consumers a record of what changed across the API surface.
+disable-model-invocation: true
 ---
 
 # generate-api-changelog

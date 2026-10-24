@@ -1,6 +1,7 @@
 ---
 name: spgr-check-xp-compliance
 description: Produce an XP-compliance check on a pull request, scoring it against the five Springer engineering disciplines (test-first, YAGNI, DRY, simple design, refactoring responsibility) with per-rule verdicts and a blocking or non-blocking severity on each finding. Use when the Code Reviewer agent reviews a PR before the change is allowed to merge.
+disable-model-invocation: true
 ---
 
 # check-xp-compliance

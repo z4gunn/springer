@@ -1,6 +1,7 @@
 ---
 name: spgr-go-no-go
 description: Synthesize all discovery findings into a single build recommendation (go, no-go, or conditional-go) with evidence-cited rationale, top risks, and dissenting evidence, then route it to a mandatory human checkpoint. Use when the Discovery Agent has completed discovery and must decide whether the product is worth building before planning begins.
+disable-model-invocation: true
 ---
 
 # go-no-go

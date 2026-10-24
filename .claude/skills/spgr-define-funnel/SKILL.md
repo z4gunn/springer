@@ -1,6 +1,7 @@
 ---
 name: spgr-define-funnel
 description: Produce a funnel-definition artifact specifying each conversion funnel as an ordered event sequence with entry criteria, a conversion window, completion criteria, and segmentation dimensions, then generate the platform-specific funnel report config. Use when the Analytics Agent must define conversion funnels against a confirmed event taxonomy.
+disable-model-invocation: true
 ---
 
 # define-funnel

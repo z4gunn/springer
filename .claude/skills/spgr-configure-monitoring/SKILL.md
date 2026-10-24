@@ -1,6 +1,7 @@
 ---
 name: spgr-configure-monitoring
 description: Configure metrics collection, health-check endpoints, and operational dashboards as version-controlled config verified in CI. Use when the DevOps Agent stands up monitoring for a service before alerting is wired, or when the Observability Agent needs golden-signal and SLO burn-rate dashboards built.
+disable-model-invocation: true
 ---
 
 # configure-monitoring

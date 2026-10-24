@@ -1,6 +1,7 @@
 ---
 name: spgr-audit-instrumentation-coverage
 description: Produce an instrumentation-coverage audit report that checks every taxonomy event against the code that should fire it and against live analytics data, returning a PASS or GATE verdict that blocks release on missing or malformed events. Use when the Analytics Agent must confirm a release is fully instrumented before launch.
+disable-model-invocation: true
 ---
 
 # audit-instrumentation-coverage

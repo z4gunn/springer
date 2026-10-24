@@ -1,6 +1,7 @@
 ---
 name: spgr-validate-env-config
 description: Generate a startup environment-configuration validation module that checks required variables, validates formats, reports all errors together, and exits non-zero on failure, plus a non-production /health/config endpoint. Use when the DevOps or backend developer agent needs the application to fail fast at startup on missing or invalid configuration.
+disable-model-invocation: true
 ---
 
 # validate-env-config

@@ -1,6 +1,7 @@
 ---
 name: spgr-write-app-store-listing
 description: Produce an app-store-listing artifact carrying App Store Connect and Google Play Console listing content, optimized for discoverability and conversion within each store's character limits and policies. Use when the App Store Agent prepares a submission or revises a listing for new features, markets, or a product-page test.
+disable-model-invocation: true
 ---
 
 # write-app-store-listing

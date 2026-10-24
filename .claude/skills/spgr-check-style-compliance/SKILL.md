@@ -1,6 +1,7 @@
 ---
 name: spgr-check-style-compliance
 description: Produce a style-compliance findings list for a PR diff, covering only style concerns linters cannot catch (semantic naming, comment quality, test naming, project idioms), every entry a non-blocking suggestion. Use when the code-reviewer agent has a diff that passed lint and format and needs the residue of semantic style review.
+disable-model-invocation: true
 ---
 
 # check-style-compliance

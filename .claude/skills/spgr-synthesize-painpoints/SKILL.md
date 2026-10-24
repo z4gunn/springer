@@ -1,6 +1,7 @@
 ---
 name: spgr-synthesize-painpoints
 description: Produce a pain-point-taxonomy artifact that merges all UGC mining outputs into one deduplicated two-level hierarchy of pain points, scored by frequency and severity and backed by verbatim examples. Use when the Discovery Agent must consolidate mine-* outputs into the single pain-point set that feeds the PRD and personas.
+disable-model-invocation: true
 ---
 
 # synthesize-painpoints

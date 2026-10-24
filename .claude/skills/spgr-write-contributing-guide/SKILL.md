@@ -1,6 +1,7 @@
 ---
 name: spgr-write-contributing-guide
 description: Generate the project CONTRIBUTING.md, the contract for how contributions are reported, branched, committed, reviewed, and merged, plus a PR template checklist that surfaces its requirements. Use when the Documentation Agent stands up the contribution contract, or when the PR process, code standards, or merge requirements change.
+disable-model-invocation: true
 ---
 
 # write-contributing-guide

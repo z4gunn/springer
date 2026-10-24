@@ -1,6 +1,7 @@
 ---
 name: spgr-validate-migration-safety
 description: Produce a migration-safety report that checks one database migration for lock risk, backwards incompatibility, data loss, and rollback safety, with a go or no-go recommendation. Use when the Backend Developer, QA, or code-reviewer agent must clear a migration before it is committed or merged.
+disable-model-invocation: true
 ---
 
 # validate-migration-safety

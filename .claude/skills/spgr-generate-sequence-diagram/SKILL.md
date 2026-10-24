@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-sequence-diagram
 description: Produce a UML sequence diagram, committed Mermaid or PlantUML source plus a rendered SVG, showing how participants collaborate over time through ordered messages for one scenario. Use when the Architect, Backend Developer, or API Design Agent needs the time-ordered interaction between participants, not static structure or data model.
+disable-model-invocation: true
 ---
 
 # generate-sequence-diagram

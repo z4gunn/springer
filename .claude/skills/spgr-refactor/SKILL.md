@@ -1,6 +1,7 @@
 ---
 name: spgr-refactor
 description: Improve the internal structure of a code section without changing its external behavior, using the existing test suite as the safety net and XP simple-design rules in priority order. Use when a developer agent has a clear refactor goal on a covered code section, or when the Code Reviewer agent flags a complexity hotspot to reduce.
+disable-model-invocation: true
 ---
 
 # refactor

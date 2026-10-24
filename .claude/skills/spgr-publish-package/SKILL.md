@@ -1,6 +1,7 @@
 ---
 name: spgr-publish-package
 description: Publish a versioned build artifact to its target registry (npm, PyPI, container registry, app store, or internal store), idempotently, with a publication record appended to the release artifact. Use when the DevOps Agent has a built artifact and a confirmed release tag, or when a dry-run must verify publish credentials before a real release.
+disable-model-invocation: true
 ---
 
 # publish-package

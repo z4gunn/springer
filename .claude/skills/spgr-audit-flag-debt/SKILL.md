@@ -1,6 +1,7 @@
 ---
 name: spgr-audit-flag-debt
 description: Produce a feature-flag-debt audit report that checks every registry flag against its retirement date, rollout state, and codebase references, classifying each as overdue, orphaned, or stale, with a PASS or GATE verdict on any release flag past retirement. Use when the Feature Flag Agent runs the scheduled flag-debt sweep.
+disable-model-invocation: true
 ---
 
 # audit-flag-debt

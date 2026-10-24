@@ -1,6 +1,7 @@
 ---
 name: spgr-write-instrumentation-spec
 description: Produce an instrumentation-spec artifact mapping every event-taxonomy event to the exact code location where it fires, with trigger condition, per-property source, and a test-coverage requirement. Use when the Analytics Agent has a confirmed event taxonomy and must remove instrumentation ambiguity before developers wire the events.
+disable-model-invocation: true
 ---
 
 # write-instrumentation-spec

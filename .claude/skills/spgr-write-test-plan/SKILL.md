@@ -1,6 +1,7 @@
 ---
 name: spgr-write-test-plan
 description: Produce a test-plan artifact defining the full testing strategy for a release or sprint, covering scope, a per-type test matrix, coverage targets by layer, entry and exit criteria, and a test-data strategy. Use when the QA Agent starts a release or sprint and developers need the blocking quality contract before they write code.
+disable-model-invocation: true
 ---
 
 # write-test-plan

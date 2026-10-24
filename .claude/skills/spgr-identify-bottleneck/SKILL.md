@@ -1,6 +1,7 @@
 ---
 name: spgr-identify-bottleneck
 description: Produce a bottleneck-analysis report that locates the single performance constraint worth fixing now from profiling data, traces, slow query logs, and saturation metrics, ranked by Theory-of-Constraints priority. Use when the Performance Agent must find the one constraint to fix before any optimization work begins.
+disable-model-invocation: true
 ---
 
 # identify-bottleneck

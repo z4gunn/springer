@@ -1,6 +1,7 @@
 ---
 name: spgr-write-api-spec
 description: Produce a complete OpenAPI 3.1 spec, the binding contract between the backend and every client surface, with every endpoint, request and response schema, per-endpoint auth, and pagination. Use when the Architect or API Design agent must define the API contract before any backend or client implementation begins.
+disable-model-invocation: true
 ---
 
 # write-api-spec

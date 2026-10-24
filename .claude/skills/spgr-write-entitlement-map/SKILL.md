@@ -1,6 +1,7 @@
 ---
 name: spgr-write-entitlement-map
 description: Produce an entitlement-map artifact defining the feature-by-plan matrix for a subscription product, with usage limits, add-ons, per-entitlement enforcement points, and degradation behavior. Use when the Feature Flag Agent must settle the plan-to-feature relationship before enforcement is implemented, or when a pricing change revises the matrix.
+disable-model-invocation: true
 ---
 
 # write-entitlement-map

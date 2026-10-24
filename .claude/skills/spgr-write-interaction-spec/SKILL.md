@@ -1,6 +1,7 @@
 ---
 name: spgr-write-interaction-spec
 description: Produce an interaction-spec artifact documenting the trigger, behavior, duration, easing, state transitions, reduced-motion equivalent, and accessibility notes for every interactive element. Use when the Design Agent must pin down interaction behavior after screen specs are approved and before frontend or mobile implementation begins.
+disable-model-invocation: true
 ---
 
 # write-interaction-spec

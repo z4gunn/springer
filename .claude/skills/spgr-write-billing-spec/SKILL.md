@@ -1,6 +1,7 @@
 ---
 name: spgr-write-billing-spec
 description: Produce a billing-spec artifact that defines the complete billing model for a subscription product, covering the plan catalog with platform price IDs, trials, proration, cancellation, tax, webhook events, and dunning entry points. Use when the Billing Agent must settle the billing model before any subscription or payment code is implemented.
+disable-model-invocation: true
 ---
 
 # write-billing-spec

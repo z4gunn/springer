@@ -1,6 +1,7 @@
 ---
 name: spgr-write-user-story
 description: Write one INVEST-compliant user story in As a / I want / So that form, linked to a persona and a PRD goal, with an INVEST self-assessment and a split recommendation for oversized stories. Use when the PM agent turns a feature need into a backlog-ready story, before acceptance criteria are written.
+disable-model-invocation: true
 ---
 
 # write-user-story

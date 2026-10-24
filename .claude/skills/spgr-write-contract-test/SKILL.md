@@ -1,6 +1,7 @@
 ---
 name: spgr-write-contract-test
 description: Produce consumer-driven Pact contract tests between internal service pairs, with consumer pact publication, provider verification in CI, and a can-i-deploy pre-deployment gate. Use when the QA agent owns contract coverage for service pairs, or the Backend Developer agent implements provider verification.
+disable-model-invocation: true
 ---
 
 # write-contract-test

@@ -1,6 +1,7 @@
 ---
 name: spgr-implement-state-management
 description: Implement client-side state management for one feature following the pattern fixed in the architecture ADR, with feature-scoped store slices, cache invalidation, and optimistic updates with a rollback path. Use when the Frontend or Mobile Developer agent wires a feature's state and the failing acceptance tests already exist.
+disable-model-invocation: true
 ---
 
 # implement-state-management

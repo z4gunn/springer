@@ -1,6 +1,7 @@
 ---
 name: spgr-build-icp
 description: Produce an icp artifact that names the one customer type to acquire first, with attributes, buying signals, willingness-to-pay, exclusion criteria, and a prioritization rationale. Use when the Discovery Agent has personas, competitive analysis, and market sizing and must settle who the product is built for first.
+disable-model-invocation: true
 ---
 
 # build-icp

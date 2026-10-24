@@ -1,6 +1,7 @@
 ---
 name: spgr-detect-test-flakiness
 description: Produce a flakiness report from CI test run history identifying non-deterministic tests, classified by likely root cause, ranked by failure rate and CI cost, with quarantine recommendations and a remediation deadline. Use when the QA, developer, or code-reviewer agent has at least 30 consecutive CI runs and must triage flaky tests.
+disable-model-invocation: true
 ---
 
 # detect-test-flakiness

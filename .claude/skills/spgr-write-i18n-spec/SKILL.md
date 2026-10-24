@@ -1,6 +1,7 @@
 ---
 name: spgr-write-i18n-spec
 description: Produce an i18n-spec artifact that fixes the internationalization architecture, covering library and message-format selection, key naming, plural rules, locale-aware formatting, and the translation workflow. Use when the i18n Agent must settle the i18n approach before any string is written, or when scope adds a locale or an RTL language.
+disable-model-invocation: true
 ---
 
 # write-i18n-spec

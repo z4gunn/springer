@@ -1,6 +1,7 @@
 ---
 name: spgr-write-deployment-runbook
 description: Produce a deployment-runbook artifact for one release, covering the pre-deployment checklist, the ordered deployment sequence with per-step verification, smoke tests, rollback triggers, and escalation. Use when the DevOps Agent prepares a release, since the runbook gates the release checklist being marked ready.
+disable-model-invocation: true
 ---
 
 # write-deployment-runbook

@@ -1,6 +1,7 @@
 ---
 name: spgr-write-release-checklist
 description: Produce a release-checklist artifact for one release version, listing every gate category with a named owner and a pending, complete, or waived status auto-populated from agent artifacts. Use when the DevOps Agent prepares a release and needs the explicit shippable gate, or when the Orchestrator Agent enforces a hard release gate.
+disable-model-invocation: true
 ---
 
 # write-release-checklist

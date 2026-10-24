@@ -1,6 +1,7 @@
 ---
 name: spgr-validate-release-readiness
 description: Produce a release-readiness verdict artifact (GO or NO-GO) by independently verifying every release checklist item, all required agent sign-offs, and green CI on the release branch, with each blocker naming its owning agent. Use when the DevOps Agent or Orchestrator reaches the final gate before authorizing a deployment.
+disable-model-invocation: true
 ---
 
 # validate-release-readiness

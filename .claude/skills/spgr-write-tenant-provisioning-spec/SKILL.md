@@ -1,6 +1,7 @@
 ---
 name: spgr-write-tenant-provisioning-spec
 description: Produce a tenant-provisioning-spec artifact defining the full tenant lifecycle (creation, configuration, suspension, deletion) as an ordered saga with per-step error handling, compensating actions, and idempotency. Use when the Multi-tenancy Agent must specify how a tenant is created and torn down before provisioning code is written.
+disable-model-invocation: true
 ---
 
 # write-tenant-provisioning-spec

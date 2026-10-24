@@ -1,6 +1,7 @@
 ---
 name: spgr-check-license-compliance
 description: Produce a license-compliance report that audits every direct and transitive dependency license against the distribution model and allowed-license list, returning a PASS or GATE verdict that fails the build on any disallowed category. Use when the Security Agent must confirm a release, or when a CI dependency gate needs the current license posture.
+disable-model-invocation: true
 ---
 
 # check-license-compliance

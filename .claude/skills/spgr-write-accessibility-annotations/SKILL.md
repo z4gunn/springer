@@ -1,6 +1,7 @@
 ---
 name: spgr-write-accessibility-annotations
 description: Produce accessibility-annotated screen specs that turn WCAG 2.1 AA conformance into a per-element implementation contract covering ARIA roles, focus order, keyboard behavior, contrast, and touch targets. Use when the Design or Accessibility Agent must annotate approved screen specs before developer handoff.
+disable-model-invocation: true
 ---
 
 # write-accessibility-annotations

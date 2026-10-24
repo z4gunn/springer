@@ -1,6 +1,7 @@
 ---
 name: spgr-audit-dx-friction
 description: Produce a developer-experience friction audit report that scores CI timing and flakiness, local setup, error-message quality, and tooling gaps, with a PASS or GATE verdict on the CI time budget and flaky-test rate. Use when the DevOps Agent runs a DX health sweep, or when a developer agent needs evidence for a workflow fix.
+disable-model-invocation: true
 ---
 
 # audit-dx-friction

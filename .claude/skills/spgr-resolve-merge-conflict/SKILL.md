@@ -1,6 +1,7 @@
 ---
 name: spgr-resolve-merge-conflict
 description: Resolve git merge conflicts by reconciling the intent of both sides, then land the result as a chore(merge) commit and re-run the test suite. Use when a developer agent hits conflicts during a merge or rebase and must reconcile two changes to the same code rather than accepting one side wholesale.
+disable-model-invocation: true
 ---
 
 # resolve-merge-conflict

@@ -1,6 +1,7 @@
 ---
 name: spgr-audit-observability-coverage
 description: Produce an observability-coverage audit report that checks every service against the metric definitions, logging schema, SLO spec, and alert runbooks, with a PASS or GATE verdict that blocks production release on any critical-path service lacking an SLO or alerting. Use when the Observability Agent must confirm a release is instrumented.
+disable-model-invocation: true
 ---
 
 # audit-observability-coverage

@@ -1,6 +1,7 @@
 ---
 name: spgr-create-wireframes
 description: Produce a low-fidelity wireframe set as a markdown artifact, covering happy-path and edge-case screens for every primary user flow in grayscale-only structure with per-screen annotations. Use when the Design Agent has a confirmed IA document and user stories and must validate flow and structure before high-fidelity design.
+disable-model-invocation: true
 ---
 
 # create-wireframes

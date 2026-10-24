@@ -6,7 +6,7 @@ This file is the operative ruleset for AI agents working in this repository. It 
 
 Springer is an AI software development team built as a library of Claude Code skills and agents. Each agent models a traditional dev-team role (product manager, architect, developer, QA, DevOps) or a vertical specialty that spans those roles. The team executes the full lifecycle on a greenfield SaaS or mobile application, from idea to production, and the human enters only at deliberate checkpoints.
 
-This repository holds the build: 27 agents and 202 skills, almost all mapped from Phase 1 specs that live in a private vault (see Spec Source below). When adding or changing an artifact that has a spec, map from the spec rather than inventing. spgr-render-doc, spgr-render-design-mockups, spgr-render-design-comps, spgr-run-harness, spgr-check-quality-floor, spgr-check-seo-baseline, spgr-write-page-copy, and spgr-ingest-document are net-new capabilities with no Phase 1 spec, authored directly to these build standards.
+This repository holds the build: 27 agents and 201 skills, almost all mapped from Phase 1 specs that live in a private vault (see Spec Source below). When adding or changing an artifact that has a spec, map from the spec rather than inventing. spgr-render-doc, spgr-render-design-mockups, spgr-render-design-comps, spgr-run-harness, spgr-check-quality-floor, spgr-check-seo-baseline, spgr-write-page-copy, and spgr-ingest-document are net-new capabilities with no Phase 1 spec, authored directly to these build standards.
 
 ## Core Design Principles
 
@@ -80,9 +80,11 @@ Guidance:
 ### Skill Rules
 
 Hard:
-- Frontmatter is comprised of exactly two keys, `name` and `description`. Nothing else.
+- Frontmatter is `name` and `description`, then `disable-model-invocation: true` on every skill the main session does not invoke itself. Nothing else. Agents read their skills by path, so a hidden skill still runs, and its description stops loading into every session.
+- The catalog, the skills without that flag, stays within the count and character budget in `scripts/validate-repo.py`. A new catalog skill fits under it or displaces one.
+- Every skill is named by an agent, a shared reference, the project CLAUDE.md template, or a skill those name. A skill nothing names is unreachable and fails validation.
 - The description carries all triggering information, both what the skill does and when to use it. There is no "when to use" section in the body, because the body is not loaded until the skill triggers.
-- The description targets 300 characters with a hard cap of 350. Every description loads into every session, so it states what the skill produces and when to invoke it. The output contract, per-field detail, and verdict conditions live in the body.
+- The description targets 300 characters with a hard cap of 350. A catalog description loads into every session, and every description is what a person reads in the skill menu, so it states what the skill produces and when to invoke it. The output contract, per-field detail, and verdict conditions live in the body.
 - The body is written in the imperative (e.g. "Produce the artifact", not "This skill will produce the artifact") and must be under 500 lines. Content that approaches that limit moves to `references/`.
 - References are one level deep from SKILL.md. A reference file longer than 100 lines opens with a table of contents.
 - A `scripts/` file is added only when the same code would be rewritten on each run, or when determinism matters. Test every script by running it. An `assets/` file is added only for files used in the output (e.g. schema files, templates, boilerplate).
@@ -105,13 +107,14 @@ Guidance:
 
 ### Per-Artifact Checklist
 
-Run this checklist on every artifact before it is committed. The shape rules in it (frontmatter keys, the description cap, the body cap, reference depth and contents, agent model and tools, the em-dash ban) are enforced by `python3 scripts/validate-repo.py`, which CI runs with `schemas/validate.py --self-check` and `python3 -m unittest discover -s tests -t tests` on every push. A harness script or hook change ships with a test in `tests/`.
+Run this checklist on every artifact before it is committed. The shape rules in it (frontmatter keys, the description cap, the catalog budget, skill reachability, the body cap, reference depth and contents, agent model and tools, the em-dash ban) are enforced by `python3 scripts/validate-repo.py`, which CI runs with `schemas/validate.py --self-check` and `python3 -m unittest discover -s tests -t tests` on every push. A harness script or hook change ships with a test in `tests/`.
 - [ ] Started from a template, not a blank file
 - [ ] Name matches the file or directory, lowercase-kebab, `spgr-` prefix, globally unique
-- [ ] Skill frontmatter is exactly `name` and `description`. Agent declares `tools` at least privilege and `model`
+- [ ] Skill frontmatter is `name` and `description`, plus `disable-model-invocation: true` unless the main session invokes it. Agent declares `tools` at least privilege and `model`
 - [ ] Description states what the artifact does and when to use it, within the length cap. Agent description is framed for delegation
 - [ ] Body is imperative and single-responsibility. Skill body is under 500 lines
 - [ ] Detail is in `references/`, with no duplication, references one level deep
+- [ ] An agent names the skill in the workflow step it governs, so the skill is reachable
 - [ ] No README, CHANGELOG, or process files
 - [ ] The spec's contracts, methodology rules, and escalation triggers are all mapped
 - [ ] No em-dashes, semicolons, body-text bold, italics, or banned filler words

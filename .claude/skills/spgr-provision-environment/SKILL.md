@@ -1,6 +1,7 @@
 ---
 name: spgr-provision-environment
 description: Stand up a development, staging, or production environment from infrastructure-as-code, then inject secrets by reference, verify service connectivity, run smoke tests, and record an environment-metadata artifact. Use when the DevOps Agent must turn confirmed IaC into a running environment that downstream agents can target.
+disable-model-invocation: true
 ---
 
 # provision-environment

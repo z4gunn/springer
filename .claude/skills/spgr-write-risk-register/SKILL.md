@@ -1,6 +1,7 @@
 ---
 name: spgr-write-risk-register
 description: Produce a risk-register artifact listing each project risk with category, likelihood, impact, risk score, mitigation, owner, status, and a heat map, updated at each phase gate. Use when the Product Manager Agent must name and track project threats before a go/no-go or phase gate, or when the Architect Agent adds technical risk entries.
+disable-model-invocation: true
 ---
 
 # write-risk-register

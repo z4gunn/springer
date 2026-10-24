@@ -1,6 +1,7 @@
 ---
 name: spgr-read-artifact
 description: Parse a stored artifact, validate it against its registered schema, and return its header, content fields, confidence map, and decision log. Use when an agent needs to consume an upstream artifact (a PRD, NFR, architecture decision, and so on) before acting on it, optionally reading only specific sections.
+disable-model-invocation: true
 ---
 
 # read-artifact

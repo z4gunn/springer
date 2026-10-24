@@ -1,6 +1,7 @@
 ---
 name: spgr-write-rbac-policy
 description: Produce an rbac-policy artifact defining the role hierarchy, the role-by-resource-by-action permission matrix, the enforcement point per permission, and a privilege-escalation analysis, with one enforcement test per permission row. Use when the Auth Agent must establish the access-control contract before any permission check is coded.
+disable-model-invocation: true
 ---
 
 # write-rbac-policy

@@ -1,6 +1,7 @@
 ---
 name: spgr-generate-design-directions
 description: Produce a design-directions artifact holding three or more genuinely distinct creative directions for human selection, each with visual language, interaction model, emotional tone, and key screen mockups. Use when the Design Agent has personas, flows, and brand constraints and must open the design space before detailed design.
+disable-model-invocation: true
 ---
 
 # generate-design-directions

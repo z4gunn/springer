@@ -1,6 +1,7 @@
 ---
 name: spgr-configure-deep-linking
 description: Configure mobile deep linking as source code, wiring iOS Universal Links and Android App Links so external links open the correct in-app screen, with a route handler, web fallback, and deep link registry. Use when the Mobile Developer agent sets up deep linking before first launch or before review.
+disable-model-invocation: true
 ---
 
 # configure-deep-linking

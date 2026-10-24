@@ -1,6 +1,7 @@
 ---
 name: spgr-search-codebase
 description: Find symbols, patterns, or strings across the repository and return line-numbered, context-rich matches with a one-line interpretation of what the pattern means. Use when a QA, developer, or code-reviewer agent must locate where a symbol is defined or used, or assess the blast radius of a change before writing or reviewing code.
+disable-model-invocation: true
 ---
 
 # search-codebase

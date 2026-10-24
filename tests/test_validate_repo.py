@@ -83,7 +83,56 @@ class ValidateRepoTest(unittest.TestCase):
         code, out = run_validator(self.root)
         self.assertEqual(code, 1)
         self.assertIn("skill-frontmatter", out)
-        self.assertIn("exactly name, description", out)
+        self.assertIn("keys must be name, description, and optionally disable-model-invocation", out)
+
+    def hidden(self, name, body="Do the thing."):
+        text = GOOD_SKILL.format(name=name).replace("---\n\n#", "disable-model-invocation: true\n---\n\n#")
+        return self.skill(name, text.replace("Do the thing.", body))
+
+    def test_hidden_flag_is_allowed_and_must_be_true(self):
+        self.hidden("spgr-a")
+        self.agent("spgr-agent-a", GOOD_AGENT.format(name="spgr-agent-a") + "2. Run spgr-a.\n")
+        code, out = run_validator(self.root)
+        self.assertEqual(code, 0, out)
+        self.skill("spgr-b", GOOD_SKILL.format(name="spgr-b").replace("---\n\n#", "disable-model-invocation: false\n---\n\n#"))
+        self.assertIn("must be true when present", run_validator(self.root)[1])
+
+    def test_catalog_over_the_count_cap_fails(self):
+        for i in range(vr.CATALOG_COUNT_CAP + 1):
+            self.skill(f"spgr-s{i}", GOOD_SKILL.format(name=f"spgr-s{i}").replace(
+                "Produce a thing from an input.", f"Produce artifact number {i} of kind k{i}."))
+        code, out = run_validator(self.root)
+        self.assertEqual(code, 1)
+        self.assertIn("skill-catalog", out)
+        self.assertIn("load into every session", out)
+
+    def test_catalog_over_the_character_cap_fails(self):
+        filler = "Use when " + "word " * 60
+        for i in range(vr.CATALOG_CHARS_CAP // 300 + 2):
+            self.skill(f"spgr-c{i}", GOOD_SKILL.format(name=f"spgr-c{i}").replace(
+                "Use when a test needs a valid skill.", f"{filler.strip()} v{i}."))
+        out = run_validator(self.root)[1]
+        self.assertIn("catalog descriptions total", out)
+
+    def test_hidden_skill_nothing_names_is_unreachable(self):
+        self.hidden("spgr-orphan")
+        out = run_validator(self.root)[1]
+        self.assertIn("skill-reachability", out)
+        self.assertIn("spgr-orphan", out)
+
+    def test_hidden_skill_named_by_a_reachable_skill_is_reachable(self):
+        self.hidden("spgr-leaf")
+        self.hidden("spgr-mid", body="Then run spgr-leaf.")
+        self.skill("spgr-entry", GOOD_SKILL.format(name="spgr-entry").replace("Do the thing.", "Run spgr-mid."))
+        self.assertNotIn("skill-reachability", run_validator(self.root)[1])
+
+    def test_longer_skill_name_does_not_reach_its_prefix(self):
+        self.hidden("spgr-load")
+        self.hidden("spgr-load-plan")
+        self.agent("spgr-agent-a", GOOD_AGENT.format(name="spgr-agent-a") + "2. Run spgr-load-plan.\n")
+        out = run_validator(self.root)[1]
+        self.assertIn(".claude/skills/spgr-load:", out)
+        self.assertNotIn(".claude/skills/spgr-load-plan:", out)
 
     def test_name_mismatch_fails(self):
         self.skill("spgr-a", GOOD_SKILL.format(name="spgr-b"))
