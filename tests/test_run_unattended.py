@@ -32,7 +32,8 @@ n_path.write_text(str(n + 1))
 action = plan[min(n, len(plan) - 1)]
 run = project / "runs" / "r1"
 def cycle(transition):
-    k = len(list((run / "artifacts").glob("CYCLE-*.json"))) + 1
+    k = sum(1 for p in (run / "artifacts").glob("*.json")
+            if json.loads(p.read_text()).get("artifact_type") == "pdca-cycle") + 1
     obj = {"artifact_id": f"CYCLE-{k:04d}", "artifact_type": "pdca-cycle", "schema_version": "v1",
            "producing_agent": "spgr-agent-orchestrator", "timestamp": "2026-06-02T12:00:00Z",
            "parent_artifact_ref": None, "version": "v0.1-draft", "version_type": "draft",
@@ -40,7 +41,8 @@ def cycle(transition):
            "content": {"cycle_id": f"CYCLE-{k:04d}", "cycle_number": k, "run_id": "r1", "phase": "development",
                        "plan": {}, "do": {}, "check": {"verdict": "pass"},
                        "act": {"transition": transition}, "next_phase": "development"}}
-    (run / "artifacts" / f"CYCLE-{k:04d}.json").write_text(json.dumps(obj))
+    # The file name a real store uses, not one chosen to match the driver.
+    (run / "artifacts" / f"pdca-cycle-{k:04d}-r1.json").write_text(json.dumps(obj))
 def result(text, error=False):
     print(json.dumps({"type": "result", "subtype": "error" if error else "success", "is_error": error,
                       "result": text}))
@@ -167,6 +169,14 @@ class DriveTest(unittest.TestCase):
         finally:
             ru.urllib.request.urlopen = saved
         self.assertIn("run complete", sent[0]["text"])
+
+    def test_cycle_count_ignores_file_names_and_other_artifacts(self):
+        art = self.store.run_dir / "artifacts"
+        (art / "pdca-cycle-0007-r1.json").write_text(json.dumps({"artifact_type": "pdca-cycle"}))
+        (art / "CYCLE-0008.json").write_text(json.dumps({"artifact_type": "pdca-cycle"}))
+        (art / "acceptance-criteria-cycle21-v0.1.json").write_text(json.dumps({"artifact_type": "acceptance-criteria"}))
+        (art / "broken.json").write_text("{")
+        self.assertEqual(ru.cycle_count(self.store.run_dir), 2)
 
     def test_usage(self):
         with contextlib.redirect_stderr(io.StringIO()):

@@ -82,7 +82,9 @@
       "Bash(git reset --hard:*)",
       "Bash(git checkout -- :*)",
       "Bash(git stash:*)",
-      "Bash(git branch -D:*)"
+      "Bash(git branch -D:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)"
     ]
   },
   "hooks": {
@@ -106,7 +108,7 @@
         ]
       },
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
         "hooks": [
           {
             "type": "command",

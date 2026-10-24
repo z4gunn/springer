@@ -122,7 +122,17 @@ def log_event(run_dir, **fields):
 
 
 def cycle_count(run_dir):
-    return len(list((Path(run_dir) / "artifacts").glob("CYCLE-*.json")))
+    """Cycles recorded so far, counted the way derive-ready-queue.py counts
+    them: by artifact_type, never by file name, because a real store names a
+    cycle pdca-cycle-<n>-<run>.json and spgr-write-artifact fixes no name."""
+    count = 0
+    for path in (Path(run_dir) / "artifacts").glob("*.json"):
+        try:
+            if json.loads(path.read_text()).get("artifact_type") == "pdca-cycle":
+                count += 1
+        except (OSError, ValueError, AttributeError):
+            continue
+    return count
 
 
 def human_gates(snapshot):

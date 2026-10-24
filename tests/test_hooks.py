@@ -354,9 +354,37 @@ class ProtectCheckConfigTest(unittest.TestCase):
         self.assertEqual(rc, 2)
         self.assertIn("rulings", err)
 
+    def bash(self, command):
+        return run_hook("protect-check-config.py",
+                        {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}},
+                        self.project)
+
+    def test_bash_writes_to_protected_paths_are_refused(self):
+        for cmd in ("echo '{}' > tsconfig.json", "cat x >> eslint.config.mjs", "cp /tmp/loose.json tsconfig.json",
+                    "mv tsconfig.json tsconfig.bak", "sed -i '' 's/true/false/' tsconfig.json",
+                    "echo x | tee tests/fixtures/real/resume.txt", "rm .claude/hooks/h.py",
+                    "npm test && echo ok >tsconfig.json",
+                    "echo '{}' > runs/r1/dispatch/C1/U1/receipts/unit.json", "cp a.json runs/_risk.json"):
+            rc, _, err = self.bash(cmd)
+            self.assertEqual(rc, 2, cmd)
+            self.assertIn("protect-check-config", err)
+
+    def test_ordinary_bash_passes(self):
+        for cmd in ("cat tsconfig.json", "npm test 2>&1 | tail -5", "cp src/app.ts src/app2.ts",
+                    "echo hi > /dev/null", "git diff tsconfig.json", "sed -n 1,5p tsconfig.json",
+                    "python3 .claude/skills/spgr-run-harness/scripts/receipt.py run u --name t -- npm test",
+                    "echo '{}' > packages/api/tsconfig.json"):
+            rc, _, _ = self.bash(cmd)
+            self.assertEqual(rc, 0, cmd)
+
+    def test_evidence_files_are_refused_to_the_edit_tools_even_when_new(self):
+        rc, _, err = self.edit("runs/r1/dispatch/C1/U1/receipts/unit.json", "Write")
+        self.assertEqual(rc, 2)
+        self.assertIn("evidence", err)
+
     def test_other_tools_and_bad_payloads_pass(self):
         rc, _, _ = run_hook("protect-check-config.py",
-                            {"tool_name": "Bash", "tool_input": {"command": "cat tsconfig.json"}}, self.project)
+                            {"tool_name": "Read", "tool_input": {"file_path": "tsconfig.json"}}, self.project)
         self.assertEqual(rc, 0)
         proc = subprocess.run([sys.executable, str(HOOKS / "protect-check-config.py")], input="not json",
                               capture_output=True, text=True)
