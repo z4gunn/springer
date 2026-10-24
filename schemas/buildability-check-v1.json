@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/buildability-check-v1.json",
+  "title": "SPGR Buildability Check v1",
+  "allOf": [{ "$ref": "https://springer.local/schemas/_envelope-v1.json" }],
+  "properties": {
+    "artifact_type": { "const": "buildability-check" },
+    "content": { "$ref": "#/$defs/content" }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": ["check_id", "builder_agent", "read_refs", "questions"],
+      "properties": {
+        "check_id": { "type": "string", "minLength": 1 },
+        "builder_agent": { "type": "string", "minLength": 1, "description": "The developer agent that will build first, reading as that builder." },
+        "read_refs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "description": "The proposed artifacts read, by artifact id." },
+        "questions": {
+          "type": "array",
+          "description": "Every question the builder would have to ask before building, sorted into one pile each.",
+          "items": {
+            "type": "object",
+            "required": ["question", "pile", "consumer"],
+            "properties": {
+              "question": { "type": "string", "minLength": 1 },
+              "pile": { "type": "string", "enum": ["answered", "minor", "human"], "description": "answered: the artifacts already settle it. minor: reversible inside the profile, taken as a default. human: blocking, or a fact only the human holds." },
+              "consumer": { "type": "string", "minLength": 1, "description": "The story or phase that needs the answer." },
+              "answer_ref": { "type": "string", "minLength": 1, "description": "For answered, the artifact id and section that settles it." },
+              "recommended_default": { "type": "string", "minLength": 1, "description": "For minor, the default taken. For human, the recommended answer the gate offers first." },
+              "decision_class": { "type": "string", "enum": ["blocking", "deferrable"] }
+            },
+            "allOf": [
+              { "if": { "properties": { "pile": { "const": "answered" } } }, "then": { "required": ["answer_ref"] } },
+              { "if": { "properties": { "pile": { "const": "minor" } } }, "then": { "required": ["recommended_default"] } },
+              { "if": { "properties": { "pile": { "const": "human" } } }, "then": { "required": ["recommended_default", "decision_class"] } }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

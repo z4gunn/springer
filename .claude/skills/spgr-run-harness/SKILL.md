@@ -202,8 +202,10 @@ rehydration algorithm, the parallel barrier, and the learnings rules, see
    direction-review checkpoint once both option units return, and fire no
    architecture-confirmation gate. Write the hil-checkpoint with pipeline_status
    paused, its `holds` per the holds table in the reference, and the units it
-   holds as `held_batch`. Carry every intake question and every open line of
-   `pending-defaults.md` in its `decisions`. Fire spgr-notify-human. Then keep
+   holds as `held_batch`. Carry every intake question, every `human` question of
+   the buildability check, and every open line of `pending-defaults.md`
+   (where the check's `minor` questions land as DEF lines) in its
+   `decisions`. Fire spgr-notify-human. Then keep
    looping on the work the gate does not hold. When the gate holds all work, or
    the orchestrator returns an empty batch while a gate is open, set the act
    transition to pause and terminate cleanly. Resuming is step 1 on the next

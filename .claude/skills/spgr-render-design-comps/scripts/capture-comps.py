@@ -17,10 +17,16 @@ Usage:
     capture-comps.py <target> --out <dir> [--widths 375,768,1440]
                      [--schemes light,dark] [--height 900]
                      [--reduced-motion] [--no-detect]
+                     [--variants a,b,c] [--variant-param variant]
 
 <target> is an .html file, a directory of .html files, or an http(s) URL.
 Writes <out>/<page>-<width>-<scheme>.png per cell, <out>/detect.json when the
 detector ran, and <out>/capture-report.json always.
+
+With --variants and a URL target, each variant is captured as its own page at
+the same URL with `?<variant-param>=<variant>` set, keeping any other query
+parameter, and named <page>-<variant>. This is how directions rendered on a
+product's real route are compared cell for cell.
 """
 
 import argparse
@@ -30,7 +36,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 DEFAULT_WIDTHS = "375,768,1440"
 DEFAULT_SCHEMES = "light,dark"
@@ -85,6 +91,24 @@ def resolve_pages(target):
     if p.is_file():
         return "file", [(p.stem, p.as_uri())]
     raise FileNotFoundError(target)
+
+
+def expand_variants(pages, variants, param="variant"):
+    """One page per variant, the URL carrying the variant as a query
+    parameter. Local files and directories are returned unchanged."""
+    if not variants:
+        return pages
+    out = []
+    for name, url in pages:
+        parts = urlparse(url)
+        if parts.scheme not in ("http", "https"):
+            out.append((name, url))
+            continue
+        for v in variants:
+            query = [(k, val) for k, val in parse_qsl(parts.query, keep_blank_values=True) if k != param]
+            query.append((param, v))
+            out.append((f"{name}-{v}", urlunparse(parts._replace(query=urlencode(query)))))
+    return out
 
 
 def locate_shot(expected, out_dir, cwd):
@@ -169,6 +193,8 @@ def main(argv):
     ap.add_argument("--height", type=int, default=DEFAULT_HEIGHT)
     ap.add_argument("--reduced-motion", action="store_true")
     ap.add_argument("--no-detect", action="store_true")
+    ap.add_argument("--variants", default="")
+    ap.add_argument("--variant-param", default="variant")
     args = ap.parse_args(argv)
 
     widths = [int(w) for w in args.widths.split(",") if w.strip()]
@@ -182,11 +208,16 @@ def main(argv):
     except FileNotFoundError:
         print(f"target not found: {args.target}", file=sys.stderr)
         return 2
+    variants = [v.strip() for v in args.variants.split(",") if v.strip()]
+    if variants and kind != "url":
+        print("--variants needs an http(s) URL target, the route the variants render on", file=sys.stderr)
+        return 2
+    pages = expand_variants(pages, variants, args.variant_param)
 
     launcher = find_impeccable()
     tools = {CLI: tool_status(CLI), DETECTOR: "ok" if launcher else "missing"}
     report = {"target": args.target, "kind": kind, "tools": tools,
-              "pages": [name for name, _ in pages], "widths": widths, "schemes": schemes,
+              "pages": [name for name, _ in pages], "variants": variants, "widths": widths, "schemes": schemes,
               "reduced_motion": args.reduced_motion, "shots": [], "failures": [],
               "detect": {"ran": False}}
 

@@ -1,0 +1,11 @@
+{
+  "name": "springer",
+  "version": "0.1.0",
+  "description": "Installs the Springer AI software development team into a project: a new instance, an existing repository, or an update to a newer runtime.",
+  "author": { "name": "z4gunn" },
+  "homepage": "https://github.com/z4gunn/springer",
+  "repository": "https://github.com/z4gunn/springer",
+  "license": "MIT",
+  "keywords": ["agents", "skills", "sdlc", "harness"],
+  "skills": "./plugin/skills/"
+}

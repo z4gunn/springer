@@ -6,7 +6,7 @@ This file is the operative ruleset for AI agents working in this repository. It 
 
 Springer is an AI software development team built as a library of Claude Code skills and agents. Each agent models a traditional dev-team role (product manager, architect, developer, QA, DevOps) or a vertical specialty that spans those roles. The team executes the full lifecycle on a greenfield SaaS or mobile application, from idea to production, and the human enters only at deliberate checkpoints.
 
-This repository holds the build: 27 agents and 201 skills, almost all mapped from Phase 1 specs that live in a private vault (see Spec Source below). When adding or changing an artifact that has a spec, map from the spec rather than inventing. spgr-render-doc, spgr-render-design-mockups, spgr-render-design-comps, spgr-run-harness, spgr-check-quality-floor, spgr-check-seo-baseline, spgr-write-page-copy, and spgr-ingest-document are net-new capabilities with no Phase 1 spec, authored directly to these build standards.
+This repository holds the build: 27 agents and 202 skills, almost all mapped from Phase 1 specs that live in a private vault (see Spec Source below). When adding or changing an artifact that has a spec, map from the spec rather than inventing. spgr-render-doc, spgr-render-design-mockups, spgr-render-design-comps, spgr-run-harness, spgr-check-quality-floor, spgr-check-seo-baseline, spgr-write-page-copy, spgr-ingest-document, and spgr-check-buildability are net-new capabilities with no Phase 1 spec, authored directly to these build standards.
 
 ## Core Design Principles
 
@@ -34,6 +34,8 @@ springer/
     hooks/                   harness hooks (e.g. the agent event logger that feeds the run dashboard)
     workflows/               one-time build scripts that read the Phase 1 specs (see Spec Source below)
     settings.json            repo-level Claude Code settings, registers the hooks
+  .claude-plugin/        the plugin and marketplace manifests, so Springer installs with /plugin
+  plugin/skills/         the plugin's only skill, spgr-install-runtime, which creates, adopts, or updates an instance from the plugin's copy
   templates/             golden starters, build from these and not from a blank file
     SKILL.template.md
     agent.template.md
