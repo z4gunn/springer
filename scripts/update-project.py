@@ -248,6 +248,27 @@ def plan_update(target, source, manifest):
     return plan
 
 
+def prune_empty_dirs(target, directory):
+    """Remove directories a removal left empty, up to the runtime directory
+    that holds them. A retired skill otherwise leaves an empty folder that
+    the validator reads as a skill with no SKILL.md."""
+    roots = {(target / rel).resolve() for rel in RUNTIME_DIRS}
+    current = directory.resolve()
+    while current not in roots and target.resolve() in current.parents:
+        leftovers = [p for p in current.iterdir() if p.name not in SKIP_NAMES]
+        if leftovers:
+            return
+        for p in current.iterdir():
+            if p.is_dir():
+                for sub in sorted(p.rglob("*"), reverse=True):
+                    sub.rmdir() if sub.is_dir() else sub.unlink()
+                p.rmdir()
+            else:
+                p.unlink()
+        current.rmdir()
+        current = current.parent
+
+
 def apply_update(target, source, manifest, plan, force):
     src_files = runtime_files(source)
     for rel in plan["add"] + plan["replace"] + (plan["keep_modified"] if force else []):
@@ -257,6 +278,7 @@ def apply_update(target, source, manifest, plan, force):
         dest.chmod(src_files[rel].stat().st_mode & 0o777)
     for rel in plan["remove"] + (plan["keep_modified_removed"] if force else []):
         (target / rel).unlink()
+        prune_empty_dirs(target, (target / rel).parent)
     renders = renders_for(source, manifest)
     for rel in plan["template_replace"] + (plan["template_merge"] if force else []):
         (target / rel).write_text(renders[rel][1])
