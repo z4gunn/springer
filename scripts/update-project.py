@@ -350,8 +350,11 @@ def cmd_manifest(target, profile):
 
 def merge_settings(existing, template):
     """The repository's settings with the runtime's permission rules and hook
-    entries added where absent. Nothing the repository has is removed or
-    reordered, so its own allowlist and hooks keep working."""
+    entries added where absent. A runtime hook entry the repository already
+    has, matched by its commands, takes the template's matcher, because a
+    runtime hook that widens its matcher protects nothing until the matcher
+    arrives. Nothing the repository has is removed or reordered, so its own
+    allowlist and hooks keep working."""
     merged = json.loads(json.dumps(existing))
     perms = merged.setdefault("permissions", {})
     for key, rules in template.get("permissions", {}).items():
@@ -360,9 +363,13 @@ def merge_settings(existing, template):
     hooks = merged.setdefault("hooks", {})
     for event, entries in template.get("hooks", {}).items():
         have = hooks.setdefault(event, [])
-        commands = {h.get("command") for e in have for h in e.get("hooks", [])}
         for entry in entries:
-            if not all(h.get("command") in commands for h in entry.get("hooks", [])):
+            wanted = {h.get("command") for h in entry.get("hooks", [])}
+            same = [e for e in have if {h.get("command") for h in e.get("hooks", [])} == wanted]
+            if same:
+                if "matcher" in entry:
+                    same[0]["matcher"] = entry["matcher"]
+            elif not wanted <= {h.get("command") for e in have for h in e.get("hooks", [])}:
                 have.append(entry)
     return merged
 

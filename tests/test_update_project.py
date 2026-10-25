@@ -357,6 +357,27 @@ class AdoptTest(unittest.TestCase):
         self.assertEqual(run_main("adopt", str(other), "--profile", "small")[0], 1)
 
 
+class MergeSettingsTest(unittest.TestCase):
+    """merge_settings adds what the repository lacks and widens the matcher of
+    a runtime hook the repository already has."""
+
+    def test_existing_runtime_hook_takes_the_template_matcher(self):
+        guard = {"type": "command", "command": "python3 .claude/hooks/guard.py"}
+        own = {"matcher": "Edit", "hooks": [{"type": "command", "command": "python3 local.py"}]}
+        existing = {"hooks": {"PreToolUse": [{"matcher": "Edit|Write", "hooks": [guard]}, own]}}
+        template = {"hooks": {"PreToolUse": [{"matcher": "Edit|Write|Bash", "hooks": [guard]}]}}
+        merged = up.merge_settings(existing, template)["hooks"]["PreToolUse"]
+        self.assertEqual([e["matcher"] for e in merged], ["Edit|Write|Bash", "Edit"])
+        self.assertEqual(existing["hooks"]["PreToolUse"][0]["matcher"], "Edit|Write")
+
+    def test_absent_hook_is_appended_once(self):
+        template = {"hooks": {"PostToolUse": [{"matcher": "Agent", "hooks": [
+            {"type": "command", "command": "python3 log.py"}]}]}}
+        once = up.merge_settings({}, template)
+        self.assertEqual(up.merge_settings(once, template), once)
+        self.assertEqual(len(once["hooks"]["PostToolUse"]), 1)
+
+
 class NewProjectIntegrationTest(unittest.TestCase):
     """The real new-project.sh on the real checkout: the sed render and the
     Python render must agree, and a fresh instance must need no update."""
