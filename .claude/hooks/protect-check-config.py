@@ -23,7 +23,17 @@ the path with its reason in `runs/_config-unlock.json`:
     {"paths": [{"path": "tsconfig.json", "reason": "ADR-004 adds a path alias"}]}
 
 That file is itself refused to the editing tools, so an agent cannot unlock
-its own edit. Registered in templates/project-settings.json behind a
+its own edit. The same goes for the evidence the merge gate reads: a unit's
+receipts under `runs/<run-id>/dispatch/` are written by receipt.py and
+product-check.py, never by hand, and `runs/_risk.json` is the human's.
+
+Bash is covered too, because an allowlisted `cp`, `mv`, `sed -i`, `tee`, or
+redirection reaches the same files. The hook reads the command's write
+targets (a `>` or `>>` redirection, `tee`, the last argument of `cp`, `ln`, or
+`install`, every file argument of `rm`, `mv`, `truncate`, `chmod`, and
+`sed -i`) and refuses one that names a protected path. It cannot see a
+write a script makes from inside, so the review-package tags stay the
+second line. Registered in templates/project-settings.json behind a
 file-exists guard. A malformed payload or any internal error passes, because
 a hook that fails closed on its own bug would stop every edit.
 """
@@ -31,6 +41,7 @@ a hook that fails closed on its own bug would stop every edit.
 import json
 import os
 import re
+import shlex
 import sys
 
 UNLOCK_REL = "runs/_config-unlock.json"
@@ -41,6 +52,10 @@ PROTECTED = re.compile(
     r"|\.gts\.[^/]+)$"
     r"|(^|/)\.husky/|^\.claude/settings\.json$|^\.claude/hooks/|^tests/fixtures/real/")
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+EVIDENCE = re.compile(r"^runs/[^/]+/dispatch/.*/receipts/|^runs/_risk\.json$")
+LAST_ARG = {"cp", "ln", "install"}
+EVERY_ARG = {"rm", "mv", "truncate", "chmod", "unlink", "shred"}
+SEPARATORS = {"&&", "||", ";", "|", "&"}
 
 
 def unlocked(project, rel):
@@ -64,6 +79,9 @@ def decide(project, file_path):
     if rel == UNLOCK_REL:
         return ("protect-check-config: runs/_config-unlock.json records the harness's rulings and is not "
                 "edited by an agent. Report the change you need as a concern in your unit report.")
+    if EVIDENCE.search(rel):
+        return (f"protect-check-config: {rel} is evidence the merge gate reads. Receipts are written by "
+                "receipt.py and product-check.py, and runs/_risk.json by the human. Rerun the check instead.")
     if not PROTECTED.search(rel) or not os.path.exists(absolute) or unlocked(project, rel):
         return None
     return (f"protect-check-config: {rel} sets the bar a check measures against, and editing it can turn a "
@@ -72,14 +90,59 @@ def decide(project, file_path):
             f"records a ruling and unlocks the path in {UNLOCK_REL}.")
 
 
+def bash_targets(command):
+    """The paths a shell command writes, as far as its words show them."""
+    try:
+        words = shlex.split(command, posix=True)
+    except ValueError:
+        words = command.split()
+    targets, segment = [], []
+
+    def flush():
+        if not segment:
+            return
+        name = os.path.basename(segment[0])
+        args = [w for w in segment[1:] if not w.startswith("-")]
+        if name in LAST_ARG and len(args) >= 2:
+            targets.append(args[-1])
+        elif name in EVERY_ARG:
+            targets.extend(args)
+        elif name == "tee":
+            targets.extend(args)
+        elif name == "sed" and any(w == "-i" or w.startswith("-i") for w in segment[1:]):
+            targets.extend(args[1:])
+        segment.clear()
+
+    i = 0
+    while i < len(words):
+        w = words[i]
+        if w in SEPARATORS:
+            flush()
+        elif w in (">", ">>", "1>", "2>", "&>") and i + 1 < len(words):
+            targets.append(words[i + 1])
+            i += 1
+        elif re.match(r"^(\d?>>?|&>)\S", w):
+            targets.append(re.sub(r"^(\d?>>?|&>)", "", w))
+        else:
+            segment.append(w)
+        i += 1
+    flush()
+    return [t for t in targets if t and not t.startswith("&") and t != "/dev/null"]
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
-        if payload.get("tool_name") not in EDIT_TOOLS:
-            return 0
+        tool = payload.get("tool_name")
         tool_input = payload.get("tool_input") or {}
         project = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd()
-        message = decide(project, tool_input.get("file_path") or tool_input.get("notebook_path"))
+        if tool in EDIT_TOOLS:
+            message = decide(project, tool_input.get("file_path") or tool_input.get("notebook_path"))
+        elif tool == "Bash":
+            message = next((m for m in (decide(project, t) for t in bash_targets(tool_input.get("command", "")))
+                            if m), None)
+        else:
+            return 0
     except Exception:  # noqa: BLE001  never block an edit on the hook's own failure
         return 0
     if message:

@@ -331,8 +331,17 @@ def pair_events(events):
 
 
 def latest_cycle(run_dir):
-    paths = sorted(glob.glob(os.path.join(run_dir, "artifacts", "CYCLE-*.json")))
-    return load_json(paths[-1]) if paths else None
+    """The pdca-cycle artifact with the highest cycle number, found by its
+    artifact_type, because the store does not fix an artifact's file name."""
+    best = None
+    for path in glob.glob(os.path.join(run_dir, "artifacts", "*.json")):
+        doc = load_json(path)
+        if not isinstance(doc, dict) or doc.get("artifact_type") != "pdca-cycle":
+            continue
+        number = (doc.get("content") or {}).get("cycle_number") or 0
+        if best is None or number > best[0]:
+            best = (number, doc)
+    return best[1] if best else None
 
 
 def hrule(width, char="─"):

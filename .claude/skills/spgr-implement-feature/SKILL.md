@@ -31,7 +31,7 @@ Turn one confirmed user story into working, tested, reviewable code in a feature
 
 ## Procedure
 
-1. Read the story, the confirmed acceptance criteria, the relevant API spec, and the architecture constraints with spgr-read-artifact. Validate each on read. If the acceptance criteria are absent, ambiguous, or unconfirmed, stop and call spgr-escalate with the precise list of missing or unclear criteria. Do not implement against assumed criteria.
+1. Read the story, the confirmed acceptance criteria, the relevant API spec, and the architecture constraints with spgr-read-artifact. Validate each on read. If the acceptance criteria are absent, ambiguous, or unconfirmed, stop and call spgr-escalate with the precise list of missing or unclear criteria. Do not implement against assumed criteria. On the `polish` lane there are no criteria artifacts by design: the brief's issue, in the human's words, and the product check it names are the criteria, and the procedure continues without them.
 2. Check the story against the approved architecture before writing any code. If the architecture cannot cleanly support the story, call spgr-escalate to surface the conflict and stop. Do not introduce a workaround that creates technical debt. For an open question in a vertical domain such as auth, security, or accessibility, call spgr-tag-vertical-agent before proceeding.
 3. Create the feature branch with the naming convention `feature/<story-id>-<short-description>`.
 4. Write the failing acceptance test first, one scenario per acceptance criterion, via spgr-write-acceptance-test. Run the suite with spgr-run-tests and confirm the new tests fail for the right reason. A test that passes before any implementation is wrong and must be corrected before continuing.

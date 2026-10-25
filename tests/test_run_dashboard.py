@@ -46,5 +46,19 @@ class DashboardRollupTest(unittest.TestCase):
         self.assertIsNone(rd.failure_line(rd.aggregate_project(str(self.root))))
 
 
+
+class LatestCycleTest(unittest.TestCase):
+    def test_latest_cycle_is_found_by_type_and_number(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            art = Path(tmp) / "artifacts"
+            art.mkdir()
+            for n in (3, 12, 7):
+                (art / f"pdca-cycle-{n:04d}-r1.json").write_text(json.dumps(
+                    {"artifact_type": "pdca-cycle", "content": {"cycle_number": n}}))
+            (art / "prd-v1.json").write_text(json.dumps({"artifact_type": "prd", "content": {"cycle_number": 99}}))
+            self.assertEqual(rd.latest_cycle(tmp)["content"]["cycle_number"], 12)
+            self.assertIsNone(rd.latest_cycle(str(Path(tmp) / "nope")))
+
+
 if __name__ == "__main__":
     unittest.main()
