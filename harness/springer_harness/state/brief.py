@@ -72,7 +72,12 @@ class BriefStore:
 
     def create(self, name):
         front = {"brief_version": 1, "name": name, "surfaces": ["web"], "autonomy": "standard", "proposed": []}
-        write_text(self.path, render({**front, **derive(front)}, {}))
+        write_text(self.path, render(self._stamped(front), {}))
+
+    def _stamped(self, front):
+        """The derived fields the harness writes. The sentence is computed on read."""
+        derived = derive(front)
+        return {**front, "profile": derived["profile"], "lane": derived["lane"]}
 
     def load(self):
         if not self.path.exists():
@@ -91,7 +96,10 @@ class BriefStore:
     def view(self, started):
         front, sections = self.load()
         proposed = set(front.get("proposed") or [])
-        names = [n for n in SECTION_ORDER if n in sections or n in REQUIRED] + \
+        # Every section is offered so a person can fill it. Idea is the entry point
+        # from Discovery, so it shows until the product sections have text.
+        started_writing = any(sections.get(n) for n in REQUIRED)
+        names = [n for n in SECTION_ORDER if n != "Idea" or sections.get("Idea") or not started_writing] + \
                 [n for n in sections if n not in SECTION_ORDER]
         return {"version": front.get("brief_version", 1), "started": started, "facts": self.facts(front),
                 "derived": derive(front),
@@ -109,8 +117,7 @@ class BriefStore:
 
     def _write(self, front, sections):
         front["brief_version"] = front.get("brief_version", 1) + 1
-        front.update(derive(front))
-        write_text(self.path, render(front, sections))
+        write_text(self.path, render(self._stamped(front), sections))
         return front["brief_version"]
 
     def update_section(self, section, body, base_version):

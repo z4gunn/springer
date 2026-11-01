@@ -1,10 +1,12 @@
 """The harness package layout: every subpackage imports, and the command exists
-and reports that it has nothing to run yet."""
+and says what to do when no daemon is running."""
 
 import contextlib
 import importlib
+import importlib.util
 import io
 import sys
+import tempfile
 import tomllib
 import unittest
 
@@ -33,12 +35,14 @@ class HarnessSkeletonTest(unittest.TestCase):
         self.assertEqual(project["name"], "springer-harness")
         self.assertEqual(project["scripts"]["springer"], "springer_harness.cli:main")
 
-    def test_cli_says_it_is_not_built_and_fails(self):
+    def test_cli_names_the_next_step_when_no_daemon_runs(self):
+        if importlib.util.find_spec("textual") is None:
+            self.skipTest("the TUI dependencies are not installed")
         cli = importlib.import_module("springer_harness.cli")
         err = io.StringIO()
-        with contextlib.redirect_stderr(err):
-            self.assertEqual(cli.main(), 1)
-        self.assertIn("under construction", err.getvalue())
+        with tempfile.TemporaryDirectory() as home, contextlib.redirect_stderr(err):
+            self.assertEqual(cli.main([home]), 1)
+        self.assertIn("springer daemon", err.getvalue())
 
 
 if __name__ == "__main__":

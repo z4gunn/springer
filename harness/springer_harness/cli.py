@@ -1,4 +1,4 @@
-"""The springer command. Onboarding and the TUI land here in later steps."""
+"""The springer command: the TUI, and for now the daemon. Onboarding lands later."""
 
 import argparse
 import sys
@@ -25,6 +25,20 @@ def serve(home, port):
     return 0
 
 
+def open_tui(home):
+    """Open the TUI on a running daemon. Onboarding will start the daemon as a service."""
+    from .tui.app import SpringerApp
+    from .tui.client import ApiClient
+
+    try:
+        client = ApiClient.from_home(home)
+    except (OSError, KeyError, ValueError):
+        sys.stderr.write(f"springer: no daemon found under {home}. Start one with `springer daemon`.\n")
+        return 1
+    SpringerApp(client).run()
+    return 0
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["daemon"]:
@@ -33,8 +47,7 @@ def main(argv=None):
         parser.add_argument("--port", type=int, default=7337)
         args = parser.parse_args(argv[1:])
         return serve(args.home, args.port)
-    sys.stderr.write("springer: the harness is under construction. Only `springer daemon` runs.\n")
-    return 1
+    return open_tui(Path.home() / ".springer" if not argv else Path(argv[0]))
 
 
 if __name__ == "__main__":

@@ -36,6 +36,8 @@ This document records the design of an opinionated, near-autonomous software dev
 | State model | Approved as written in springer-state-model.md: the unit as a first-class entity, sessions tracked separately, gates with level and holds, the usage window as daemon state, mechanical crash recovery, and overlapping cycles with disjointness computed from declared paths |
 | Branch | A new branch of the Springer repository. Greenfield for the harness package, the runtime brought over as a unit pruned by profile, the repository restructured into harness/ and runtime/. See Branch strategy |
 | Backlog default | Files in the repository plus the TUI board. A tracker is an optional one-way projection |
+| TUI brief editor | A section rail with status marks, the editor, and a facts panel, with the critique as marks on the rail and a list under the editor. Moving between sections saves. The interview fills an empty section directly and proposes beside a section with the human's text, to accept, edit, or drop, and never overwrites it |
+| TUI run screen | Open gates first at full width, collapsing when there are none. A number key answers the selected gate, recommended option first |
 | Design system | Per product, tokens emitted as code into packages/ui, extracted from real wireframe needs |
 | Prototype carry-forward | Tokens, primitives, patterns, and Zod contracts carry forward. Screen composites are specified and rebuilt. The prototype directory is deleted |
 | RAG | Harness-owned FTS5 index over structured records. Embeddings only if misses are observed |
@@ -583,7 +585,6 @@ Deliberately not done: a generic orchestrator, full RAG for builders, a new wire
 ## Open items
 
 - Usage-window budgeting: which provider signal exposes window consumption, how the scheduler maps it to a dispatch rate, and the TUI display.
-- Brief editor behavior in the TUI: section navigation, inline critique display, and how interview answers are merged into sections the human already edited.
 - Task spec template per type with the executable check and allowlist.
 - Risk rules as a versioned data file.
 - Merge mechanics: stacked retargeting, L0 collisions, rebase policy.
