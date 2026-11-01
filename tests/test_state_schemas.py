@@ -75,9 +75,10 @@ def run_state(**content):
     obj["schema_version"] = "v2"
     obj["content"] = {"run_id": "demo", "regenerable": True, "active_phase": "development", "cycle_counter": 3,
                       "wip_board": {"backlog": [], "development": ["S-1"], "review": [], "validation": [], "done": []},
-                      "units": {"running": 1, "done": 4},
+                      "units": {"running": 1, "done": 4}, "paused": False, "waiting_on": None,
                       "in_flight": [{"unit_id": "U-0412", "session_id": "S-0001", "agent": "spgr-agent-qa-tester",
-                                     "model": "claude-sonnet-5-5", "started_at": TS, "context_percent": 10, "cost": 0.2}],
+                                     "model": "claude-sonnet-5-5", "started_at": TS, "context_percent": 10, "cost": 0.2,
+                                     "last_tool_call": "Bash"}],
                       "open_gates": [{"id": "G-0001", "level": "L2", "holds": ["U-0412"], "age_seconds": 60}],
                       "worktrees": [{"unit_id": "U-0412", "path": "/tmp/w/U-0412"}], "mvp_line": None, "deferred": [],
                       "window": {"provider": "claude-code", "used_fraction": None, "resets_at": TS},
@@ -101,6 +102,7 @@ DAEMON_EVENTS = {
     "merge": {"unit_id": "U-0412", "pr": 7, "sha": "abc"},
     "retrieval": {"unit_id": "U-0412", "record_ids": ["adr-1"]},
     "window_sample": {"provider": "claude-code", "used_fraction": 0.5, "resets_at": TS},
+    "operation_applied": {"op_id": "op-1", "type": "run.pause", "actor": "tui", "args": {"reason": "lunch"}},
 }
 
 
@@ -223,8 +225,17 @@ class StateSchemaTest(unittest.TestCase):
         self.assertInvalid("run-state-v2", run_state(open_gates=["G-0001"]))
         self.assertInvalid("run-state-v2", run_state(units={"paused": 1}))
         self.assertInvalid("run-state-v2", run_state(regenerable=False))
-        over_wip = {"backlog": [], "development": ["S1", "S2", "S3"], "review": [], "validation": [], "done": []}
-        self.assertInvalid("run-state-v2", run_state(wip_board=over_wip))
+        self.assertInvalid("run-state-v2", run_state(waiting_on="lunch"))
+
+    def test_review_may_exceed_the_wip_limit_because_a_hold_never_blocks_the_agent(self):
+        board = {"backlog": [], "development": [], "review": ["U-0001", "U-0002", "U-0003"], "validation": [], "done": []}
+        self.assertValid("run-state-v2", run_state(wip_board=board))
+
+    def test_every_gate_in_the_contract_has_a_type(self):
+        for kind in ("direction-review", "pr-merge", "scope-change", "discovery-go-no-go", "structure-confirmation",
+                     "scope-review", "taste-review", "production-release", "provisioning-required", "routine-decision"):
+            self.assertValid("hil-checkpoint-v2", gate(checkpoint_type=kind))
+        self.assertInvalid("hil-checkpoint-v2", gate(checkpoint_type="brief-submit"))
 
     def test_v1_records_still_validate_against_v1(self):
         validate = self.validate

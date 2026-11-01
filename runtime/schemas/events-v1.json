@@ -57,6 +57,9 @@
     },
     {
       "$ref": "#/$defs/window_sample"
+    },
+    {
+      "$ref": "#/$defs/operation_applied"
     }
   ],
   "$defs": {
@@ -899,6 +902,53 @@
         "resets_at": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "operation_applied": {
+      "type": "object",
+      "description": "A typed operation the daemon applied. A secret value is never in args.",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "op_id",
+        "type",
+        "actor",
+        "args"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "operation_applied"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "op_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "object"
         }
       }
     }

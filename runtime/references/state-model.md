@@ -58,6 +58,7 @@ This reference defines the durable state the Springer harness daemon reads and w
 | Worktree | unit id | ~/.springer/worktrees/<project>/U-nnnn/ | daemon |
 | Usage window | provider account | ~/.springer/usage/<provider>.json | daemon |
 | Index | none | ~/.springer/index.sqlite | daemon, rebuildable |
+| Audit log | op_id | ~/.springer/audit.jsonl, every applied operation, including one with no run | daemon |
 
 ## Unit lifecycle
 
@@ -134,16 +135,17 @@ events.jsonl keeps its current line format and its existing event names (agent_d
 | merge | unit_id, pr, sha |
 | retrieval | unit_id, record ids supplied |
 | window_sample | provider, used fraction, resets at |
+| operation_applied | op_id, type, actor, args. A secret value is never in args |
 
-The event ledger is what the TUI run screen and the dashboard read. The projection and the index are rebuilt from the cycle log plus the event ledger.
+A human intervention is recorded as operation_applied rather than as a cycle record, because a cycle record requires a plan, do, check, and act. Lines written by the session hooks carry no seq, so the API orders a stream by a cursor over the ledger and not by seq. The event ledger is what the TUI run screen and the dashboard read. The projection and the index are rebuilt from the cycle log plus the event ledger.
 
 ## Gate record (hil-checkpoint-v2)
 
-Changes from v1: level (L0, L1, L2, L3) is added, holds narrows from phase names and ids to the unit ids whose merge or start waits and becomes required, options stay as they are and are ordered recommended first, digest (true when the gate is informational and closes on view) is added, channel_refs (where it was sent) is added, response (option chosen, free text, rule change, by, at) is added. A gate with holds empty and level L1 is a digest entry, not a pause, so a digest gate records pipeline_status resumed.
+Changes from v1: checkpoint_type gains discovery-go-no-go, structure-confirmation, scope-review, taste-review, production-release, provisioning-required, and routine-decision, level (L0, L1, L2, L3) is added, holds narrows from phase names and ids to the unit ids whose merge or start waits and becomes required, options stay as they are and are ordered recommended first, digest (true when the gate is informational and closes on view) is added, channel_refs (where it was sent) is added, response (option chosen, free text, rule change, by, at) is added. A gate with holds empty and level L1 is a digest entry, not a pause, so a digest gate records pipeline_status resumed.
 
 ## Run projection (run-state-v2)
 
-Keeps every v1 field, changes open_gates from checkpoint ids to objects (id, level, holds, age), and adds: units (count by state), in_flight (unit id, session id, agent, model, started at, context percent, cost), worktrees (unit id, path), mvp_line (feature ids above and below), deferred (feature ids), window (provider, used fraction, resets at), generated_from_seq (the last event seq reflected). regenerable stays true.
+Keeps every v1 field, changes open_gates from checkpoint ids to objects (id, level, holds, age), drops the v1 cap on the wip_board stages because the scheduler enforces WIP and an L2 hold never blocks the agent, and adds: paused, waiting_on, last_tool_call on each in_flight row, units (count by state), in_flight (unit id, session id, agent, model, started at, context percent, cost), worktrees (unit id, path), mvp_line (feature ids above and below), deferred (feature ids), window (provider, used fraction, resets at), generated_from_seq (the last event seq reflected). regenerable stays true.
 
 ## Worktree claim and lock
 

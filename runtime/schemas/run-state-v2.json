@@ -31,7 +31,8 @@
         "units",
         "in_flight",
         "generated_from_seq",
-        "open_gates"
+        "open_gates",
+        "paused"
       ],
       "properties": {
         "run_id": {
@@ -91,7 +92,7 @@
             "validation",
             "done"
           ],
-          "description": "Stories by stage. development, review, and validation are capped at the WIP limit of 2.",
+          "description": "Stories or units by stage. The scheduler enforces the WIP limit, and the projection reports what is true, because an L2 hold never blocks the agent, so review can exceed the limit.",
           "properties": {
             "backlog": {
               "type": "array",
@@ -103,22 +104,19 @@
               "type": "array",
               "items": {
                 "type": "string"
-              },
-              "maxItems": 2
+              }
             },
             "review": {
               "type": "array",
               "items": {
                 "type": "string"
-              },
-              "maxItems": 2
+              }
             },
             "validation": {
               "type": "array",
               "items": {
                 "type": "string"
-              },
-              "maxItems": 2
+              }
             },
             "done": {
               "type": "array",
@@ -325,6 +323,12 @@
               "cost": {
                 "type": "number",
                 "minimum": 0
+              },
+              "last_tool_call": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           }
@@ -417,6 +421,18 @@
           "type": "integer",
           "minimum": 0,
           "description": "The last event seq this projection reflects."
+        },
+        "paused": {
+          "type": "boolean",
+          "description": "True while run.pause is in force. Rebuilt from operation_applied events."
+        },
+        "waiting_on": {
+          "enum": [
+            null,
+            "usage_window",
+            "gate",
+            "provisioning"
+          ]
         }
       }
     }

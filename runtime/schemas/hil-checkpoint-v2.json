@@ -47,7 +47,14 @@
             "design-direction-selection",
             "pr-merge",
             "security-compliance-flag",
-            "scope-change"
+            "scope-change",
+            "discovery-go-no-go",
+            "structure-confirmation",
+            "scope-review",
+            "taste-review",
+            "production-release",
+            "provisioning-required",
+            "routine-decision"
           ]
         },
         "artifact_ref": {

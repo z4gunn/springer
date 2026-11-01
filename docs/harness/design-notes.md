@@ -388,7 +388,7 @@ Backlog: the epic, feature, story tree and the WIP board, the dependency graph, 
 
 Brief: where the human spends their time. A structured editor for goals, personas, core flows, non-goals, constraints, and attachments. A side panel for profile, deploy, surfaces, and pinned decisions with defaults. The chat line in interview mode asks what a product manager would ask and fills the brief from the answers. Check brief runs the buildability critique inline. Start run is the only commit.
 
-Run: phase, dependency graph, in-flight units with context percent and cost, open gates as cards with the recommended option first and the consequences stated, the L1 digest as a feed, interventions (cancel, re-dispatch at a higher tier, pause) on the unit row. A design gate opens the browser on the daemon's localhost page for the mockups and comps, because a terminal cannot show them.
+Run: phase, dependency graph, in-flight units with context percent and cost, open gates as cards with the recommended option first and the consequences stated, the L1 digest as a feed, interventions (cancel and re-dispatch at a higher tier on the unit row, pause on the run). A design gate opens the browser on the daemon's localhost page for the mockups and comps, because a terminal cannot show them.
 
 The chat line on every screen is an agent over typed operations on the daemon API, with a confirm step for anything that changes config or scope and an audit log. It cannot do anything a click cannot.
 
@@ -428,7 +428,7 @@ CLI tier flags: --output-format json or stream-json, --allowedTools and --permis
 
 ### Monitoring
 
-Per run: phase, open gates with age, WIP board, graph colored by merged, open, or blocked. Per unit: agent, model, elapsed, context percent, last tool call, cost. Stream-json from each session piped to the run screen. Failure-class mix and the one figure, product checks per 100 dispatches. Spend against the daily cap. Interventions are API calls that write cycle records.
+Per run: phase, open gates with age, WIP board, graph colored by merged, open, or blocked. Per unit: agent, model, elapsed, context percent, last tool call, cost. Stream-json from each session piped to the run screen. Failure-class mix and the one figure, product checks per 100 dispatches. Spend against the daily cap. Interventions are API calls that write operation_applied events.
 
 ### Package layout
 
@@ -536,7 +536,7 @@ Steps 3 and 4 will tempt the TUI to be designed around the mock. The API contrac
 
 With no tracker configured, the backlog is files in the repository plus a board in the TUI, and that is the default rather than a fallback. The run store under runs/ is already the source of truth for stories and their states, and a tracker is only ever a one-way projection of it.
 
-The TUI Backlog screen renders the epic, feature, story hierarchy as a tree and as a board with the WIP columns (ready, in progress, in review, blocked, done), the dependency graph, the MVP line, and the risk tag per item. It is editable where the human is allowed to act: move the MVP line, defer or restore a feature, reorder within a wave, add a bug, answer an unknown, open the PR for an item. Every edit is a typed operation that writes a cycle record, so the board never diverges from the log.
+The TUI Backlog screen renders the epic, feature, story hierarchy as a tree and as a board with the WIP columns (ready, in progress, in review, blocked, done), the dependency graph, the MVP line, and the risk tag per item. It is editable where the human is allowed to act: move the MVP line, defer or restore a feature, reorder within a wave, add a bug, answer an unknown, open the PR for an item. Every edit is a typed operation recorded as an operation_applied event, so the board never diverges from the log.
 
 For reading outside the TUI, the harness renders docs/backlog.md at gates (under the existing docs rendering policy) with the same tree, status, and MVP line, so the backlog is reviewable in git and in a pull request.
 
