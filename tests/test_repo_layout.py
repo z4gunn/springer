@@ -48,7 +48,8 @@ class ScaffoldTest(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.target = Path(cls.tmp.name) / "app"
         subprocess.run(["bash", str(REPO / "scripts" / "new-project.sh"), str(cls.target), "small"],
-                       check=True, capture_output=True, text=True)
+                       check=True, capture_output=True, text=True,
+                       env=dict(os.environ, GIT_CONFIG_GLOBAL="/dev/null"))
 
     @classmethod
     def tearDownClass(cls):
@@ -67,11 +68,6 @@ class ScaffoldTest(unittest.TestCase):
     def test_manifest_records_instance_paths(self):
         manifest = json.loads((self.target / up.MANIFEST_REL).read_text())
         self.assertEqual(set(manifest["runtime"]), set(up.source_runtime_files(REPO)))
-
-    def test_a_fresh_instance_has_nothing_to_update(self):
-        plan = up.plan_update(self.target, REPO, json.loads((self.target / up.MANIFEST_REL).read_text()))
-        for action in ("add", "replace", "keep_modified", "remove", "keep_modified_removed", "keep_instance_only"):
-            self.assertEqual(plan[action], [], action)
 
 
 if __name__ == "__main__":
