@@ -22,7 +22,7 @@ def is_paused(ledger):
 
 
 def rebuild(run_dir, run_id, ledger, units, gates, cycles, now, sessions_for, window=None, profile=None,
-            externally_held=False):
+            write=True):
     states = [units.state(u) for u in units.ids()]
     counts = {}
     for state in states:
@@ -81,6 +81,7 @@ def rebuild(run_dir, run_id, ledger, units, gates, cycles, now, sessions_for, wi
     }
     if profile:
         doc["content"]["profile"] = profile
-    write_json(f"{run_dir}/run-state.json", doc)
+    if write:
+        write_json(f"{run_dir}/run-state.json", doc)
     return doc
 

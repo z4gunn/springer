@@ -15,8 +15,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install the schema validator dependencies
-        run: python -m pip install --quiet jsonschema referencing
+      - name: Install the schema validator and harness dependencies
+        run: python -m pip install --quiet jsonschema referencing "./harness[test]"
 
       - name: Validate the repo against the CLAUDE.md hard rules
         run: python scripts/validate-repo.py
