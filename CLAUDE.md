@@ -27,11 +27,16 @@ These constraints shape every agent and are non-negotiable.
 springer/
   README.md              project overview for people (overview, motivation, methodology, agent and skill catalog)
   CLAUDE.md              this file, the operative ruleset for AI, loaded every session
-  .claude/
-    skills/<name>/SKILL.md   built skills, auto-loaded in this repo
-    agents/<name>.md         built agents, auto-loaded in this repo
+  harness/               the springer-harness Python package: daemon, API, TUI, providers
+  runtime/               the source of the runtime an instance receives
+    skills/<name>/SKILL.md   built skills
+    agents/<name>.md         built agents
     references/<name>.md     shared cross-skill references (e.g. diagram-standards), cited by repo-relative path
     hooks/                   harness hooks (e.g. the agent event logger that feeds the run dashboard)
+    schemas/                 artifact JSON Schemas, built first (see Build Order)
+  schemas                symlink to runtime/schemas
+  .claude/
+    skills, agents, references, hooks   symlinks into runtime/, so this repo loads its own runtime
     workflows/               one-time build scripts that read the Phase 1 specs (see Spec Source below)
     settings.json            repo-level Claude Code settings, registers the hooks
   .claude-plugin/        the plugin and marketplace manifests, so Springer installs with /plugin
@@ -41,7 +46,6 @@ springer/
     agent.template.md
     project-CLAUDE.md    the tailored CLAUDE.md a project instance receives
     project-settings.json the instance settings: harness permission allowlist plus the event hooks
-  schemas/               artifact JSON Schemas, built first (see Build Order)
   scripts/               repo tooling (new-project.sh instantiates a project instance, update-project.py brings one up to a newer runtime or adopts an existing repository, validate-repo.py enforces the hard rules below, eval-skills.py runs the behavioral evals)
   evals/                 behavioral eval scenarios, one JSON per behavior an agent must show in a real transcript
   tests/                 unittest suite for the harness scripts, the hooks, the validator, and the eval checker, run by CI
@@ -49,6 +53,8 @@ springer/
   runs/                  the run store where a project's artifacts accumulate (gitignored)
   brand/                 brand assets (avatars, favicon, social preview)
 ```
+
+Edit the runtime under `runtime/`. A path written inside a runtime file, such as `.claude/skills/<name>/SKILL.md` or `schemas/validate.py`, is the path it takes in an instance and stays that way. The symlinks make those paths resolve in this repository too, and `scripts/new-project.sh` and `scripts/update-project.py` copy from `runtime/` to the instance paths, so an instance never sees `runtime/`, `harness/`, or a symlink.
 
 A repo-level README.md is intentional. The no-README rule in Universal Rules below applies inside a skill or agent directory, not at the repository root.
 
@@ -110,7 +116,7 @@ Guidance:
 
 ### Per-Artifact Checklist
 
-Run this checklist on every artifact before it is committed. The shape rules in it (frontmatter keys, the description cap, the catalog budget, skill reachability, the body cap, reference depth and contents, agent model and tools, the em-dash ban) are enforced by `python3 scripts/validate-repo.py`, which CI runs with `schemas/validate.py --self-check` and `python3 -m unittest discover -s tests -t tests` on every push. A harness script or hook change ships with a test in `tests/`.
+Run this checklist on every artifact before it is committed. The shape rules in it (frontmatter keys, the description cap, the catalog budget, skill reachability, the body cap, reference depth and contents, agent model and tools, the em-dash ban) are enforced by `python3 scripts/validate-repo.py`, which CI runs with `runtime/schemas/validate.py --self-check` and `python3 -m unittest discover -s tests -t tests` on every push. A harness script or hook change ships with a test in `tests/`.
 - [ ] Started from a template, not a blank file
 - [ ] Name matches the file or directory, lowercase-kebab, `spgr-` prefix, globally unique
 - [ ] Skill frontmatter is `name` and `description`, plus `disable-model-invocation: true` unless the main session invokes it. Agent declares `tools` at least privilege and `model`
@@ -136,7 +142,7 @@ Hard:
 
 Each item is a prerequisite for the next.
 
-1. Artifact schemas (`schemas/`), the typed output for every handoff. Everything else validates against them.
+1. Artifact schemas (`runtime/schemas/`), the typed output for every handoff. Everything else validates against them.
 2. Orchestrator agent, which routes artifacts, tracks WIP, and manages the escalation queue.
 3. PM and Architecture agents. Validate the full architecture checkpoint flow (PM to Architecture to human approval) before any developer agents.
 4. Architecture-gate verticals: Auth, Security, and Compliance, wired as consultants and gates before the architecture checkpoint is operational.

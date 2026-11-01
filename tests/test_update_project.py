@@ -33,18 +33,18 @@ GITIGNORE = """.env
 
 def make_source(root):
     """A miniature Springer checkout with the files update-project reads."""
-    (root / ".claude" / "skills" / "spgr-one").mkdir(parents=True)
-    (root / ".claude" / "skills" / "spgr-one" / "SKILL.md").write_text("one v1\n")
-    (root / ".claude" / "skills" / "spgr-two").mkdir(parents=True)
-    (root / ".claude" / "skills" / "spgr-two" / "SKILL.md").write_text("two v1\n")
-    (root / ".claude" / "agents").mkdir()
-    (root / ".claude" / "agents" / "spgr-agent-a.md").write_text("agent v1\n")
-    (root / ".claude" / "references").mkdir()
-    (root / ".claude" / "references" / "ref.md").write_text("ref v1\n")
-    (root / ".claude" / "hooks").mkdir()
-    (root / ".claude" / "hooks" / "h.py").write_text("print(1)\n")
-    (root / "schemas").mkdir()
-    (root / "schemas" / "x-v1.json").write_text("{}\n")
+    (root / "runtime" / "skills" / "spgr-one").mkdir(parents=True)
+    (root / "runtime" / "skills" / "spgr-one" / "SKILL.md").write_text("one v1\n")
+    (root / "runtime" / "skills" / "spgr-two").mkdir(parents=True)
+    (root / "runtime" / "skills" / "spgr-two" / "SKILL.md").write_text("two v1\n")
+    (root / "runtime" / "agents").mkdir()
+    (root / "runtime" / "agents" / "spgr-agent-a.md").write_text("agent v1\n")
+    (root / "runtime" / "references").mkdir()
+    (root / "runtime" / "references" / "ref.md").write_text("ref v1\n")
+    (root / "runtime" / "hooks").mkdir()
+    (root / "runtime" / "hooks" / "h.py").write_text("print(1)\n")
+    (root / "runtime" / "schemas").mkdir()
+    (root / "runtime" / "schemas" / "x-v1.json").write_text("{}\n")
     (root / "templates").mkdir()
     (root / "templates" / "project-CLAUDE.md").write_text(CLAUDE_TEMPLATE)
     (root / "templates" / "project-settings.json").write_text(SETTINGS_TEMPLATE)
@@ -53,8 +53,8 @@ def make_source(root):
 
 def instantiate(source, target, profile="small"):
     """What new-project.sh does, minus git."""
-    for rel in up.RUNTIME_DIRS:
-        shutil.copytree(source / rel, target / rel)
+    for source_rel, instance_rel in up.RUNTIME_LAYOUT:
+        shutil.copytree(source / source_rel, target / instance_rel)
     (target / "CLAUDE.md").write_text(up.render_claude_md(source, profile))
     (target / ".claude" / "settings.json").write_text(up.render_settings(source))
     (target / ".gitignore").write_text(up.render_gitignore(source))
@@ -111,16 +111,16 @@ class UpdateProjectTest(unittest.TestCase):
         self.assertNotIn("replaced", out)
 
     def test_source_change_replaces_an_unedited_file(self):
-        (self.source / ".claude" / "skills" / "spgr-one" / "SKILL.md").write_text("one v2\n")
+        (self.source / "runtime" / "skills" / "spgr-one" / "SKILL.md").write_text("one v2\n")
         code, out, _ = run_main("update", str(self.target))
         self.assertEqual(code, 0)
         self.assertIn("1 replaced", out)
         self.assertEqual((self.target / ".claude" / "skills" / "spgr-one" / "SKILL.md").read_text(), "one v2\n")
         self.assertEqual(self.manifest()["runtime"][".claude/skills/spgr-one/SKILL.md"],
-                         up.sha256(self.source / ".claude" / "skills" / "spgr-one" / "SKILL.md"))
+                         up.sha256(self.source / "runtime" / "skills" / "spgr-one" / "SKILL.md"))
 
     def test_instance_edit_is_kept_unless_forced(self):
-        (self.source / ".claude" / "skills" / "spgr-one" / "SKILL.md").write_text("one v2\n")
+        (self.source / "runtime" / "skills" / "spgr-one" / "SKILL.md").write_text("one v2\n")
         (self.target / ".claude" / "skills" / "spgr-one" / "SKILL.md").write_text("one edited here\n")
         code, out, _ = run_main("update", str(self.target))
         self.assertEqual(code, 0)
@@ -130,16 +130,16 @@ class UpdateProjectTest(unittest.TestCase):
         self.assertEqual((self.target / ".claude" / "skills" / "spgr-one" / "SKILL.md").read_text(), "one v2\n")
 
     def test_new_source_file_is_added(self):
-        (self.source / ".claude" / "skills" / "spgr-three").mkdir()
-        (self.source / ".claude" / "skills" / "spgr-three" / "SKILL.md").write_text("three\n")
+        (self.source / "runtime" / "skills" / "spgr-three").mkdir()
+        (self.source / "runtime" / "skills" / "spgr-three" / "SKILL.md").write_text("three\n")
         code, out, _ = run_main("update", str(self.target))
         self.assertIn("1 added", out)
         self.assertTrue((self.target / ".claude" / "skills" / "spgr-three" / "SKILL.md").exists())
         self.assertIn(".claude/skills/spgr-three/SKILL.md", self.manifest()["runtime"])
 
     def test_removed_source_file_is_removed_when_unedited_and_kept_when_edited(self):
-        shutil.rmtree(self.source / ".claude" / "skills" / "spgr-two")
-        (self.source / ".claude" / "references" / "ref.md").unlink()
+        shutil.rmtree(self.source / "runtime" / "skills" / "spgr-two")
+        (self.source / "runtime" / "references" / "ref.md").unlink()
         (self.target / ".claude" / "references" / "ref.md").write_text("ref edited\n")
         code, out, _ = run_main("update", str(self.target))
         self.assertIn("1 removed", out)
@@ -148,7 +148,7 @@ class UpdateProjectTest(unittest.TestCase):
         self.assertTrue((self.target / ".claude" / "references" / "ref.md").exists())
 
     def test_removing_a_whole_skill_removes_its_folder(self):
-        shutil.rmtree(self.source / ".claude" / "skills" / "spgr-two")
+        shutil.rmtree(self.source / "runtime" / "skills" / "spgr-two")
         cache = self.target / ".claude" / "skills" / "spgr-two" / "__pycache__"
         cache.mkdir()
         (cache / "x.pyc").write_bytes(b"0")
@@ -195,7 +195,7 @@ class UpdateProjectTest(unittest.TestCase):
         self.assertEqual(run_main("update", str(self.target))[0], 0)
 
     def test_dry_run_writes_nothing(self):
-        (self.source / ".claude" / "skills" / "spgr-one" / "SKILL.md").write_text("one v2\n")
+        (self.source / "runtime" / "skills" / "spgr-one" / "SKILL.md").write_text("one v2\n")
         before = self.manifest()
         code, out, _ = run_main("update", str(self.target), "--dry-run")
         self.assertEqual(code, 0)

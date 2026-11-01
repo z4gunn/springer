@@ -171,14 +171,17 @@ A skill is a single-responsibility capability that an agent invokes, such as wri
 springer/
   README.md              this file, project overview for people
   CLAUDE.md              the operative ruleset for AI agents, loaded every session
-  .claude/
-    agents/<name>.md         the 27 agents, auto-loaded in this repo
-    skills/<name>/SKILL.md    the 202 skills, auto-loaded in this repo
+  harness/               the springer-harness Python package: daemon, API, TUI, providers (under construction)
+  runtime/               the source of the runtime each project instance receives
+    agents/<name>.md          the 27 agents
+    skills/<name>/SKILL.md    the 202 skills
     references/<name>.md      shared cross-skill references (for example pdca-harness, design-quality, typescript-standards)
     hooks/                    the event logger, the session-usage sensor, the design detector, and the git and config guards
+    schemas/                  JSON Schemas for the typed artifacts that flow between agents
+  schemas                symlink to runtime/schemas
+  .claude/               symlinks into runtime/ so this repo auto-loads its own runtime, plus the repo settings
   .claude-plugin/        the plugin and marketplace manifests, so Springer installs with /plugin
   plugin/skills/         the plugin's one skill, spgr-install-runtime
-  schemas/               JSON Schemas for the typed artifacts that flow between agents
   scripts/               new-project.sh, update-project.py (update or adopt an instance), validate-repo.py, eval-skills.py
   evals/                 behavioral eval scenarios, one per behavior an agent must show in a real transcript
   tests/                 unittest suite for the harness scripts, hooks, validator, and eval checker, run by CI

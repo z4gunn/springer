@@ -13,7 +13,7 @@ from pathlib import Path
 
 from helpers import REPO, load_script
 
-cc = load_script(REPO / ".claude" / "skills" / "spgr-render-design-comps" / "scripts" / "capture-comps.py")
+cc = load_script(REPO / "runtime" / "skills" / "spgr-render-design-comps" / "scripts" / "capture-comps.py")
 
 FAKE_CLI = """#!/bin/sh
 # Fake playwright-cli: writes a file for screenshot, accepts everything else.

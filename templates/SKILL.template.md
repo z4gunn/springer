@@ -5,7 +5,7 @@ disable-model-invocation: true
 ---
 
 <!--
-GOLDEN TEMPLATE. Copy to .claude/skills/spgr-<verb-noun>/SKILL.md and fill in. Delete every comment before shipping.
+GOLDEN TEMPLATE. Copy to runtime/skills/spgr-<verb-noun>/SKILL.md and fill in. Delete every comment before shipping.
 RULES (see ../CLAUDE.md Build Standards): frontmatter is name + description, plus disable-model-invocation: true unless the
 main session invokes this skill itself. Name the skill in the workflow step of the agent that uses it. Body imperative and <500 lines.
 All "when to use" lives in description, never here. Push detail to references/. No README/CHANGELOG.

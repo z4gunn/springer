@@ -14,7 +14,7 @@ from pathlib import Path
 
 from helpers import REPO, load_script
 
-fg = load_script(REPO / ".claude" / "skills" / "spgr-check-quality-floor" / "scripts" / "floor_guard.py")
+fg = load_script(REPO / "runtime" / "skills" / "spgr-check-quality-floor" / "scripts" / "floor_guard.py")
 
 APP = "def add(a, b):\n    return a + b\n"
 TEST = ("from app import add\n\n\ndef test_add():\n"

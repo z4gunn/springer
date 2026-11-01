@@ -15,7 +15,7 @@ from pathlib import Path
 
 from helpers import REPO, load_script
 
-SKILLS = REPO / ".claude" / "skills"
+SKILLS = REPO / "runtime" / "skills"
 hn = load_script(SKILLS / "spgr-mine-ugc-forums" / "scripts" / "hn_search.py")
 apple = load_script(SKILLS / "spgr-mine-app-store-reviews" / "scripts" / "apple_reviews.py")
 bsky = load_script(SKILLS / "spgr-mine-social-media" / "scripts" / "bsky_search.py")

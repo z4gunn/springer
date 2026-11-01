@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, harness]
   pull_request:
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
         run: python scripts/validate-repo.py
 
       - name: Schema registry self-check
-        run: python schemas/validate.py --self-check
+        run: python runtime/schemas/validate.py --self-check
 
       - name: Harness script and hook tests
         run: python -m unittest discover -s tests -t tests -v

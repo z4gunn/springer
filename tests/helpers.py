@@ -1,7 +1,7 @@
 """Shared fixtures for the harness script tests.
 
-The harness scripts live under .claude/skills/spgr-run-harness/scripts/ and
-.claude/hooks/ with hyphenated file names, so they are loaded by path. A
+The harness scripts live under runtime/skills/spgr-run-harness/scripts/ and
+runtime/hooks/ with hyphenated file names, so they are loaded by path. A
 RunStore builds a runs/<run-id>/ tree in a temporary directory with the exact
 shapes derive-ready-queue.py and rebuild-projection.py read, one call per
 fact: a cycle, a gate, an escalation, an event, a lock, a defaults ledger.
@@ -16,9 +16,9 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPTS = REPO / ".claude" / "skills" / "spgr-run-harness" / "scripts"
-HOOKS = REPO / ".claude" / "hooks"
-SCHEMAS = REPO / "schemas"
+SCRIPTS = REPO / "runtime" / "skills" / "spgr-run-harness" / "scripts"
+HOOKS = REPO / "runtime" / "hooks"
+SCHEMAS = REPO / "runtime" / "schemas"
 
 
 def load_script(path):

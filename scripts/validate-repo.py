@@ -52,6 +52,12 @@ TOC_THRESHOLD = 100
 MODELS = {"haiku", "sonnet", "opus"}
 EM_DASH = "—"
 AUX_NAMES = re.compile(r"^(readme|changelog|install|installation|setup|contributing|process)(\..*)?$", re.I)
+# The source of each runtime directory in this checkout. An instance installs
+# them under .claude/, which is why the path an agent body states, the one it
+# resolves at run time, stays the instance path.
+SKILLS_DIR = "runtime/skills"
+AGENTS_DIR = "runtime/agents"
+REFERENCES_DIR = "runtime/references"
 SKILL_PATH_SENTENCE = ".claude/skills/<name>/SKILL.md"
 HIDDEN_KEY = "disable-model-invocation"
 # The catalog is the set of skills whose descriptions load into every main
@@ -108,7 +114,7 @@ class Report:
         return 1 if total else 0
 
 
-def check_skills(root, report, rel_dir=".claude/skills"):
+def check_skills(root, report, rel_dir=SKILLS_DIR):
     """The shape rules for every skill under rel_dir. The plugin's own
     skills under plugin/skills take the same rules and stay out of the
     catalog and reachability checks, which describe the runtime."""
@@ -164,7 +170,7 @@ def check_skills(root, report, rel_dir=".claude/skills"):
 def skill_frontmatters(root):
     """Map each skill directory name to (frontmatter values, body)."""
     out = {}
-    for skill_dir in sorted(p for p in (root / ".claude" / "skills").iterdir() if p.is_dir()):
+    for skill_dir in sorted(p for p in (root / SKILLS_DIR).iterdir() if p.is_dir()):
         skill_md = skill_dir / "SKILL.md"
         if skill_md.exists():
             _, values, body = frontmatter(skill_md.read_text())
@@ -184,11 +190,11 @@ def check_catalog(root, report):
                for name, (values, _) in skill_frontmatters(root).items() if is_catalog(values)}
     chars = sum(len(d) for d in catalog.values())
     if len(catalog) > CATALOG_COUNT_CAP:
-        report.fail("skill-catalog", ".claude/skills",
+        report.fail("skill-catalog", SKILLS_DIR,
                     f"{len(catalog)} skills load into every session, cap is {CATALOG_COUNT_CAP}. "
                     f"Mark agent-only skills {HIDDEN_KEY}: true")
     if chars > CATALOG_CHARS_CAP:
-        report.fail("skill-catalog", ".claude/skills",
+        report.fail("skill-catalog", SKILLS_DIR,
                     f"catalog descriptions total {chars} characters, cap is {CATALOG_CHARS_CAP}")
 
 
@@ -199,8 +205,8 @@ def check_reachability(root, report):
     main session can invoke them by description."""
     skills = skill_frontmatters(root)
     roots = {name for name, (values, _) in skills.items() if is_catalog(values)}
-    sources = list((root / ".claude" / "agents").glob("*.md"))
-    sources += list((root / ".claude" / "references").glob("*.md"))
+    sources = list((root / AGENTS_DIR).glob("*.md"))
+    sources += list((root / REFERENCES_DIR).glob("*.md"))
     sources += [p for p in [root / "templates" / "project-CLAUDE.md"] if p.exists()]
     for path in sources:
         roots |= set(SKILL_NAME.findall(path.read_text())) & set(skills)
@@ -210,11 +216,11 @@ def check_reachability(root, report):
         if name in reached or name not in skills:
             continue
         reached.add(name)
-        skill_dir = root / ".claude" / "skills" / name
+        skill_dir = root / SKILLS_DIR / name
         text = "".join(p.read_text(errors="ignore") for p in skill_dir.rglob("*.md"))
         frontier.extend(set(SKILL_NAME.findall(text)) - reached)
     for name in sorted(set(skills) - reached):
-        report.fail("skill-reachability", f".claude/skills/{name}",
+        report.fail("skill-reachability", f"{SKILLS_DIR}/{name}",
                     "no agent, reference, template, or reachable skill names this skill")
 
 
@@ -229,7 +235,7 @@ def check_routing(root, report):
     two still scores identical text at one. The repo's closest pair sits well
     under the cap, so a new skill fails only when it restates an existing one."""
     docs = {}
-    for skill_dir in sorted(p for p in (root / ".claude" / "skills").iterdir() if p.is_dir()):
+    for skill_dir in sorted(p for p in (root / SKILLS_DIR).iterdir() if p.is_dir()):
         skill_md = skill_dir / "SKILL.md"
         if not skill_md.exists():
             continue
@@ -255,14 +261,14 @@ def check_routing(root, report):
         va, vb = vectors[a], vectors[b]
         score = sum(x * vb.get(w, 0.0) for w, x in va.items())
         if score >= OVERLAP_CAP:
-            report.fail("skill-routing", f".claude/skills/{a}",
+            report.fail("skill-routing", f"{SKILLS_DIR}/{a}",
                         f"description overlaps {b} at {score:.2f}, cap is {OVERLAP_CAP:.2f}")
 
 
 def check_agents(root, report):
-    agents_dir = root / ".claude" / "agents"
+    agents_dir = root / AGENTS_DIR
     for agent_md in sorted(agents_dir.glob("*.md")):
-        rel = f".claude/agents/{agent_md.name}"
+        rel = f"{AGENTS_DIR}/{agent_md.name}"
         keys, values, body = frontmatter(agent_md.read_text())
         if keys is None:
             report.fail("agent-frontmatter", rel, "no frontmatter block")
@@ -282,16 +288,17 @@ def check_agents(root, report):
 
 
 def check_references(root, report):
-    for ref in sorted((root / ".claude" / "references").glob("*.md")):
+    for ref in sorted((root / REFERENCES_DIR).glob("*.md")):
         text = ref.read_text()
         lines = text.count("\n")
         if lines > TOC_THRESHOLD and not has_contents(text):
-            report.fail("references", f".claude/references/{ref.name}",
+            report.fail("references", f"{REFERENCES_DIR}/{ref.name}",
                         f"{lines} lines without a Contents section")
 
 
 def check_voice(root, report):
-    candidates = list((root / ".claude").rglob("*.md"))
+    candidates = list((root / "runtime").rglob("*.md"))
+    candidates.extend((root / ".claude").rglob("*.md"))
     for name in ("README.md", "CLAUDE.md"):
         if (root / name).exists():
             candidates.append(root / name)
@@ -306,8 +313,8 @@ def check_voice(root, report):
 
 def main(argv):
     root = Path(argv[1]).resolve() if len(argv) > 1 else Path(__file__).resolve().parents[1]
-    if not (root / ".claude" / "skills").is_dir():
-        sys.stderr.write(f"no .claude/skills under {root}\n")
+    if not (root / SKILLS_DIR).is_dir():
+        sys.stderr.write(f"no {SKILLS_DIR} under {root}\n")
         return 1
     report = Report()
     check_skills(root, report)

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from helpers import HOOKS, REPO, RunStore, read_events, run_hook
 
-REVIEWER = REPO / ".claude" / "agents" / "spgr-agent-code-reviewer.md"
+REVIEWER = REPO / "runtime" / "agents" / "spgr-agent-code-reviewer.md"
 
 
 def dispatch_payload(hook_event, project, tool_use_id="tu-1", agent="spgr-agent-code-reviewer",

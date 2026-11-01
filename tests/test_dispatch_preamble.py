@@ -7,7 +7,7 @@ import unittest
 
 from helpers import REPO
 
-PREAMBLE = REPO / ".claude" / "skills" / "spgr-run-harness" / "assets" / "dispatch-preamble.md"
+PREAMBLE = REPO / "runtime" / "skills" / "spgr-run-harness" / "assets" / "dispatch-preamble.md"
 
 
 class DispatchPreambleTest(unittest.TestCase):
@@ -28,7 +28,7 @@ class DispatchPreambleTest(unittest.TestCase):
             self.assertIn(needle, self.text)
 
     def test_the_harness_points_at_it(self):
-        skill = (REPO / ".claude" / "skills" / "spgr-run-harness" / "SKILL.md").read_text()
+        skill = (REPO / "runtime" / "skills" / "spgr-run-harness" / "SKILL.md").read_text()
         self.assertIn("assets/dispatch-preamble.md", skill)
 
 

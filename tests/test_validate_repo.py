@@ -49,21 +49,21 @@ class ValidateRepoTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        (self.root / ".claude" / "skills").mkdir(parents=True)
-        (self.root / ".claude" / "agents").mkdir(parents=True)
-        (self.root / ".claude" / "references").mkdir(parents=True)
+        (self.root / "runtime" / "skills").mkdir(parents=True)
+        (self.root / "runtime" / "agents").mkdir(parents=True)
+        (self.root / "runtime" / "references").mkdir(parents=True)
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def skill(self, name, text=None):
-        d = self.root / ".claude" / "skills" / name
+        d = self.root / "runtime" / "skills" / name
         d.mkdir(parents=True, exist_ok=True)
         (d / "SKILL.md").write_text(text if text is not None else GOOD_SKILL.format(name=name))
         return d
 
     def agent(self, name, text=None):
-        p = self.root / ".claude" / "agents" / f"{name}.md"
+        p = self.root / "runtime" / "agents" / f"{name}.md"
         p.write_text(text if text is not None else GOOD_AGENT.format(name=name))
         return p
 
@@ -141,8 +141,8 @@ class ValidateRepoTest(unittest.TestCase):
         self.hidden("spgr-load-plan")
         self.agent("spgr-agent-a", GOOD_AGENT.format(name="spgr-agent-a") + "2. Run spgr-load-plan.\n")
         out = run_validator(self.root)[1]
-        self.assertIn(".claude/skills/spgr-load:", out)
-        self.assertNotIn(".claude/skills/spgr-load-plan:", out)
+        self.assertIn("runtime/skills/spgr-load:", out)
+        self.assertNotIn("runtime/skills/spgr-load-plan:", out)
 
     def test_name_mismatch_fails(self):
         self.skill("spgr-a", GOOD_SKILL.format(name="spgr-b"))
@@ -214,7 +214,7 @@ class ValidateRepoTest(unittest.TestCase):
         self.assertIn("em-dash at line", out)
 
     def test_shared_reference_needs_contents_when_long(self):
-        (self.root / ".claude" / "references" / "big.md").write_text("# Big\n" + "t\n" * 120)
+        (self.root / "runtime" / "references" / "big.md").write_text("# Big\n" + "t\n" * 120)
         self.assertIn("references (1)", run_validator(self.root)[1])
 
 
