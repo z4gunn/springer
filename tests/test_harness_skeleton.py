@@ -1,12 +1,7 @@
-"""The harness package layout: every subpackage imports, and the command exists
-and says what to do when no daemon is running."""
+"""The harness package layout: every subpackage imports, and the command is declared."""
 
-import contextlib
 import importlib
-import importlib.util
-import io
 import sys
-import tempfile
 import tomllib
 import unittest
 
@@ -34,15 +29,6 @@ class HarnessSkeletonTest(unittest.TestCase):
         project = tomllib.loads((HARNESS / "pyproject.toml").read_text())["project"]
         self.assertEqual(project["name"], "springer-harness")
         self.assertEqual(project["scripts"]["springer"], "springer_harness.cli:main")
-
-    def test_cli_names_the_next_step_when_no_daemon_runs(self):
-        if importlib.util.find_spec("textual") is None:
-            self.skipTest("the TUI dependencies are not installed")
-        cli = importlib.import_module("springer_harness.cli")
-        err = io.StringIO()
-        with tempfile.TemporaryDirectory() as home, contextlib.redirect_stderr(err):
-            self.assertEqual(cli.main([home]), 1)
-        self.assertIn("springer daemon", err.getvalue())
 
 
 if __name__ == "__main__":

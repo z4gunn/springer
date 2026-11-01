@@ -9,74 +9,81 @@ import webbrowser
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.css.query import NoMatches
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.widgets import ContentSwitcher, Input, Static
 
 from .client import ApiError, ConnectionLost, run_path
 from .dialogs import ConfirmDialog
 from .panes import BacklogPane, BriefPane, ProjectsPane, RunPane
-from .theme import C, THEME, join, keys, paint
+from .theme import C, STONES, THEME, join, lines, mark, paint, stones_laid
 
 REFRESH_SECONDS = 0.25
 IDLE_REFRESH_SECONDS = 5
 RETRY_SECONDS = 1
 LOST = "Lost the daemon. What you see may be stale. Retrying."
 QUIET_EVENTS = {"heartbeat"}
+QUIT_WORDS = {"q", "quit", "exit"}
 
 
 class SpringerApp(App):
     TITLE = "Springer"
     CSS = """
     Screen { background: $background; }
-    #topbar { height: 1; padding: 0 1; }
-    #banner { height: auto; background: $error 20%%; color: $error; padding: 0 1; display: none; }
+    #topbar { height: 2; padding: 0 2; margin-bottom: 1; }
+    #mark { width: 10; height: 2; }
+    #where { width: 1fr; height: 2; }
+    #nav { width: auto; height: 2; }
+    #banner { height: auto; background: $error 20%%; color: $error; padding: 0 2; display: none; }
     #banner.lost { display: block; }
     #panes { height: 1fr; }
-    .title { height: auto; padding: 0 1; }
-    .section { height: 1; padding: 0 1; margin-top: 1; }
-    .hint { height: auto; padding: 0 1; }
-    #statusline { height: 1; padding: 0 1; }
-    #chat-log { height: auto; max-height: 4; padding: 0 1; display: none; }
+    .title { height: auto; padding: 0 2; }
+    .section { height: 1; padding: 0 2; margin-top: 1; }
+    .hint { height: auto; padding: 0 2; }
+    #chat-log { height: auto; max-height: 4; padding: 0 2; display: none; }
     #chat-log.shown { display: block; }
-    #prompt { dock: bottom; height: 2; border-top: solid %(border)s; padding: 0 1; }
+    #footer { dock: bottom; height: 3; }
+    #prompt { height: 2; border-top: solid %(border)s; padding: 0 2; margin: 0 2 0 0; }
     #prompt-mark { width: 2; height: 1; }
     #chat { height: 1; width: 1fr; border: none; padding: 0; background: $background; }
-    #chat:focus { border: none; background: $background; }
+    #chat:focus { border: none; background: $background; background-tint: transparent; }
+    #statusline { height: 1; padding: 0 2; }
     DataTable { height: auto; max-height: 1fr; background: $background; margin: 0 1; }
     DataTable:focus { background-tint: transparent; }
-    DataTable > .datatable--header { background: $background; color: %(dim)s; text-style: bold; }
+    DataTable > .datatable--header { background: $background; color: %(dim)s; text-style: none; }
     DataTable > .datatable--cursor { background: %(selected)s; color: %(text)s; }
     DataTable:focus > .datatable--cursor { background: %(selected)s; color: %(text)s; text-style: none; }
     DataTable > .datatable--hover { background: $background; }
+    DataTable > .datatable--header-hover, DataTable > .datatable--header-cursor { background: $background; color: %(dim)s; }
     #projects, #backlog { height: 1fr; }
-    #board { height: 1fr; padding: 0 1; }
-    #gates-box { height: auto; max-height: 50%%; background: %(pending)s; border-left: thick $primary; padding: 0 1; margin: 1 1 0 1; }
+    #board { height: 1fr; padding: 0 2; }
+    #gates-box { height: auto; max-height: 50%%; background: %(card)s; border-left: thick %(you_bar)s; padding: 0 2; margin: 0 2; }
     #gates { height: auto; }
-    #routine { height: auto; padding: 0 1; margin-top: 1; }
-    #brief-main { height: 1fr; margin-top: 1; }
-    #rail { width: 30; height: 100%%; border: none; padding: 0; background: $background; }
-    #rail:focus { border: none; }
+    #routine { height: auto; padding: 0 2; margin-top: 1; }
+    #brief-main { height: 1fr; margin: 1 2 0 2; }
+    #rail { width: 28; height: 100%%; border: none; padding: 0; background: $background; }
+    #rail:focus { border: none; background-tint: transparent; }
     #rail > .option-list--option-highlighted { background: %(selected)s; color: %(text)s; text-style: none; }
     #rail:focus > .option-list--option-highlighted { background: %(selected)s; color: %(text)s; text-style: none; }
     #brief-editor { width: 1fr; height: 100%%; border-left: solid %(border)s; padding: 0 1; }
     #editor { height: 1fr; border: none; padding: 0; background: $background; }
-    #editor:focus { border: none; }
+    #editor:focus { border: none; background-tint: transparent; }
     #proposal { height: auto; display: none; }
     #facts { width: 32; height: 100%%; padding: 0 1; border-left: solid %(border)s; }
-    #recommendation { height: auto; padding: 0 1; }
-    #critique { height: auto; max-height: 8; padding: 0 1; margin-top: 1; }
+    #recommendation { height: auto; padding: 0 2; }
+    #critique { height: auto; max-height: 8; padding: 0 2; margin-top: 1; }
     ConfirmDialog, FormDialog, TextDialog, EditDialog { align: center middle; background: $background 60%%; }
-    .dialog { width: 70; height: auto; max-height: 80%%; background: $surface; border-left: thick $primary; padding: 1 2; }
+    .dialog { width: 70; height: auto; max-height: 80%%; background: %(card)s; border-left: thick %(you_bar)s; padding: 1 2; }
     .dialog.wide { width: 90%%; height: 80%%; }
-    .dialog-title { text-style: bold; color: $primary; margin-bottom: 1; }
+    .dialog-title { text-style: bold; color: %(text)s; margin-bottom: 1; }
     .dialog Label { color: %(dim)s; }
-    .dialog Input { border: none; border-bottom: solid %(border)s; height: 2; padding: 0; background: $surface; margin-bottom: 1; }
-    .dialog Input:focus { border: none; border-bottom: solid $primary; background: $surface; }
-    #dialog-editor { height: 1fr; border: none; background: $surface; }
+    .dialog Input { border: none; border-bottom: solid %(border)s; height: 2; padding: 0; background: %(card)s; margin-bottom: 1; }
+    .dialog Input:focus { border: none; border-bottom: solid %(you_bar)s; background: %(card)s; background-tint: transparent; }
+    #dialog-editor { height: 1fr; border: none; background: %(card)s; }
     """ % C
     BINDINGS = [Binding("p", "show('projects')", "projects"), Binding("b", "show('brief')", "brief"),
                 Binding("k", "show('backlog')", "backlog"), Binding("r", "show('run')", "run"),
-                Binding("slash", "chat", "chat"), Binding("q", "quit", "quit")]
+                Binding("slash", "chat", "chat"), Binding("q", "quit", "quit"),
+                Binding("ctrl+c", "quit", "quit", priority=True)]
 
     def __init__(self, client, open_url=webbrowser.open):
         super().__init__()
@@ -91,7 +98,10 @@ class SpringerApp(App):
         self._idle = 0.0
 
     def compose(self) -> ComposeResult:
-        yield Static("Springer", id="topbar", markup=False)
+        with Horizontal(id="topbar"):
+            yield Static(mark(), id="mark", markup=False)
+            yield Static("", id="where", markup=False)
+            yield Static("", id="nav", markup=False)
         yield Static(LOST, id="banner", markup=False)
         with ContentSwitcher(initial="projects", id="panes"):
             yield ProjectsPane(id="projects-pane")
@@ -99,10 +109,11 @@ class SpringerApp(App):
             yield BacklogPane(id="backlog-pane")
             yield RunPane(id="run-pane")
         yield Static("", id="chat-log", markup=False)
-        yield Static("", id="statusline", markup=False)
-        with Horizontal(id="prompt"):
-            yield Static(paint("› ", "accent", bold=True), id="prompt-mark")
-            yield Input(placeholder="ask anything  (press / to focus)", id="chat")
+        with Vertical(id="footer"):
+            with Horizontal(id="prompt"):
+                yield Static(paint("› ", "you", bold=True), id="prompt-mark")
+                yield Input(placeholder="ask anything, or type quit", id="chat")
+            yield Static("", id="statusline", markup=False)
 
     def on_mount(self):
         self.register_theme(THEME)
@@ -242,17 +253,39 @@ class SpringerApp(App):
             used = usage[0]["used_fraction"]
             resets = calendar.timegm(time.strptime(usage[0]["resets_at"], "%Y-%m-%dT%H:%M:%SZ"))
             window = f"window {'unknown' if used is None else f'{used:.0%}'}, resets {time.strftime('%H:%M', time.localtime(resets))}"
-        where = " ".join(x for x in (self.project, self.run_id) if x)
-        parked = state["state"] == "parked"
+        where = " · ".join(x for x in (self.project, self.run_id) if x)
+        self.main.query_one("#where", Static).update(
+            lines([paint("springer", "text", bold=True), paint(where, "dim")]))
         current = self.main.query_one("#panes", ContentSwitcher).current.removesuffix("-pane")
         tabs = []
-        for key, name in (("p", "projects"), ("b", "brief"), ("k", "backlog"), ("r", "run")):
-            tabs += [paint(key, "accent"), paint(f" {name}   ", "text" if name == current else "dim", bold=name == current)]
-        self.main.query_one("#topbar", Static).update(join(
-            paint("springer", "accent", bold=True), paint(f"  {where}" if where else "", "system"), "     ", *tabs))
-        self.main.query_one("#statusline", Static).update(join(
-            paint("● ", "soft" if parked else "success"), paint(f"daemon {state['state']}", "dim"),
-            paint(f"   {window}", "dim")))
+        for key, name in (("p", "projects"), ("b", "brief"), ("k", "backlog"), ("r", "run"), ("q", "quit")):
+            tabs += [paint(f"{key} ", "dim"), paint(f"{name}   ", "text" if name == current else "dim", bold=name == current)]
+        status = [window]
+        progress = paint("")
+        if self.run_id and self.project:
+            path = run_path(self.project, self.run_id)
+            run = await self.client.get(path)
+            metrics = await self.client.get(path + "/metrics")
+            status.append(f"${metrics['list_price_spend_usd']:.2f} at list price")
+            progress = self._progress(run)
+        status.append(f"daemon {state['state']}")
+        self.main.query_one("#nav", Static).update(lines([join(*tabs), progress]))
+        self.main.query_one("#statusline", Static).update(paint("  ·  ".join(s for s in status if s), "dim"))
+
+    def _progress(self, run):
+        """Phase, stones, and any state that changes what the run is doing."""
+        complete = run.get("complete", False)
+        laid = stones_laid(run["active_phase"], complete)
+        parts = [paint("complete" if complete else run["active_phase"], "stone")]
+        if laid is not None:
+            parts.append(paint(f"  ·  {laid} of {STONES} stones laid", "dim"))
+        if run["paused"]:
+            parts.append(paint("  ·  PAUSED", "text", bold=True))
+        if run["waiting_on"] == "usage_window":
+            parts.append(paint("  ·  waiting on usage window", "stone"))
+        elif run["waiting_on"] == "provisioning":
+            parts.append(paint("  ·  waiting on provisioning", "you"))
+        return join(*parts)
 
     def _set_connected(self, connected):
         if connected != self.connected:
@@ -292,6 +325,9 @@ class SpringerApp(App):
             return
         message = event.value
         event.input.value = ""
+        if message.strip().lower().lstrip("/") in QUIT_WORDS:
+            self.exit()
+            return
         self.run_worker(self._chat(message))
 
     async def _chat(self, message):

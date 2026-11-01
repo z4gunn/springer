@@ -33,11 +33,11 @@ def status_of(project):
     if run["paused"]:
         return paint("● paused", "dim")
     if run["open_gates"]:
-        return paint(f"● {run['open_gates']} waiting on you", "accent", bold=True)
+        return paint(f"● {run['open_gates']} waiting on you", "you", bold=True)
     if run["waiting_on"] == "usage_window":
-        return paint("● waiting on usage window", "soft")
+        return paint("● waiting on usage window", "stone")
     if run["waiting_on"] == "provisioning":
-        return paint("● waiting on provisioning", "soft")
+        return paint("● waiting on provisioning", "you")
     return paint("● running", "success")
 
 
@@ -85,7 +85,6 @@ class ProjectsPane(Pane):
     BINDINGS = [Binding("n", "new", "new"), Binding("a", "adopt", "adopt"), Binding("x", "archive", "archive")]
 
     def compose(self) -> ComposeResult:
-        yield Static(paint("PROJECTS", "accent", bold=True), classes="title")
         yield DataTable(id="projects", cursor_type="row", zebra_stripes=False)
         yield Static(keys(("n", "new"), ("a", "adopt"), ("enter", "open"), ("x", "archive")), classes="hint")
 
@@ -98,7 +97,7 @@ class ProjectsPane(Pane):
         for project in projects:
             run = project["active_run"]
             rows.append((project["slug"], (paint(project["name"], bold=True), paint(project["profile"] or "-", "dim"),
-                                           paint(run["phase"] if run else "-", "system"),
+                                           paint(run["phase"] if run else "-", "stone"),
                                            str(run["open_gates"]) if run else "0",
                                            str(run["in_flight"]) if run else "0", status_of(project))))
         self.fill(self.query_one("#projects", DataTable), rows)
@@ -146,7 +145,7 @@ class BriefPane(Pane):
         self.version = None
 
     def compose(self) -> ComposeResult:
-        yield Static("BRIEF", id="brief-title", classes="title")
+        yield Static("", id="brief-title", classes="title")
         yield Static("", id="recommendation", markup=False)
         with Horizontal(id="brief-main"):
             yield OptionList(id="rail")
@@ -166,7 +165,7 @@ class BriefPane(Pane):
     async def load(self):
         slug = self.app.project
         if slug is None:
-            self.query_one("#brief-title", Static).update("BRIEF  open a project first")
+            self.query_one("#brief-title", Static).update(paint("Open a project first.", "dim"))
             return
         self.brief = await self.client.get(f"/v1/projects/{slug}/brief")
         critique = await self.client.get(f"/v1/projects/{slug}/brief/critique")
@@ -177,19 +176,18 @@ class BriefPane(Pane):
         self._render_brief(critique)
 
     def _render_brief(self, critique):
-        name = self.app.project
         self.query_one("#brief-title", Static).update(
-            join(paint(f"BRIEF {name}", "accent", bold=True), paint(f"  v{self.brief['version']}", "dim")))
+            join(paint("brief", "dim", bold=True), paint(f"  v{self.brief['version']}", "dim")))
         errored = {e["section"] for e in critique["errors"]}
         warned = {e["section"] for e in critique["warnings"]}
 
         def mark(section):
             if section["confidence"] == "proposed":
-                return paint("?", "accent", bold=True)
+                return paint("?", "you", bold=True)
             if section["name"] in errored:
                 return paint("!", "error", bold=True)
             if section["name"] in warned:
-                return paint("•", "soft")
+                return paint("•", "stone")
             return paint("✓", "success") if section["body"] else paint("○", "dim")
 
         rail = self.query_one("#rail", OptionList)
@@ -199,20 +197,20 @@ class BriefPane(Pane):
         if self.brief["sections"]:
             rail.highlighted = highlighted if highlighted is not None else 0
         facts = self.brief["facts"]
-        rows = [paint("FACTS", "dim", bold=True)]
+        rows = [paint("facts", "dim", bold=True)]
         rows += [join(paint(f"{k} ", "dim"), ", ".join(map(str, v)) if isinstance(v, list) else str(v))
                  for k, v in facts.items() if k not in ("pinned", "budget", "proposed")]
         rows += [join(paint(f"pinned {k} ", "dim"), str(v)) for k, v in (facts.get("pinned") or {}).items()]
-        rows += [Text(""), paint(self.brief["derived"]["sentence"], "soft")]
+        rows += [Text(""), paint(self.brief["derived"]["sentence"], "stone")]
         self.query_one("#facts", Static).update(lines(rows))
         recommendation = self.brief["recommendation"]
         self.query_one("#recommendation", Static).update(
-            join(paint(f"Discovery says {recommendation['verdict']}: ", "accent", bold=True), recommendation["summary"],
+            join(paint(f"Discovery says {recommendation['verdict']}: ", "you", bold=True), recommendation["summary"],
                  paint("   x dismiss", "dim"))
             if recommendation and not recommendation.get("dismissed") else "")
         notes = [paint(f"! {e['message']}", "error") for e in critique["errors"]]
-        notes += [paint(f"• {w['message']}", "soft") for w in critique["warnings"]]
-        notes += [paint(f"i {i['message']}", "system") for i in critique["info"]]
+        notes += [paint(f"• {w['message']}", "stone") for w in critique["warnings"]]
+        notes += [paint(f"i {i['message']}", "stone") for i in critique["info"]]
         if critique["errors"]:
             notes.append(paint(f"Start blocked: {len(critique['errors'])} error(s)", "error", bold=True))
         elif not self.brief["started"]:
@@ -353,7 +351,7 @@ class BacklogPane(Pane):
         self.folded = set()
 
     def compose(self) -> ComposeResult:
-        yield Static("BACKLOG", id="backlog-title", classes="title")
+        yield Static("", id="backlog-title", classes="title")
         yield DataTable(id="backlog", cursor_type="row", show_header=False)
         yield Static("", id="board", markup=False)
         yield Static(keys(("v", "view"), ("space", "fold"), ("m", "move line here"), ("d", "defer/restore"),
@@ -364,13 +362,13 @@ class BacklogPane(Pane):
 
     async def load(self):
         if not self.app.run_id:
-            self.query_one("#backlog-title", Static).update("BACKLOG  no run yet")
+            self.query_one("#backlog-title", Static).update(paint("No backlog until a run starts.", "dim"))
             return
         self.data = await self.client.get(run_path(self.app.project, self.app.run_id) + "/backlog")
         unanswered = sum(1 for u in self.data["unknowns"] if u["answer"] is None)
         self.query_one("#backlog-title", Static).update(join(
-            paint(f"BACKLOG {self.app.run_id}", "accent", bold=True), paint(f"   view: {self.view_name}", "dim"),
-            paint(f"   unknowns: {unanswered}", "soft" if unanswered else "dim")))
+            paint("backlog", "dim", bold=True), paint(f"   view: {self.view_name}", "dim"),
+            paint(f"   unknowns: {unanswered}", "you" if unanswered else "dim")))
         table = self.query_one("#backlog", DataTable)
         board = self.query_one("#board", Static)
         table.display = self.view_name == "tree"
@@ -395,11 +393,11 @@ class BacklogPane(Pane):
         rows, line_drawn = [], False
         for epic in self.data["epics"]:
             critical = "  critical" if epic.get("critical") else ""
-            rows.append((f"epic:{epic['epic_id']}", (paint(f"{epic['epic_id']} {epic['title']}{critical}", "accent", bold=True),
+            rows.append((f"epic:{epic['epic_id']}", (paint(f"{epic['epic_id']} {epic['title']}{critical}", "text", bold=True),
                                                      "", "", "", "")))
             for feature in epic["features"]:
                 if not feature["mvp"] and not line_drawn:
-                    rows.append(("line", (paint("──────────── MVP LINE ────────────", "soft", bold=True), "", "", "", "")))
+                    rows.append(("line", (paint("──────────── MVP LINE ────────────", "stone", bold=True), "", "", "", "")))
                     line_drawn = True
                 fold = "▸" if feature["feature_id"] in self.folded else "▾"
                 rows.append((f"feature:{feature['feature_id']}",
@@ -430,7 +428,7 @@ class BacklogPane(Pane):
         return lines(rows)
 
     def _graph_text(self):
-        rows = [paint("DEPENDENCIES", "dim", bold=True)]
+        rows = [paint("dependencies", "dim", bold=True)]
         edges = [join(s["story_id"], paint(" <- ", "dim"), ", ".join(s["depends_on"]))
                  for s in self._stories() if s.get("depends_on")]
         return lines(rows + (edges or [paint("None.", "dim")]))
@@ -546,47 +544,34 @@ class RunPane(Pane):
         self.selected_gate = 0
 
     def compose(self) -> ComposeResult:
-        yield Static("RUN", id="run-title", classes="title")
         yield VerticalScroll(Static("", id="gates", markup=False), id="gates-box")
-        yield Static(join(paint("IN FLIGHT", "dim", bold=True), "     ", keys(("P", "pause"))), classes="section")
+        yield Static("", id="run-title", classes="section", markup=False)
         yield DataTable(id="units", cursor_type="row")
-        yield Static(keys(("c", "cancel"), ("R", "re-dispatch one tier up"), ("enter", "live output")), classes="hint")
+        yield Static(keys(("c", "cancel"), ("R", "one tier up"), ("enter", "live output"), ("P", "pause run")),
+                     classes="hint")
         yield Static("", id="routine", markup=False)
 
     def on_mount(self):
-        self.query_one("#units", DataTable).add_columns("UNIT", "AGENT", "MODEL", "ELAPSED", "CONTEXT", "COST", "LAST TOOL")
+        self.query_one("#units", DataTable).add_columns("UNIT", "AGENT", "MODEL", "TIME", "CTX", "COST", "LAST")
 
     def _path(self):
         return run_path(self.app.project, self.app.run_id)
 
     async def load(self):
         if not self.app.run_id:
-            self.query_one("#run-title", Static).update("RUN  no run yet. Start one from the brief.")
+            self.query_one("#run-title", Static).update(paint("No run yet. Start one from the brief.", "dim"))
             return
         path = self._path()
         self.run = await self.client.get(path)
         self.open_gates = (await self.client.get(path + "/gates", state="open", digest="false"))["items"]
         self.digest = (await self.client.get(path + "/gates", state="open", digest="true"))["items"]
-        metrics = await self.client.get(path + "/metrics")
         self.selected_gate = min(self.selected_gate, max(0, len(self.open_gates) - 1))
-        self._render_run(metrics)
+        self._render_run()
 
-    def _render_run(self, metrics):
+    def _render_run(self):
         run = self.run
-        flags = []
-        if run.get("complete"):
-            flags.append("complete")
-        if run["paused"]:
-            flags.append("PAUSED")
-        if run["waiting_on"] == "usage_window":
-            flags.append("waiting on usage window")
-        elif run["waiting_on"] == "provisioning":
-            flags.append("waiting on provisioning")
         counts = ", ".join(f"{count} {state}" for state, count in sorted(run["units"].items()))
-        self.query_one("#run-title", Static).update(join(
-            paint(f"RUN {self.app.run_id}", "accent", bold=True), paint(f"  {run['active_phase']}", "text"),
-            paint(f"  {'  '.join(flags)}", "soft", bold=True), paint(f"   {counts}", "dim"),
-            paint(f"   ${metrics['list_price_spend_usd']:.2f} at list price", "dim")))
+        self.query_one("#run-title", Static).update(join(paint("in flight", "dim", bold=True), paint(f"   {counts}", "dim")))
         self.query_one("#gates-box").display = bool(self.open_gates)
         self.query_one("#gates", Static).update(self._gates_text())
         rows = []
@@ -596,37 +581,46 @@ class RunPane(Pane):
                          (row["unit_id"], row["agent"].removeprefix("spgr-agent-"), row["model"], age(row["started_at"]),
                           context, f"${row.get('cost') or 0:.2f}", row.get("last_tool_call") or "")))
         self.fill(self.query_one("#units", DataTable), rows)
-        rows = [join(paint("ROUTINE", "dim", bold=True), paint(" since you looked   ", "dim"), keys(("v", "clear")))]
-        rows += [paint(f"  ✓ {g['decision_prompt']}", "success") for g in self.digest] or [paint("  Nothing new.", "dim")]
+        rows = [join(paint("routine, since you looked", "dim", bold=True), "   ", keys(("v", "clear")))]
+        rows += [join(paint("· ", "success"), paint(g["decision_prompt"], "dim")) for g in self.digest] or [paint("Nothing new.", "dim")]
         self.query_one("#routine", Static).update(lines(rows))
 
+    def _gate_label(self, gate):
+        kind = {"pr-merge": "merge"}.get(gate["checkpoint_type"], gate["checkpoint_type"].replace("-", " "))
+        return f"{gate['checkpoint_id']} · {gate['level']} {kind} · {gate['context']['age_seconds'] // 60}m"
+
     def _gates_text(self):
+        """One gate reads as one block. With several, each gets a line and tab moves
+        between them. Terracotta is on what you act on and nothing else."""
         if not self.open_gates:
             return ""
-        rows = [join(paint(f"WAITING ON YOU ({len(self.open_gates)})", "accent", bold=True),
-                     paint("   tab next" if len(self.open_gates) > 1 else "", "dim"))]
+        single = len(self.open_gates) == 1
+        rows = [join(paint("needs you", "you", bold=True),
+                     paint(f"   {self._gate_label(self.open_gates[0])}" if single else f" ({len(self.open_gates)})   tab next", "dim"))]
         for index, gate in enumerate(self.open_gates):
             selected = index == self.selected_gate
+            if not single:
+                rows.append(join(paint("› " if selected else "  ", "you", bold=True), paint(self._gate_label(gate), "text" if selected else "dim")))
+            if not selected:
+                continue
             context = gate["context"]
-            rows.append(join(paint("› " if selected else "  ", "accent", bold=True), paint(gate["checkpoint_id"], bold=selected),
-                             " ", paint(gate["level"], RISK[gate["level"]], bold=True),
-                             paint(f" {gate['checkpoint_type']}, age {context['age_seconds'] // 60}m", "dim")))
-            rows.append(paint(f"  {gate['decision_prompt']}", bold=selected))
-            rows += [paint(f"  {f.get('vertical', '').removeprefix('spgr-agent-')}: {f.get('detail', '')} ({f.get('rule', '')})",
+            rows.append(paint(gate["decision_prompt"], "text", bold=True))
+            rows += [paint(f"{f.get('vertical', '').removeprefix('spgr-agent-')}  {f.get('detail', '')} ({f.get('rule', '')})",
                            "error") for f in context.get("findings", [])]
-            if selected:
-                for number, option in enumerate(gate["options"], 1):
-                    rows.append(join(paint(f"  {number} ", "accent", bold=True), paint(option["option"], bold=True),
-                                     paint(f"  {option['consequence']}", "dim"),
-                                     paint(" (recommended)" if option.get("recommended_because") else "", "success")))
-                rows += [join(paint(f"  decision {decision['decision_id']}: ", "dim"), decision["prompt"])
-                         for decision in gate.get("decisions", [])]
-                hints = [("n", "answer with notes")]
-                if context.get("diff_path"):
-                    hints.append(("d", "diff"))
-                if context.get("design_session"):
-                    hints.append(("o", "open in browser"))
-                rows.append(join("  ", keys(*hints)))
+            width = max(len(o["option"]) for o in gate["options"]) + 2
+            for number, option in enumerate(gate["options"], 1):
+                rows.append(join(paint(f"{number} ", "you", bold=True),
+                                 paint(option["option"].replace("_", " ").ljust(width), "text", bold=True),
+                                 paint(option["consequence"], "dim"),
+                                 paint("   recommended" if option.get("recommended_because") else "", "success")))
+            rows += [join(paint(f"decision {decision['decision_id']}  ", "dim"), decision["prompt"])
+                     for decision in gate.get("decisions", [])]
+            hints = [("n", "answer with notes")]
+            if context.get("diff_path"):
+                hints.append(("d", "diff"))
+            if context.get("design_session"):
+                hints.append(("o", "open in browser"))
+            rows.append(keys(*hints))
         return lines(rows)
 
     def _gate(self):

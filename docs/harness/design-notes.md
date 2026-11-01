@@ -37,6 +37,7 @@ This document records the design of an opinionated, near-autonomous software dev
 | Branch | A new branch of the Springer repository. Greenfield for the harness package, the runtime brought over as a unit pruned by profile, the repository restructured into harness/ and runtime/. See Branch strategy |
 | Backlog default | Files in the repository plus the TUI board. A tracker is an optional one-way projection |
 | TUI brief editor | A section rail with status marks, the editor, and a facts panel, with the critique as marks on the rail and a list under the editor. Moving between sections saves. The interview fills an empty section directly and proposes beside a section with the human's text, to accept, edit, or drop, and never overwrites it |
+| TUI look | Lintel: everything is stone, and terracotta, the color of the icon's two springers, means this needs you. A two-line arch mark, phase shown as stones laid of nine with the walking skeleton as the keystone, tinted blocks over boxes |
 | TUI run screen | Open gates first at full width, collapsing when there are none. A number key answers the selected gate, recommended option first |
 | Design system | Per product, tokens emitted as code into packages/ui, extracted from real wireframe needs |
 | Prototype carry-forward | Tokens, primitives, patterns, and Zod contracts carry forward. Screen composites are specified and rebuilt. The prototype directory is deleted |

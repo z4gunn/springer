@@ -141,7 +141,7 @@ class TuiCase(unittest.IsolatedAsyncioTestCase):
         """A started run, opened in the Run screen."""
         run_id = self.start_run()
         await self.open_acme(pilot)
-        await self.see(pilot, f"RUN {run_id}")
+        await self.see(pilot, f"acme · {run_id}", "in flight")
         return run_id
 
     async def backlog_screen(self, pilot):
@@ -239,14 +239,14 @@ class ProjectsScreenTest(TuiCase):
             await pilot.press("up")
             await pilot.pause(0.1)
             await pilot.press("enter")
-            await self.see(pilot, "BRIEF acme")
+            await self.see(pilot, "brief  v")
 
 
 class BriefScreenTest(TuiCase):
     async def test_editor_facts_panel_and_derived_profile(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            screen = await self.see(pilot, "BRIEF acme", "✓ Problem", "FACTS", "runs as brochure")
+            screen = await self.see(pilot, "brief  v", "✓ Problem", "facts", "runs as brochure")
             self.assertNotIn("sentence", screen, "the derived sentence is not a fact")
             self.assertEqual(self.app.query_one("#editor", TextArea).text, GOOD["Problem"])
             await pilot.press("enter")
@@ -333,7 +333,7 @@ class BriefScreenTest(TuiCase):
             await self.dialog(pilot, ConfirmDialog)
             await self.see(pilot, "Commits the brief")
             await pilot.press("y")
-            await self.see(pilot, "RUN acme-1")
+            await self.see(pilot, "acme · acme-1", "in flight")
 
     async def test_start_is_refused_with_the_reason_while_an_error_stands(self):
         BriefStore(self.project).update_section("Core flows", "### Bad\nCritical: yes\n", self.version)
@@ -352,9 +352,9 @@ class BriefScreenTest(TuiCase):
             [{"item_id": "stripe", "secret_name": "STRIPE_KEY", "needed_by": "skeleton"}]))
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, f"RUN {run_id}")
+            await self.see(pilot, f"acme · {run_id}", "in flight")
             await pilot.press("b")
-            await self.see(pilot, "BRIEF acme")
+            await self.see(pilot, "brief  v")
             await pilot.press("v")
             await self.dialog(pilot, FormDialog)
             field = self.app.screen.query_one("#field-value", Input)
@@ -476,7 +476,7 @@ class RunScreenTest(TuiCase):
         async with self.app.run_test(size=self.SIZE) as pilot:
             run_id = await self.run_screen(pilot)
             await self.tick(3)
-            await self.see(pilot, "requirements", run_id, "U-0001", "product-manager", "mock-sonnet", "ELAPSED", "LAST TOOL")
+            await self.see(pilot, "requirements", run_id, "U-0001", "product-manager", "mock-sonnet", "TIME", "LAST")
             row = re.compile(r"U-0001.*\d+%.*\$0\.\d\d.*(Read|Bash)")
             await self.until(pilot, lambda: row.search(self.text()))
 
@@ -497,16 +497,16 @@ class RunScreenTest(TuiCase):
         async with self.app.run_test(size=self.SIZE) as pilot:
             run_id = await self.run_screen(pilot)
             gate_id = self.merge_gate(run_id)
-            screen = await self.see(pilot, "WAITING ON YOU (1)", f"{gate_id} L2 pr-merge", "Merge PR 9?",
-                                    "auth: Sessions expire. (R1)", "1 approve  It merges. (recommended)",
-                                    "2 send_back  A fresh session fixes it.")
-            self.assertLess(screen.index("WAITING ON YOU"), screen.index("IN FLIGHT"), "gates come first")
+            screen = await self.see(pilot, "needs you", f"{gate_id} · L2 merge", "Merge PR 9?",
+                                    "auth  Sessions expire. (R1)", "1 approve    It merges.   recommended",
+                                    "2 send back  A fresh session fixes it.")
+            self.assertLess(screen.index("needs you"), screen.index("in flight"), "gates come first")
 
     async def test_no_open_gate_collapses_the_card_area(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.run_screen(pilot)
-            screen = await self.see(pilot, "IN FLIGHT")
-            self.assertNotIn("WAITING ON YOU", screen)
+            screen = await self.see(pilot, "in flight")
+            self.assertNotIn("needs you", screen)
             self.assertFalse(self.app.query_one("#gates-box").display)
 
     async def test_a_number_key_answers_the_gate(self):
@@ -515,7 +515,7 @@ class RunScreenTest(TuiCase):
             gate_id = self.merge_gate(run_id)
             await self.see(pilot, "1 approve")
             await pilot.press("1")
-            await self.until(pilot, lambda: "WAITING ON YOU" not in self.text())
+            await self.until(pilot, lambda: "needs you" not in self.text())
             self.assertEqual(self.engine(run_id).gates.get(gate_id)["content"]["response"]["option"], "approve")
 
     async def test_tab_moves_between_gates_and_the_number_answers_the_chosen_one(self):
@@ -523,7 +523,7 @@ class RunScreenTest(TuiCase):
             run_id = await self.run_screen(pilot)
             first = self.merge_gate(run_id)
             second = self.merge_gate(run_id, "U-0002")
-            await self.see(pilot, "WAITING ON YOU (2)", f"› {first}")
+            await self.see(pilot, "needs you (2)", f"› {first}")
             await pilot.press("tab")
             await self.see(pilot, f"› {second}")
             await pilot.press("2")
@@ -537,7 +537,7 @@ class RunScreenTest(TuiCase):
             gate_id = self.engine(run_id).gates.open(
                 "direction-review", "L3", [], "Pick.", [{"option": "accept", "consequence": "Freezes."}],
                 decisions=[{"decision_id": "D1", "kind": "question", "prompt": "Which direction?"}])["content"]["checkpoint_id"]
-            await self.see(pilot, "decision D1: Which direction?")
+            await self.see(pilot, "decision D1  Which direction?")
             await pilot.press("1")
             await self.dialog(pilot, FormDialog)
             await self.see(pilot, "Which direction?")
@@ -578,7 +578,7 @@ class RunScreenTest(TuiCase):
             self.engine(run_id).gates.open("routine-decision", "L1", [], "U-0006 merged at L1",
                                            [{"option": "viewed", "consequence": "Closes."}], digest=True)
             await self.see(pilot, "U-0006 merged at L1")
-            self.assertNotIn("WAITING ON YOU", self.text(), "a digest entry is not a pause")
+            self.assertNotIn("needs you", self.text(), "a digest entry is not a pause")
             await pilot.press("v")
             await self.see(pilot, "Nothing new.")
 
@@ -705,13 +705,32 @@ class AllScreensTest(TuiCase):
             await self.see(pilot, "The chat agent is not built yet.")
             self.assertEqual(self.app.query_one("#chat", Input).value, "")
 
+    async def test_quit_is_shown_and_works_from_the_key_and_the_prompt(self):
+        for how in ("key", "quit", "exit", "/quit", "EXIT"):
+            with self.subTest(how):
+                self.app = SpringerApp(self.client, open_url=self.opened.append)
+                async with self.app.run_test(size=self.SIZE) as pilot:
+                    await self.see(pilot, "q quit")
+                    if how == "key":
+                        await pilot.press("q")
+                    else:
+                        await pilot.press("slash", *how, "enter")
+                    await self.until(pilot, lambda: self.app._exit)
+
+    async def test_typing_a_sentence_with_quit_in_it_does_not_quit(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.see(pilot, "Acme")
+            await pilot.press("slash", *"why did it quit", "enter")
+            await self.see(pilot, "The chat agent is not built yet.")
+            self.assertFalse(self.app._exit)
+
     async def test_typing_in_the_chat_line_does_not_switch_screens(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.see(pilot, "Acme")
             await pilot.press("slash", *"brk")
             await pilot.pause(0.1)
             self.assertEqual(self.app.query_one("#chat", Input).value, "brk")
-            self.assertIn("PROJECTS", self.text())
+            self.assertIn("NAME", self.text())
 
     async def test_audit_of_applied_operations(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
@@ -736,15 +755,15 @@ class AllScreensTest(TuiCase):
     async def test_screen_keys_switch(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, "BRIEF acme")
+            await self.see(pilot, "brief  v")
             await pilot.press("escape", "k")
-            await self.see(pilot, "BACKLOG")
+            await self.see(pilot, "No backlog until a run starts.")
             await pilot.press("r")
-            await self.see(pilot, "RUN")
+            await self.see(pilot, "No run yet.")
             await pilot.press("p")
-            await self.see(pilot, "PROJECTS")
+            await self.see(pilot, "NAME")
             await pilot.press("b")
-            await self.see(pilot, "BRIEF acme")
+            await self.see(pilot, "brief  v")
 
 
 class WholeRunTest(TuiCase):
@@ -757,7 +776,7 @@ class WholeRunTest(TuiCase):
             await pilot.press("s")
             await self.dialog(pilot, ConfirmDialog)
             await pilot.press("y")
-            await self.see(pilot, "RUN acme-1")
+            await self.see(pilot, "acme · acme-1", "in flight")
             answered = set()
             for _ in range(160):
                 await self.tick()
@@ -765,7 +784,7 @@ class WholeRunTest(TuiCase):
                 screen = self.text()
                 if "complete" in screen.splitlines()[1]:
                     break
-                match = re.search(r"› (G-\d+) L\d (\S+),", screen)
+                match = re.search(r"(?:› |needs you   )(G-\d+) ·", screen)
                 if match and match.group(1) not in answered and "1 " in screen:
                     answered.add(match.group(1))
                     await pilot.press("1")
@@ -806,6 +825,34 @@ COVERAGE = {
     ("All", "Chat line"): (AllScreensTest, "test_chat_line"),
     ("All", "Audit of applied operations"): (AllScreensTest, "test_audit_of_applied_operations"),
 }
+
+
+class LookTest(unittest.TestCase):
+    """Terracotta means this needs you, so it stays a rule and not a preference."""
+
+    @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
+    def test_terracotta_is_only_painted_on_what_needs_a_person(self):
+        allowed = ("waiting on you", "needs you", "› ", "number", "waiting on provisioning", '"?"', "Discovery says",
+                   "unknowns", '"L2"')
+        for name in ("panes.py", "app.py", "theme.py"):
+            source = (REPO / "harness" / "springer_harness" / "tui" / name).read_text()
+            for line in source.splitlines():
+                if re.search(r'"you"', line) and not re.search(r'^(RISK|DARK|LIGHT)|warning=C', line.strip()):
+                    self.assertTrue(any(word in line for word in allowed), f"{name}: {line.strip()}")
+
+    @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
+    def test_every_phase_the_stones_know_is_within_the_arch(self):
+        from springer_harness.tui.theme import STONES, STONES_LAID, stones_laid
+        self.assertTrue(all(0 <= laid <= STONES for laid in STONES_LAID.values()))
+        self.assertEqual(stones_laid("anything", complete=True), STONES)
+        self.assertIsNone(stones_laid("a phase nobody named"))
+
+    @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
+    def test_the_mark_is_the_arch_in_two_lines(self):
+        from springer_harness.tui.theme import MARK_SPRINGER, mark
+        rendered = mark()
+        self.assertEqual(len(rendered.plain.splitlines()), 2)
+        self.assertIn(MARK_SPRINGER.lower(), " ".join(str(s.style) for s in rendered.spans).lower())
 
 
 class AcceptanceListTest(unittest.TestCase):
