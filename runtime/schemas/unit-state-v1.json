@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/unit-state-v1.json",
+  "title": "SPGR Unit State v1",
+  "description": "state.json, the current state of one unit. Written by the daemon.",
+  "type": "object",
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "unit_id",
+    "state",
+    "entered_at",
+    "history",
+    "retries_spent",
+    "sessions"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "unit-state"
+    },
+    "schema_version": {
+      "const": "v1"
+    },
+    "unit_id": {
+      "type": "string",
+      "pattern": "^U-[0-9]{4,}$"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "planned",
+        "ready",
+        "running",
+        "returned",
+        "checking",
+        "gated",
+        "done",
+        "retry",
+        "redispatch",
+        "blocked",
+        "abandoned",
+        "cancelled"
+      ]
+    },
+    "entered_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "state",
+          "at",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "ready",
+              "running",
+              "returned",
+              "checking",
+              "gated",
+              "done",
+              "retry",
+              "redispatch",
+              "blocked",
+              "abandoned",
+              "cancelled"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "retries_spent": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^S-[0-9]{4,}$"
+      }
+    },
+    "pr": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "number",
+        "branch",
+        "base"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "merge": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "sha",
+        "at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sha": {
+          "type": "string",
+          "minLength": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "cancelled_by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "if": {
+    "properties": {
+      "state": {
+        "const": "cancelled"
+      }
+    },
+    "required": [
+      "state"
+    ]
+  },
+  "then": {
+    "required": [
+      "cancelled_by"
+    ],
+    "properties": {
+      "cancelled_by": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/usage-window-v1.json",
+  "title": "SPGR Usage Window v1",
+  "description": "~/.springer/usage/<provider>.json, one per provider account. Written by the daemon, read before claiming a ready unit.",
+  "type": "object",
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "provider",
+    "window_start",
+    "resets_at",
+    "used_fraction",
+    "own_tokens",
+    "dispatch_rate"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "usage-window"
+    },
+    "schema_version": {
+      "const": "v1"
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "window_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resets_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "used_fraction": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1,
+      "description": "From the provider's usage signal. Null while no signal has been read."
+    },
+    "own_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The daemon's own count for the window, a cross-check on used_fraction."
+    },
+    "dispatch_rate": {
+      "type": "number",
+      "minimum": 0,
+      "description": "The concurrency the scheduler derived. Zero parks the scheduler until resets_at."
+    }
+  },
+  "additionalProperties": false
+}

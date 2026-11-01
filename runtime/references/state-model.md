@@ -1,7 +1,26 @@
 # Springer Harness State Model
 
 Date: 2026-11-01
-Status: design reference for the harness daemon, to be placed under runtime/references/state-model.md with schemas under runtime/schemas/
+Status: reference for the harness daemon, with its schemas under runtime/schemas/. Two edits it calls for land at step 5 of the branch sequence, because existing runtime files are not rewritten before then: the barrier paragraph in pdca-harness.md, and unit_id on work_item in pdca-cycle-v1. The in-session harness keeps the barrier rule until that edit.
+
+## Contents
+
+- Scope
+- Principles carried over
+- What changes
+- Entities
+- Unit lifecycle
+- Unit directory
+- Session lifecycle
+- Events
+- Gate record (hil-checkpoint-v2)
+- Run projection (run-state-v2)
+- Worktree claim and lock
+- Usage window
+- Scheduler tick
+- Crash recovery
+- Schemas to add
+- Validation and evals
 
 ## Scope
 
@@ -18,7 +37,7 @@ This reference defines the durable state the Springer harness daemon reads and w
 
 1. The unit becomes a first-class entity with an id, a directory, a lifecycle, and its own records. Today a unit is a work_item nested in a cycle record with no identity of its own.
 2. Cycles may overlap. The current rule, no new cycle is planned while any prior dispatch lacks a completion, exists because the main session cannot know which files an in-flight unit touches. The daemon can, from the unit spec, so it plans a new cycle whenever the ready queue is non-empty and WIP and usage-window room exist, and checks disjointness against in-flight units. A cycle still closes only when every unit it routed is terminal. This is the one rule change to pdca-harness.md, and it displaces the barrier paragraph it replaces.
-3. Gates carry a risk level (L0 to L3) and the list of unit ids they hold. hil-checkpoint-v2 adds level and holds. An L2 gate holds the merge of the units it names and nothing else.
+3. Gates carry a risk level (L0 to L3) and the list of unit ids they hold. hil-checkpoint-v2 adds level and narrows holds to unit ids. An L2 gate holds the merge of the units it names and nothing else.
 4. Sessions are tracked as their own records, because a unit may run across more than one session (a handoff at the context threshold) and a session may die without returning.
 5. The lock is daemon-level with a heartbeat, in the same file and format claim-run.py uses, so the in-session shim and any stray Claude Code session see the lock and refuse to write.
 
@@ -101,7 +120,7 @@ A unit in running has exactly one session not in a terminal state. A handoff spa
 
 ## Events
 
-events.jsonl keeps its current line format and its existing event names (dispatch, completion, agent_backgrounded, agent_joined, agent_abandoned). The daemon adds these, each carrying run_id, unit_id, session_id where applicable, and a monotonic seq.
+events.jsonl keeps its current line format and its existing event names (agent_dispatched, agent_completed, agent_backgrounded, agent_stopped, agent_joined, agent_abandoned, product_check). The daemon adds these, each carrying run_id, unit_id, session_id where applicable, and a monotonic seq.
 
 | Event | Payload |
 |-------|---------|
@@ -120,11 +139,11 @@ The event ledger is what the TUI run screen and the dashboard read. The projecti
 
 ## Gate record (hil-checkpoint-v2)
 
-Adds to v1: level (L0, L1, L2, L3), holds (unit ids whose merge or start waits), options (ordered, recommended first, each with consequences), digest (true when the gate is informational and closes on view), channel_refs (where it was sent), response (option chosen, free text, rule change, by, at). A gate with holds empty and level L1 is a digest entry, not a pause.
+Changes from v1: level (L0, L1, L2, L3) is added, holds narrows from phase names and ids to the unit ids whose merge or start waits and becomes required, options stay as they are and are ordered recommended first, digest (true when the gate is informational and closes on view) is added, channel_refs (where it was sent) is added, response (option chosen, free text, rule change, by, at) is added. A gate with holds empty and level L1 is a digest entry, not a pause, so a digest gate records pipeline_status resumed.
 
 ## Run projection (run-state-v2)
 
-Keeps every v1 field and adds: units (count by state), in_flight (unit id, session id, agent, model, started at, context percent, cost), open_gates (id, level, holds, age), worktrees (unit id, path), mvp_line (feature ids above and below), deferred (feature ids), window (provider, used fraction, resets at), generated_from_seq (the last event seq reflected). regenerable stays true.
+Keeps every v1 field, changes open_gates from checkpoint ids to objects (id, level, holds, age), and adds: units (count by state), in_flight (unit id, session id, agent, model, started at, context percent, cost), worktrees (unit id, path), mvp_line (feature ids above and below), deferred (feature ids), window (provider, used fraction, resets at), generated_from_seq (the last event seq reflected). regenerable stays true.
 
 ## Worktree claim and lock
 
@@ -185,4 +204,4 @@ pdca-cycle-v1 is unchanged. The work_item definition gains an optional unit_id s
 
 ## Validation and evals
 
-validate-repo.py gains the new schemas in its self-check. The harness test suite, against the mock provider, covers: every unit transition in the table, overlapping cycles with a disjointness conflict, a handoff across two sessions, a dead session at reconcile, a daemon restart with units in each state, an exhausted window parking and resuming, and a stale lock takeover. One eval scenario covers the shim: a Claude Code session in a project with a daemon-held run refuses to write and says why.
+validate.py --self-check picks up the new schemas from the registry directory, and tests/test_state_schemas.py proves each one accepts a valid record and rejects an invalid one. The harness test suite, against the mock provider, covers: every unit transition in the table, overlapping cycles with a disjointness conflict, a handoff across two sessions, a dead session at reconcile, a daemon restart with units in each state, an exhausted window parking and resuming, and a stale lock takeover. One eval scenario covers the shim: a Claude Code session in a project with a daemon-held run refuses to write and says why.

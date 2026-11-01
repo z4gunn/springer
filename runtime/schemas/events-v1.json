@@ -1,0 +1,906 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/events-v1.json",
+  "title": "SPGR Event Line v1",
+  "description": "One line of runs/<run_id>/events.jsonl. A line written by the in-session hooks and scripts keeps its current shape and has no seq. A line written by the daemon always carries seq and run_id.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/agent_dispatched"
+    },
+    {
+      "$ref": "#/$defs/agent_completed"
+    },
+    {
+      "$ref": "#/$defs/agent_backgrounded"
+    },
+    {
+      "$ref": "#/$defs/agent_stopped"
+    },
+    {
+      "$ref": "#/$defs/agent_joined"
+    },
+    {
+      "$ref": "#/$defs/agent_abandoned"
+    },
+    {
+      "$ref": "#/$defs/product_check"
+    },
+    {
+      "$ref": "#/$defs/unit_state"
+    },
+    {
+      "$ref": "#/$defs/session_started"
+    },
+    {
+      "$ref": "#/$defs/session_usage"
+    },
+    {
+      "$ref": "#/$defs/session_exited"
+    },
+    {
+      "$ref": "#/$defs/worktree_claimed"
+    },
+    {
+      "$ref": "#/$defs/worktree_released"
+    },
+    {
+      "$ref": "#/$defs/gate_opened"
+    },
+    {
+      "$ref": "#/$defs/gate_answered"
+    },
+    {
+      "$ref": "#/$defs/merge"
+    },
+    {
+      "$ref": "#/$defs/retrieval"
+    },
+    {
+      "$ref": "#/$defs/window_sample"
+    }
+  ],
+  "$defs": {
+    "agent_dispatched": {
+      "type": "object",
+      "description": "Written by the agent event hook at dispatch.",
+      "required": [
+        "ts",
+        "event"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "agent_dispatched"
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_use_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "agent_completed": {
+      "type": "object",
+      "description": "Written by the agent event hook on a foreground return.",
+      "required": [
+        "ts",
+        "event"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "agent_completed"
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_use_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "agent_backgrounded": {
+      "type": "object",
+      "description": "Written by the agent event hook on a background dispatch. Not a join.",
+      "required": [
+        "ts",
+        "event"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "agent_backgrounded"
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_use_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "agent_stopped": {
+      "type": "object",
+      "description": "Written by the agent event hook at SubagentStop.",
+      "required": [
+        "ts",
+        "event"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "agent_stopped"
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_use_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "agent_joined": {
+      "type": "object",
+      "description": "Appended by the harness when a background dispatch returns.",
+      "required": [
+        "ts",
+        "event"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "agent_joined"
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_use_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "agent_abandoned": {
+      "type": "object",
+      "description": "Appended for a dispatch known dead.",
+      "required": [
+        "ts",
+        "event"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "agent_abandoned"
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_use_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "product_check": {
+      "type": "object",
+      "description": "Written by product-check.py, one line per check.",
+      "required": [
+        "ts",
+        "event"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "product_check"
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cycle_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "check_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "type": "string",
+          "minLength": 1
+        },
+        "duration_s": {
+          "type": "number"
+        },
+        "results_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "unit_state": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "from",
+        "to",
+        "reason"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "unit_state"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "from": {
+          "enum": [
+            "planned",
+            "ready",
+            "running",
+            "returned",
+            "checking",
+            "gated",
+            "done",
+            "retry",
+            "redispatch",
+            "blocked",
+            "abandoned",
+            "cancelled",
+            null
+          ]
+        },
+        "to": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "ready",
+            "running",
+            "returned",
+            "checking",
+            "gated",
+            "done",
+            "retry",
+            "redispatch",
+            "blocked",
+            "abandoned",
+            "cancelled"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "session_started": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "session_id",
+        "provider",
+        "pid",
+        "model",
+        "tier"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "session_started"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^S-[0-9]{4,}$"
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pid": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tier": {
+          "type": "string",
+          "enum": [
+            "haiku",
+            "sonnet",
+            "opus"
+          ]
+        }
+      }
+    },
+    "session_usage": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "session_id",
+        "input_tokens",
+        "output_tokens",
+        "context_percent",
+        "cost"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "session_usage"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^S-[0-9]{4,}$"
+        },
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "context_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "cost": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "session_exited": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "session_id",
+        "code",
+        "outcome"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "session_exited"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^S-[0-9]{4,}$"
+        },
+        "code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "return",
+            "handoff",
+            "killed",
+            "dead"
+          ]
+        }
+      }
+    },
+    "worktree_claimed": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "path",
+        "branch"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "worktree_claimed"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "worktree_released": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "path",
+        "branch"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "worktree_released"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "gate_opened": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "gate_id",
+        "level",
+        "holds"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "gate_opened"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gate_id": {
+          "type": "string",
+          "pattern": "^G-[0-9]{4,}$"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3"
+          ]
+        },
+        "holds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^U-[0-9]{4,}$"
+          }
+        }
+      }
+    },
+    "gate_answered": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "gate_id",
+        "response",
+        "by"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "gate_answered"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gate_id": {
+          "type": "string",
+          "pattern": "^G-[0-9]{4,}$"
+        },
+        "response": {
+          "type": "string",
+          "minLength": 1
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "merge": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "pr",
+        "sha"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "merge"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "pr": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "retrieval": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "record_ids"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "retrieval"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "record_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "window_sample": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "provider",
+        "used_fraction",
+        "resets_at"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "window_sample"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "used_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "resets_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
