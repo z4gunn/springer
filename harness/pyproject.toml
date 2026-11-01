@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "springer-harness"
+version = "0.0.0"
+description = "The Springer daemon, API, and TUI that drive the runtime through one workflow."
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = []
+
+[project.scripts]
+springer = "springer_harness.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["springer_harness"]
