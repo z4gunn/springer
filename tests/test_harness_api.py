@@ -323,6 +323,15 @@ class OperationCatalogTest(ApiCase):
         self.confirmed("project.create", {"name": "Existing", "path": str(target), "mode": "adopt"}, project=None)
         self.assertTrue((target / ".claude" / "springer-manifest.json").exists())
 
+    def test_expand_path(self):
+        from springer_harness.daemon import expand_path
+        home = Path.home()
+        self.assertEqual(expand_path("~/Repos/app"), home / "Repos/app")
+        self.assertEqual(expand_path("  ~Repos/app "), home / "Repos/app", "no user is named Repos")
+        self.assertEqual(expand_path("~"), home)
+        self.assertEqual(expand_path("/srv/app"), Path("/srv/app"))
+        self.assertFalse(expand_path("rel/app").is_absolute())
+
     def test_project_create_refuses_a_relative_path_and_a_duplicate(self):
         first = self.op("project.create", {"name": "Acme", "path": "/tmp/x", "mode": "new"}, project=None)
         self.op("project.create", {"name": "Acme", "path": "/tmp/x", "mode": "new"}, project=None,

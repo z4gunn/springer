@@ -5,13 +5,16 @@ in docs/harness/api-contract.md, and a meta-test fails when a row has no test.""
 import ast
 import asyncio
 import json
+import os
 import re
+import shutil
 import socket
 import tempfile
 import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from harness_support import REPO, git_project
 
@@ -181,6 +184,39 @@ class ProjectsScreenTest(TuiCase):
             self.merge_gate(run_id)
             await self.see(pilot, "1 waiting on you")
 
+    async def create(self, pilot, path):
+        await self.see(pilot, "Acme")
+        await pilot.press("n")
+        await self.dialog(pilot, FormDialog)
+        self.app.screen.query_one("#field-name", Input).value = "Fresh"
+        self.app.screen.query_one("#field-path", Input).value = path
+        await pilot.press("enter")
+        await self.dialog(pilot, ConfirmDialog)
+        await pilot.press("y")
+
+    async def test_a_tilde_path_means_the_home_directory(self):
+        for typed in ("~/Repos/fresh", "~Repos/fresh"):
+            with self.subTest(typed), mock.patch.dict(os.environ, {"HOME": str(self.root / "home-dir")}):
+                self.daemon.home.projects_path.write_text(json.dumps(self.daemon.home.projects()))
+                projects = self.daemon.home.projects()
+                projects.pop("fresh", None)
+                self.daemon.home.projects_path.write_text(json.dumps(projects))
+                shutil.rmtree(self.root / "home-dir", ignore_errors=True)
+                self.app = SpringerApp(self.client, open_url=self.opened.append)
+                async with self.app.run_test(size=self.SIZE) as pilot:
+                    await self.create(pilot, typed)
+                    await self.see(pilot, "Fresh")
+                self.assertTrue((self.root / "home-dir" / "Repos" / "fresh" / ".claude").is_dir())
+
+    async def test_a_relative_path_is_relative_to_where_springer_ran(self):
+        cwd = os.getcwd()
+        self.addCleanup(os.chdir, cwd)
+        os.chdir(self.root)
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.create(pilot, "apps/fresh")
+            await self.see(pilot, "Fresh")
+        self.assertTrue((self.root / "apps" / "fresh" / ".claude").is_dir())
+
     async def test_new_open_archive(self):
         target = self.root / "fresh"
         async with self.app.run_test(size=self.SIZE) as pilot:
@@ -210,7 +246,7 @@ class BriefScreenTest(TuiCase):
     async def test_editor_facts_panel_and_derived_profile(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            screen = await self.see(pilot, "BRIEF acme", "ok Problem", "FACTS", "runs as brochure")
+            screen = await self.see(pilot, "BRIEF acme", "✓ Problem", "FACTS", "runs as brochure")
             self.assertNotIn("sentence", screen, "the derived sentence is not a fact")
             self.assertEqual(self.app.query_one("#editor", TextArea).text, GOOD["Problem"])
             await pilot.press("enter")
@@ -223,12 +259,12 @@ class BriefScreenTest(TuiCase):
     async def test_every_section_is_offered_even_when_empty(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, "-- Glossary", "-- Constraints", "-- Design preferences")
+            await self.see(pilot, "○ Glossary", "○ Constraints", "○ Design preferences")
 
     async def test_moving_to_another_section_saves_the_one_you_left(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, "ok Problem")
+            await self.see(pilot, "✓ Problem")
             self.app.query_one("#editor", TextArea).load_text("Edited in place.")
             await pilot.press("down")
             await self.until(pilot, lambda: BriefStore(self.project).load()[1]["Problem"] == "Edited in place.")
@@ -256,7 +292,7 @@ class BriefScreenTest(TuiCase):
         store.update_section("Core flows", "### Bad\nWho: Nobody\nCritical: yes\n", self.version)
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, "!! Core flows", "!! Bad has no outcome.", "Start blocked: 2 error(s)")
+            await self.see(pilot, "! Core flows", "! Bad has no outcome.", "Start blocked: 2 error(s)")
 
     async def test_discovery_proposed_sections_and_go_or_no_go(self):
         store = BriefStore(self.project)
@@ -266,11 +302,11 @@ class BriefScreenTest(TuiCase):
         store._write(front, sections)
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, "Discovery says go: Real pain.", "?? Users", "Users is still a proposal")
+            await self.see(pilot, "Discovery says go: Real pain.", "? Users", "Users is still a proposal")
             await pilot.press("down")
             await self.until(pilot, lambda: self.app.query_one("#brief-pane").section == "Users")
             await pilot.press("y")
-            await self.see(pilot, "ok Users")
+            await self.see(pilot, "✓ Users")
             await pilot.press("x")
             await self.until(pilot, lambda: "Discovery says" not in self.text())
             await pilot.press("d")
@@ -283,7 +319,7 @@ class BriefScreenTest(TuiCase):
         room for a proposal beside the human's text."""
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, "ok Problem")
+            await self.see(pilot, "✓ Problem")
             self.assertTrue(self.app.query("#proposal"))
             await pilot.press("slash")
             await pilot.press(*"who is it for", "enter")
@@ -333,7 +369,7 @@ class BriefScreenTest(TuiCase):
         store = BriefStore(self.project)
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, "ok Problem")
+            await self.see(pilot, "✓ Problem")
             pane = self.app.query_one("#brief-pane")
             self.app.query_one("#editor", TextArea).load_text("Mine.")
             store.update_section("Glossary", "Someone else wrote this.", self.version)
@@ -348,7 +384,7 @@ class BriefScreenTest(TuiCase):
     async def test_a_refresh_never_overwrites_what_you_are_typing(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, "ok Problem")
+            await self.see(pilot, "✓ Problem")
             self.app.query_one("#editor", TextArea).load_text("Half a thought")
             self.app.mark_dirty()
             await pilot.pause(0.6)
@@ -487,9 +523,9 @@ class RunScreenTest(TuiCase):
             run_id = await self.run_screen(pilot)
             first = self.merge_gate(run_id)
             second = self.merge_gate(run_id, "U-0002")
-            await self.see(pilot, "WAITING ON YOU (2)", f"> {first}")
+            await self.see(pilot, "WAITING ON YOU (2)", f"› {first}")
             await pilot.press("tab")
-            await self.see(pilot, f"> {second}")
+            await self.see(pilot, f"› {second}")
             await pilot.press("2")
             await self.until(pilot, lambda: self.engine(run_id).gates.get(second)["content"]["response"])
             self.assertEqual(self.engine(run_id).gates.get(second)["content"]["response"]["option"], "send_back")
@@ -729,7 +765,7 @@ class WholeRunTest(TuiCase):
                 screen = self.text()
                 if "complete" in screen.splitlines()[1]:
                     break
-                match = re.search(r"> (G-\d+) L\d (\S+),", screen)
+                match = re.search(r"› (G-\d+) L\d (\S+),", screen)
                 if match and match.group(1) not in answered and "1 " in screen:
                     answered.add(match.group(1))
                     await pilot.press("1")
@@ -787,7 +823,7 @@ class AcceptanceListTest(unittest.TestCase):
 
     def test_the_tui_reaches_the_daemon_only_through_the_api(self):
         """Contract rule 5, and what lets the real provider slot in with no TUI change."""
-        allowed = {".client", ".dialogs", ".panes", "client", "dialogs", "panes"}
+        allowed = {"client", "dialogs", "panes", "theme"}
         for path in sorted((REPO / "harness" / "springer_harness" / "tui").glob("*.py")):
             for node in ast.walk(ast.parse(path.read_text())):
                 if isinstance(node, ast.ImportFrom) and node.level:

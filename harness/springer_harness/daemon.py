@@ -2,6 +2,7 @@
 and the API reads through it. All writers take one lock, so an operation and a tick
 never interleave, which is the single-writer rule held inside one process."""
 
+import os
 import re
 import subprocess
 import sys
@@ -20,6 +21,16 @@ from .state.usage import UsageWindow
 
 SOURCE = Path(__file__).resolve().parents[2]
 TICK_SECONDS = 5
+
+
+def expand_path(raw):
+    """A path as a person writes it. ~/Repos/app is the home directory, and so is
+    ~Repos/app unless Repos really is a user, because that is what people mean by it."""
+    text = raw.strip()
+    if text.startswith("~"):
+        expanded = os.path.expanduser(text)
+        text = str(Path.home() / text[1:].lstrip("/")) if expanded.startswith("~") else expanded
+    return Path(text)
 
 
 def slugify(name):
@@ -91,9 +102,10 @@ class Daemon:
         slug = slugify(name)
         if slug in self.home.projects():
             raise InvalidArgs(f"a project named {slug} already exists")
-        target = Path(path)
+        target = expand_path(path)
         if not target.is_absolute():
-            raise InvalidArgs("path must be absolute")
+            raise InvalidArgs(f"{path} is relative, and the daemon has no directory to read it from. "
+                              "Use ~/Repos/app or a full path.")
         if mode == "new":
             done = subprocess.run(["bash", str(SOURCE / "scripts" / "new-project.sh"), str(target), "small"],
                                   capture_output=True, text=True)

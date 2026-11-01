@@ -261,7 +261,7 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 
 | Type | Args | Confirm | Effect |
 |------|------|---------|--------|
-| project.create | `name`, `path`, `mode` (new, adopt) | Yes | Scaffolds or adopts the repository and registers it |
+| project.create | `name`, `path` (absolute or starting with `~`), `mode` (new, adopt) | Yes | Scaffolds or adopts the repository and registers it. A client resolves a relative path against its own directory before sending it |
 | project.archive | none | Yes | Hides the project and refuses a new run. Deletes nothing |
 | brief.update_section | `section`, `body`, `base_version` | After start | Writes the section and marks it confirmed. After `run.start` it opens a scope-change gate |
 | brief.update_facts | `facts`, `base_version` | After start | Writes the frontmatter and recomputes `derived`. After `run.start` it opens a scope-change gate |

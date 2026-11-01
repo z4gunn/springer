@@ -6,6 +6,8 @@ from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Static, TextArea
 
+from .theme import keys
+
 
 class Dialog(ModalScreen):
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
@@ -28,7 +30,7 @@ class ConfirmDialog(Dialog):
         with Vertical(classes="dialog"):
             yield Static(self.preview["summary"], classes="dialog-title", markup=False)
             yield Static(lines, markup=False)
-            yield Static("y confirm   n cancel", classes="hint")
+            yield Static(keys(("y", "confirm"), ("n", "cancel")), classes="hint")
 
     def action_yes(self):
         self.dismiss(True)
@@ -39,19 +41,21 @@ class FormDialog(Dialog):
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
-    def __init__(self, title, fields, masked=()):
+    def __init__(self, title, fields, masked=(), placeholders=None):
         super().__init__()
         self.form_title = title
         self.fields = fields
         self.masked = masked
+        self.placeholders = placeholders or {}
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog"):
             yield Static(self.form_title, classes="dialog-title", markup=False)
             for name, value in self.fields.items():
                 yield Label(name)
-                yield Input(value=value, id=f"field-{name}", password=name in self.masked)
-            yield Static("enter submit   escape cancel", classes="hint")
+                yield Input(value=value, id=f"field-{name}", password=name in self.masked,
+                            placeholder=self.placeholders.get(name, ""))
+            yield Static(keys(("enter", "submit"), ("esc", "cancel")), classes="hint")
 
     def on_input_submitted(self):
         self.dismiss({name: self.query_one(f"#field-{name}", Input).value for name in self.fields})
@@ -70,7 +74,7 @@ class TextDialog(Dialog):
             yield Static(self.dialog_title, classes="dialog-title", markup=False)
             with VerticalScroll():
                 yield Static(self.text, id="dialog-text", markup=False)
-            yield Static("escape close", classes="hint")
+            yield Static(keys(("esc", "close")), classes="hint")
 
     def append(self, line):
         self.text += line + "\n"
@@ -91,7 +95,7 @@ class EditDialog(Dialog):
         with Vertical(classes="dialog wide"):
             yield Static(self.dialog_title, classes="dialog-title", markup=False)
             yield TextArea(self.text, id="dialog-editor")
-            yield Static("ctrl+s save   escape cancel", classes="hint")
+            yield Static(keys(("ctrl+s", "save"), ("esc", "cancel")), classes="hint")
 
     def action_save(self):
         self.dismiss(self.query_one("#dialog-editor", TextArea).text)
