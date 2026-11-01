@@ -97,6 +97,7 @@ DAEMON_EVENTS = {
     "session_exited": {"unit_id": "U-0412", "session_id": "S-0001", "code": None, "outcome": "dead"},
     "worktree_claimed": {"unit_id": "U-0412", "path": "/w", "branch": "b"},
     "worktree_released": {"unit_id": "U-0412", "path": "/w", "branch": "b"},
+    "worktree_kept": {"unit_id": "U-0412", "path": "/w", "reason": "dirty"},
     "gate_opened": {"gate_id": "G-0001", "level": "L2", "holds": ["U-0412"]},
     "gate_answered": {"gate_id": "G-0001", "response": "approve", "by": "human"},
     "merge": {"unit_id": "U-0412", "pr": 7, "sha": "abc"},

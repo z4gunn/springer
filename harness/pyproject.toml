@@ -8,7 +8,14 @@ version = "0.0.0"
 description = "The Springer daemon, API, and TUI that drive the runtime through one workflow."
 requires-python = ">=3.12"
 license = "MIT"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115",
+    "pyyaml>=6",
+    "uvicorn>=0.30",
+]
+
+[project.optional-dependencies]
+test = ["httpx>=0.27"]
 
 [project.scripts]
 springer = "springer_harness.cli:main"

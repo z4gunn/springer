@@ -130,6 +130,7 @@ events.jsonl keeps its current line format and its existing event names (agent_d
 | session_usage | input tokens, output tokens, context percent, cost (periodic, from the stream) |
 | session_exited | code, outcome (return, handoff, killed, dead) |
 | worktree_claimed, worktree_released | path, branch |
+| worktree_kept | path, reason git refused the removal |
 | gate_opened | gate_id, level, holds |
 | gate_answered | gate_id, response, by |
 | merge | unit_id, pr, sha |

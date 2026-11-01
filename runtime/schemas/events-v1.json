@@ -60,6 +60,9 @@
     },
     {
       "$ref": "#/$defs/operation_applied"
+    },
+    {
+      "$ref": "#/$defs/worktree_kept"
     }
   ],
   "$defs": {
@@ -949,6 +952,49 @@
         },
         "args": {
           "type": "object"
+        }
+      }
+    },
+    "worktree_kept": {
+      "type": "object",
+      "description": "git refused a worktree removal, and the worktree is left for the human.",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "path",
+        "reason"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "worktree_kept"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
