@@ -29,6 +29,10 @@ class Worktrees:
         """Reuse the unit's worktree when the branch is intact, otherwise rebuild it."""
         path, branch = self.path(unit_id), f"unit/{unit_id}"
         if self._intact(path):
+            # A retry reuses the worktree. When the unit has committed nothing yet, it
+            # moves up to the base, so it reads what landed since (e.g. the brief).
+            # Fast-forward only, so no work is ever lost.
+            _git(path, "merge", "--ff-only", "--quiet", base)
             return path, branch
         _git(self.project, "worktree", "prune")
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -455,6 +455,13 @@ class OperationCatalogTest(ApiCase):
         self.assertEqual(errors[0]["rule"], "unknown-user")
         self.assertIn("who is not in Users. Add them to Users.", errors[0]["message"])
 
+    def test_run_start_commits_the_brief_so_a_worktree_can_read_it(self):
+        self.start()
+        shown = subprocess.run(["git", "-C", str(self.project_path), "show", "HEAD:docs/brief.md"],
+                               capture_output=True, text=True)
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        self.assertIn("Freelancers", shown.stdout)
+
     def test_run_cancel_ends_the_run_and_a_new_one_can_start(self):
         self.daemon.provider.default.ticks = 50
         run_id = self.start()

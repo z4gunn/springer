@@ -132,6 +132,7 @@ class ProviderTest(FakeBinCase):
         self.assertEqual(args[args.index("--agent") + 1], "spgr-agent-product-manager")
         self.assertEqual(args[args.index("--model") + 1], "opus")
         self.assertIn("AskUserQuestion", args)
+
         brief = (request.session_dir / "brief.md").read_text()
         self.assertIn("Write the PRD", brief)
         self.assertIn("result.json", brief, "the brief carries the output contract")
@@ -143,6 +144,14 @@ class ProviderTest(FakeBinCase):
         self.assertEqual(provider.usage_signal(), {"used_fraction": 0.42, "resets_at": "2026-11-02T17:20:00Z"})
         self.assertEqual((request.session_dir / "return.txt").read_text(), "DONE")
         self.assertTrue((request.session_dir / "stream.jsonl").read_text().count("\n") >= 4)
+
+    def test_the_project_allowlist_goes_in_as_flags(self):
+        (self.root / ".claude").mkdir()
+        (self.root / ".claude/settings.json").write_text(json.dumps(
+            {"permissions": {"allow": ["Bash(pnpm test:*)"], "deny": ["Bash(git push --force:*)"]}}))
+        args = ClaudeCodeProvider(str(self.claude)).command(self.request())
+        self.assertEqual(args[args.index("--allowedTools") + 1], "Bash(pnpm test:*)")
+        self.assertIn("Bash(git push --force:*)", args[args.index("--disallowedTools"):])
 
     def test_a_handoff_with_no_result_is_a_handoff(self):
         handle = ClaudeCodeProvider(str(self.claude)).spawn(self.request("handoff"))
@@ -235,7 +244,7 @@ class OrchestratorTest(FakeBinCase):
         self.assertEqual([(u.key, u.agent, u.model_tier) for u in batch.units],
                          [("prd", "spgr-agent-product-manager", "opus")])
         args = self.calls()[-1]["args"]
-        self.assertEqual(args[args.index("--agent") + 1], "spgr-agent-orchestrator")
+        self.assertNotIn("--agent", args, "an agent's tool list would hide the structured output tool")
         self.assertIn("--json-schema", args)
         self.assertTrue((self.project / "runs/acme-1/plan/plan-001.json").exists())
         self.assertFalse(self.planner.finished())
@@ -257,6 +266,14 @@ class OrchestratorTest(FakeBinCase):
         self.assertIsNone(self.ask())
         error = json.loads((self.project / "runs/acme-1/plan/error-001.json").read_text())
         self.assertIn("nobody is not an agent", error["error"])
+
+    def test_a_batch_written_as_text_is_read_with_defaults(self):
+        from springer_harness.providers.claude_code import json_from_text
+        from springer_harness.scheduler.orchestrator import normalize
+        text = 'Here:\n```json\n{"units": [{"key": "prd", "agent": "a", "brief": "b"}], "done": false}\n```\nPRD first.'
+        found = normalize(json_from_text(text), text)
+        self.assertEqual((found["phase"], found["rationale"], found["units"][0]["model_tier"]),
+                         ("planning", "PRD first.", "sonnet"))
 
     def test_done_with_no_units_finishes_the_run(self):
         self.plan_file.write_text(json.dumps({**self.PLAN, "done": True, "units": []}))

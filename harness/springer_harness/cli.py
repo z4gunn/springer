@@ -20,7 +20,7 @@ from pathlib import Path
 from .build import build_id
 
 DEFAULT_PORT = 7337
-START_TIMEOUT_SECONDS = 15
+START_TIMEOUT_SECONDS = 45
 
 
 def default_home():

@@ -87,12 +87,30 @@ Rules for the schema:
   billing, infra, or CI, L3 for a unit that must not start before a person decides.
 - gates: only the gates the autonomy level fires (under standard, one direction-review
   holding the units that need the picked option and direction). holds names unit keys.
+- A unit in blocked, gated, or planned behind a gate is waiting on a person, and the
+  answer resumes that same unit. Never route its work again under a new key.
 - done: true only when the profile's work is finished and nothing remains to route.
   Return an empty units list with done false when everything left is held.
 
 Run state:
 {state}
 """
+
+
+def normalize(output, text=None):
+    """Defaults for what a reply parsed from text may leave out, where the schema
+    would have required it. A reply that is not an object stays as it is."""
+    if not isinstance(output, dict):
+        return output
+    output = {"done": False, "phase": "planning", "next_phase": None, "units": [], "gates": [], **output}
+    output.setdefault("rationale", "")
+    if not output["rationale"] and text:
+        output["rationale"] = _summary(text.rsplit("```", 1)[-1], 400)
+    output["units"] = [{"expected_outcome": u.get("brief", "")[:200], "declared_paths": [], "depends_on": [],
+                        "risk_baseline": "L0", "model_tier": "sonnet", **u} for u in output["units"]]
+    output["gates"] = [{"holds": [], "options": [{"option": "proceed", "consequence": "The held units start."}], **g}
+                       for g in output["gates"]]
+    return output
 
 
 def _summary(text, limit=600):
@@ -190,6 +208,7 @@ class OrchestratorPlanner:
         try:
             found = run_once(self.binary, self.project, prompt, agent="spgr-agent-orchestrator", model=self.model,
                              schema=SCHEMA, log=self.folder / f"plan-{n:03d}.log")
+            found["output"] = normalize(found["output"], found.get("text"))
             problems = self.problems(found["output"], state)
             if problems:
                 raise ValueError("; ".join(problems))

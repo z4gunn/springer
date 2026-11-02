@@ -54,6 +54,41 @@ detail "waiting on a person", and stop.
 """
 
 
+def permissions(cwd):
+    """The project's own allow and deny lists, passed as flags. Claude Code ignores a
+    settings file's allowlist in a directory nobody marked trusted, and every unit
+    worktree is a new directory, so the flags carry the allowlist instead."""
+    try:
+        settings = json.loads((Path(cwd) / ".claude" / "settings.json").read_text())
+    except (OSError, ValueError):
+        return [], []
+    found = settings.get("permissions") or {}
+    return list(found.get("allow") or []), list(found.get("deny") or [])
+
+
+def role_prompt(cwd, agent):
+    """An agent file's body, for a call that needs tools its frontmatter leaves out."""
+    path = Path(cwd) / ".claude" / "agents" / f"{agent}.md"
+    if not path.exists():
+        return ""
+    text = path.read_text()
+    return text.split("---", 2)[2].strip() if text.startswith("---") else text
+
+
+def json_from_text(text):
+    """The last JSON object in a reply, fenced or bare, or None."""
+    import re
+    blocks = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text or "", re.S) or [text or ""]
+    for block in reversed(blocks):
+        try:
+            found = json.loads(block)
+            if isinstance(found, dict):
+                return found
+        except ValueError:
+            continue
+    return None
+
+
 def _iso(epoch):
     return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -197,6 +232,7 @@ class ClaudeCodeProvider:
         """The shared preamble, unchanged so repeat dispatches share a cached prefix,
         then the line naming this unit's brief."""
         brief_path = Path(request.session_dir) / "brief.md"
+        brief_path.parent.mkdir(parents=True, exist_ok=True)
         env = request.env
         contract = OUTPUT_CONTRACT.format(session_dir=request.session_dir,
                                           run_dir=Path(env.get("SPRINGER_PROJECT_DIR", ".")) / "runs" /
@@ -209,10 +245,18 @@ class ClaudeCodeProvider:
         return preamble.rstrip() + f"\n{brief_path}\n"
 
     def command(self, request):
-        return [self.binary, "-p", self.prompt(request), "--output-format", "stream-json", "--verbose",
-                "--agent", request.agent, "--model", TIERS.get(request.model_tier, request.model_tier),
-                "--permission-mode", "acceptEdits", "--disallowedTools", "AskUserQuestion",
-                *self.extra_args]
+        allow, deny = permissions(request.cwd)
+        command = [self.binary, "-p", self.prompt(request), "--output-format", "stream-json", "--verbose",
+                   "--agent", request.agent, "--model", TIERS.get(request.model_tier, request.model_tier),
+                   "--permission-mode", "acceptEdits", "--disallowedTools", "AskUserQuestion", *deny]
+        run_dir = request.env.get("SPRINGER_PROJECT_DIR") and request.env.get("SPRINGER_RUN_ID")
+        if run_dir:
+            # The brief, the session directory, and the run artifacts live in the run
+            # store in the main checkout, outside the worktree the session works in.
+            command += ["--add-dir", str(Path(request.env["SPRINGER_PROJECT_DIR"]) / "runs" / request.env["SPRINGER_RUN_ID"])]
+        if allow:
+            command += ["--allowedTools", *allow]
+        return command + list(self.extra_args)
 
     def environment(self, request):
         env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "CLAUDECODE")}
@@ -229,8 +273,14 @@ def run_once(binary, cwd, prompt, agent=None, model="sonnet", schema=None, timeo
     Used for the judgment steps the daemon asks for outside a unit (e.g. Plan)."""
     cmd = [shutil.which(binary) or binary, "-p", prompt, "--output-format", "json", "--model", model,
            "--permission-mode", "acceptEdits", "--disallowedTools", "AskUserQuestion"]
-    if agent:
-        cmd += ["--agent", agent]
+    # The role goes in as a system prompt, not --agent: an agent's tool list would
+    # leave out the tool that returns structured output.
+    role = role_prompt(cwd, agent) if agent else ""
+    if role:
+        cmd += ["--append-system-prompt", role]
+    allow, _ = permissions(cwd)
+    if allow:
+        cmd += ["--allowedTools", *allow]
     if schema:
         cmd += ["--json-schema", json.dumps(schema)]
     env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "CLAUDECODE")}
@@ -244,5 +294,8 @@ def run_once(binary, cwd, prompt, agent=None, model="sonnet", schema=None, timeo
         raise RuntimeError(f"claude returned no JSON (exit {done.returncode}): {done.stderr[-500:]}")
     if body.get("is_error"):
         raise RuntimeError(body.get("result") or "claude reported an error")
-    return {"output": body.get("structured_output"), "text": body.get("result"),
+    output = body.get("structured_output")
+    if output is None and schema:
+        output = json_from_text(body.get("result"))
+    return {"output": output, "text": body.get("result"),
             "cost": body.get("total_cost_usd"), "seconds": round(time.time() - started)}

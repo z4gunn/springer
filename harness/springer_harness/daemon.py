@@ -136,6 +136,7 @@ class Daemon:
         write_json(path / "runs" / run_id / "run-brief.json", doc)
         if kind == "build":
             self._stamp_profile(path, derived["profile"])
+            self.commit_brief(slug, path, run_id)
             if hasattr(self.source_host, "ensure_remote"):
                 private = (self.config or {}).get("private_repos", True)
                 try:
@@ -144,6 +145,23 @@ class Daemon:
                     raise InvalidArgs(f"the project has no GitHub repository and one could not be made: {exc}")
         self.engines[(slug, run_id)] = self._new_engine(slug, path, run_id, kind)
         return run_id
+
+    def commit_brief(self, slug, path, run_id):
+        """Start run is the commit: a unit's worktree is cut from a commit, so a brief
+        that lives only in the working tree is a brief no session can read."""
+        brief = "docs/brief.md"
+        changed = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "--", brief],
+                                 capture_output=True, text=True).stdout.strip()
+        if not changed:
+            return
+        subprocess.run(["git", "-C", str(path), "add", "--", brief], capture_output=True)
+        done = subprocess.run(["git", "-C", str(path), "-c", "user.name=Springer", "-c", "user.email=springer@local",
+                               "commit", "-q", "-m", f"docs: the brief for {run_id}", "--", brief],
+                              capture_output=True, text=True)
+        if done.returncode:
+            sys.stderr.write(f"could not commit the brief in {path}: {done.stderr.strip()}\n")
+        elif hasattr(self.source_host, "publish"):
+            self.source_host.publish(slug, "HEAD")
 
     def _stamp_profile(self, path, profile):
         """Scaffolding happens before the brief exists, so the ruleset learns its profile
