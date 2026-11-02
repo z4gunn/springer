@@ -209,19 +209,7 @@ A lane says what kind of change a run makes. `build` takes a product that does n
 
 The harness automates the loop a person otherwise runs by hand. The orchestrator decides the next unit of work and then stops. The `spgr-run-harness` skill is the loop around it. It reads run state, asks the orchestrator what runs next, dispatches the work, checks the result, records the tick, and repeats, pausing only at the human gates. It models the cycle as Plan-Do-Check-Act. Plan is the orchestrator routing the next batch of work. Do is each domain agent producing its artifact. Check is schema validation, the read-only vertical audits, and evidence a script can hold: every gating command a unit runs writes a receipt with its exit code, the number of tests that ran, and the commit and tree it ran on, and a pull request does not reach its merge gate while a receipt is failed, stale, or zero-run. The reviewer reads a package that opens with every change that eases a gate (a skipped or removed test, a loosened check config, an edited real fixture, a file outside the story) and answers each one, and an instance hook refuses an agent edit to an existing check config outright. Act records the transition and then advances, retries a failure, routes an escalation, or pauses at a gate. A failure is classified before it is retried: a platform glitch, a context overflow, an agent that stopped to ask, and a broken tool each get their own response, and only a real defect spends one of the two bounded retries. The harness dispatches under a token-economy rule set: every dispatch opens with the same fixed contract so repeat dispatches reuse a cached prompt prefix, bounded fixes go to fresh agents, mechanical units go to the smallest model tier, and each story carries a compact context brief so units read a projection instead of the full artifact corpus. At the end of a run the retrospective records what it learned, and a mistake a script could catch must name the check that will catch it next time rather than add a paragraph of rules.
 
-To start a run, open this repository in Claude Code and ask for the harness by name, giving it a run id and a one-paragraph problem statement:
-
-```
-Use spgr-run-harness to start run-id acme-1 on this problem: <one paragraph>
-```
-
-The harness drives phase to phase and stops at the first human gate that holds all work, for example the direction review under `standard` or prd-approval under `supervised`. It writes a checkpoint and reports what it needs. Answer the checkpoint, then ask the harness to resume:
-
-```
-The architecture gate is answered, resume spgr-run-harness for run-id acme-1
-```
-
-Start and resume are the same path. On every entry the harness rehydrates from disk, so a run survives being stopped and is safe to pick up later. Run the harness in the main Claude session, never as a subagent, because it dispatches the orchestrator and the domain agents as its own subagents.
+To start a run, type `springer` in a terminal. It starts the daemon when none is running and opens the TUI, where you write the brief and start. The harness drives phase to phase and stops at the human gates, which you answer in the TUI. On this branch the daemon runs a mock provider, so a real project needs step 6 of the build plan, or `main`.
 
 What a run leaves behind, all under `runs/<run-id>/`:
 
@@ -230,17 +218,11 @@ What a run leaves behind, all under `runs/<run-id>/`:
 - `run-state.json`, a derived projection of where the run is now: phase, WIP board, open gates, and open escalations. It is a cache that the harness rebuilds from the cycle log, never edited by hand.
 - A `hil-checkpoint` artifact at each gate, and an `escalation` artifact whenever an agent refuses to proceed on a real risk rather than guessing.
 
-The loop rules, the rehydration algorithm, the parallel barrier, and the advisory-learnings model are in `.claude/references/pdca-harness.md`.
+The loop rules, the rehydration algorithm, the scheduling rules, and the advisory-learnings model are in `.claude/references/pdca-harness.md`.
 
 ### Leave a run going unattended
 
-Start the run with `autonomy: autopilot` in the problem statement and answer the one direction review. Then, from a terminal in the project:
-
-```bash
-python3 .claude/skills/spgr-run-harness/scripts/run-unattended.py acme-1
-```
-
-The driver runs the harness in back-to-back headless sessions, each starting with a fresh context, so a full context window never waits for you. It sleeps through a usage limit until the reset, and stops after three failed or two idle sessions so a stuck run does not burn a night. Under autopilot, `pr-risk.py` scores every pull request once the reviewer approves and CI is green. Low and medium risk merge on their own. High risk waits for you: auth, the data model or a destructive migration, billing, a new vendor, CI and infra, secrets, an open Critical or High finding, or a placeholder for a fact only you have. A high-risk PR holds only the work that depends on it. Production deploys always wait. When the run completes or every remaining item waits on you, the driver posts to the Slack incoming webhook in `SPRINGER_SLACK_WEBHOOK_URL` (set it in `.env`). It falls back to a macOS notification and always writes `runs/<run-id>/unattended-status.md`. Tools are allowed by the instance settings allowlist, with edits accepted, so a command outside the list is refused rather than left waiting at a prompt.
+Quit the TUI while a run is in progress and the daemon keeps it going. Run `springer` to come back. `run-unattended.py` drove the old in-session loop and no longer has anything to drive. It is removed once the daemon has done a real run.
 
 The backlog is an epic, feature, then story, task, or bug hierarchy, and the orchestrator finishes a whole feature, product check included, before it starts the next.
 

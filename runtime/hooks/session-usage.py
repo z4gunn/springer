@@ -111,7 +111,8 @@ def scan(transcript_path, state):
 
 def main():
     payload = json.load(sys.stdin)
-    project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or "."
+    # A daemon session runs in a worktree, and the run store is not in a worktree.
+    project_dir = os.environ.get("SPRINGER_PROJECT_DIR") or os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or "."
     session_id = payload.get("session_id") or "unknown"
     transcript = payload.get("transcript_path")
     if not transcript or not os.path.isfile(transcript):

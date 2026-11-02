@@ -47,6 +47,11 @@
             "null"
           ],
           "description": "Workstream this unit belongs to, for WIP accounting and parallel scheduling."
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$",
+          "description": "The unit a daemon-written cycle routed."
         }
       }
     },
@@ -153,7 +158,8 @@
                     "enum": [
                       "completed",
                       "failed",
-                      "skipped"
+                      "skipped",
+                      "pending"
                     ]
                   }
                 }
@@ -255,11 +261,28 @@
               "description": "Each failed unit as classify-failure.py named it. Only a defect spends a bounded retry.",
               "items": {
                 "type": "object",
-                "required": ["unit_id", "class"],
+                "required": [
+                  "unit_id",
+                  "class"
+                ],
                 "properties": {
-                  "unit_id": { "type": "string", "minLength": 1 },
-                  "class": { "type": "string", "enum": ["transient", "context", "blocked", "environment", "defect"] },
-                  "evidence": { "type": "string" }
+                  "unit_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "class": {
+                    "type": "string",
+                    "enum": [
+                      "transient",
+                      "context",
+                      "blocked",
+                      "environment",
+                      "defect"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "string"
+                  }
                 }
               }
             },

@@ -1,7 +1,7 @@
 # PDCA harness reference
 
-Detail for the spgr-run-harness skill: the per-tick state machine, the
-rehydration algorithm, the parallel barrier and scheduling rules, gate and
+Policy for the harness daemon, which drives every run: the per-tick state machine, the
+rehydration algorithm, the scheduling rules, gate and
 escalation handling, the advisory-learnings mechanism, and the determinism
 scripts. The skill body holds the loop. This file holds the rules behind it.
 
@@ -16,7 +16,7 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 - Product check
 - Verdict and transition table
 - Rehydration: start equals resume
-- Parallel Do: the barrier and disjoint scheduling
+- Parallel Do: disjoint scheduling
 - Token economy and dispatch efficiency
 - Dispatch contract
 - Main-session budget and unattended runs
@@ -330,20 +330,20 @@ The held batch lives in the checkpoint's `held_batch` field, or in the paused
 pdca-cycle artifact for a gate that holds all work, never in checkpoint prose,
 so resume is deterministic.
 
-## Parallel Do: the barrier and disjoint scheduling
+## Parallel Do: disjoint scheduling
 
-Multiple domain subagents dispatched in one main-session turn run concurrently.
-The turn boundary is the fork-join barrier: the harness does not proceed to Check
-or Act until every dispatched agent has returned. Because all run-state writes
-happen in the main session after the barrier, there is a single writer and no
-concurrent-write hazard.
+The daemon runs units concurrently, each in its own session and worktree, and it is the
+only writer of run state. Cycles may overlap: it plans a new cycle whenever the ready
+queue is empty and WIP and usage-window room exist, and it knows from each unit's
+declared paths which units can run together. A cycle closes when every unit it routed is
+terminal, and a new one does not wait for it. See `state-model.md`.
 
 Two rules keep a parallel batch safe.
 - Disjoint work only. Co-scheduled units must be file-disjoint. If two units
   would edit the same file, the orchestrator serializes them instead.
-- WIP limits are hard. At most two stories each in development, review, and
-  validation, encoded as a maxItems cap in the run-state schema. Never exceed a
-  limit to make progress. Queue the excess.
+- WIP limits are hard. The scheduler enforces them at dispatch. Never exceed a limit to
+  make progress. Queue the excess. An L2 hold does not count against dispatch, because
+  a hold stops the merge and never the agent.
 
 The read-only audit fan-out in Check parallelizes with zero contention and is the
 low-risk half of parallelism.
@@ -366,27 +366,9 @@ remove .worktrees/<branch>` and keeps the branch. A removal git refuses is
 left in place and reported, never forced. A batch with a single build unit
 may still work in the main checkout.
 
-A cycle is not closed while a unit it dispatched is still running, and a new
-cycle is not planned while any dispatch from a prior cycle lacks a completion.
-A background agent outlives the turn that dispatched it, so the turn boundary
-alone does not enforce the barrier. `derive-ready-queue.py` reads
-`events.jsonl`, reports `unjoined_dispatches`, and sets blocked while any exist.
-The check keys on unmatched dispatch ids, never on elapsed time. When a dispatch
-is known dead (a session-limit death, a killed agent), the harness appends an
-`agent_abandoned` event carrying the same tool_use_id to release it.
-
-The run is single-writer at the session level too. On entry the harness
-claims the run with `claim-run.py <run-dir> claim <session-id>` and re-claims
-at every tick as a heartbeat, and `derive-ready-queue.py --session <id>` sets
-blocked while another session's live lock exists. On exit the harness releases
-it. A lock not refreshed for thirty minutes is stale and is taken over.
-
-Dispatch in the foreground. Several Agent calls in one turn already run in
-parallel, and a foreground call returns when its agent finishes, so the hook's
-completion event is a real join. A background dispatch (`run_in_background`)
-returns at once, the hook logs it as `agent_backgrounded`, and it stays
-un-joined until the harness appends `agent_joined` with its tool_use_id when
-the task notification arrives.
+The run is single-writer. The daemon holds `runs/<run-id>/.lock` with a `daemon:` id and
+refreshes it at every tick. A session that finds a live lock it does not hold leaves the
+run alone. A lock not refreshed for thirty minutes is stale and is taken over.
 
 ## Token economy and dispatch efficiency
 

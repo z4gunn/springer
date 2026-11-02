@@ -15,6 +15,7 @@ Usage:
     python3 scripts/update-project.py adopt <target> --profile <profile> [--force]
     python3 scripts/update-project.py update <target> [--dry-run] [--force]
     python3 scripts/update-project.py status <target>
+    python3 scripts/update-project.py set-profile <target> <profile>
 
 manifest  writes <target>/.claude/springer-manifest.json from the files now
           in the target. new-project.sh calls it after the initial copy.
@@ -28,6 +29,9 @@ update    brings the target up to this checkout. Per runtime file: added when
           hand merge. Refuses to touch a target with a live run lock unless
           --force, because a harness may be mid-tick.
 status    prints what update would do, same as update --dry-run.
+set-profile  records the profile a project's brief derives. The ruleset is re-stamped
+          only when the instance never edited it, and the manifest follows, so an
+          update does not read the change as a local edit.
 adopt     installs the runtime into an existing repository that was not made
           by new-project.sh. Never deletes or replaces a file the repository
           already has: a runtime path that already holds different content
@@ -505,16 +509,45 @@ def cmd_update(target, dry_run, force):
     return 0
 
 
+def cmd_set_profile(target, profile):
+    """Record the profile a brief derives. The ruleset an instance edited is left alone,
+    and reported, because it is theirs."""
+    manifest = load_manifest(target)
+    if manifest is None:
+        sys.stderr.write(f"{target} has no {MANIFEST_REL}\n")
+        return 1
+    if manifest.get("profile") == profile:
+        print(f"profile is already {profile}")
+        return 0
+    rel = manifest.get("claude_md") or "CLAUDE.md"
+    pristine = (target / rel).exists() and sha256(target / rel) == sha256_text(renders_for(SOURCE, manifest)[rel][1])
+    manifest["profile"] = profile
+    render = renders_for(SOURCE, manifest)[rel][1]
+    manifest["templates"][rel]["rendered_hash"] = sha256_text(render)
+    if pristine:
+        (target / rel).write_text(render)
+        print(f"profile set to {profile} in {rel}")
+    else:
+        print(f"profile set to {profile}. {rel} has local edits and was left as it is.")
+    write_manifest(target, manifest)
+    return 0
+
+
 def main(argv):
     args = [a for a in argv[1:] if not a.startswith("--")]
     flags = [a for a in argv[1:] if a.startswith("--")]
-    if len(args) < 2 or args[0] not in ("manifest", "adopt", "update", "status"):
+    if len(args) < 2 or args[0] not in ("manifest", "adopt", "update", "status", "set-profile"):
         sys.stderr.write(__doc__)
         return 2
     target = Path(args[1]).resolve()
     if not target.is_dir():
         sys.stderr.write(f"no such directory: {target}\n")
         return 1
+    if args[0] == "set-profile":
+        if len(args) < 3 or args[2] not in PROFILES:
+            sys.stderr.write(f"set-profile needs one of {', '.join(PROFILES)}\n")
+            return 2
+        return cmd_set_profile(target, args[2])
     if args[0] in ("manifest", "adopt"):
         profile = None
         if "--profile" in argv:

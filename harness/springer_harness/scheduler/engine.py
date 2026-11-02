@@ -21,6 +21,11 @@ from ..state.sessions import SessionStore
 from ..state.units import MAX_RETRIES, TIERS, UnitStore, is_terminal
 from .plan import Snapshot
 
+GATE_TYPES = ("direction-review", "architecture-options-selection", "architecture-confirmation", "prd-approval",
+              "design-direction-selection", "pr-merge", "security-compliance-flag", "scope-change", "discovery-go-no-go",
+              "structure-confirmation", "scope-review", "taste-review", "production-release", "provisioning-required")
+DECISION_KINDS = ("question", "prd-approval", "architecture-options-selection", "design-direction-selection",
+                  "default-review")
 MERGE_OPTIONS = [
     {"option": "approve", "consequence": "It merges, and stacked work can follow.",
      "recommended_because": "Reviewed and green. Read the findings first."},
@@ -243,6 +248,8 @@ class RunEngine:
     def _check_one(self, state):
         unit_id = state["unit_id"]
         session_dir = self.sessions(unit_id).dir(state["sessions"][-1])
+        if self._raise_requested_gate(unit_id, state["sessions"][-1], session_dir):
+            return
         result = read_result(session_dir)
         if result.status != "pass":
             self._on_failure(unit_id, state, result)
@@ -255,6 +262,28 @@ class RunEngine:
         else:
             self.units.transition(unit_id, "done", "artifact confirmed")
         self._release(unit_id)
+
+    def _raise_requested_gate(self, unit_id, session_id, session_dir):
+        """A headless session asks for a person by leaving gate-request.json. A request
+        the schema would refuse is a defect in the session and falls through to Check."""
+        request = read_json(session_dir / "gate-request.json")
+        if not isinstance(request, dict):
+            return False
+        options = request.get("options")
+        decisions = request.get("decisions") or []
+        if request.get("checkpoint_type") not in GATE_TYPES or not request.get("decision_prompt") \
+                or not options or not all(isinstance(o, dict) and o.get("option") and o.get("consequence") for o in options) \
+                or not all(isinstance(d, dict) and d.get("decision_id") and d.get("kind") in DECISION_KINDS and d.get("prompt")
+                           for d in decisions):
+            return False
+        key = f"{unit_id}/{session_id}"
+        # Check runs again after a crash, so the same request must not open two gates.
+        if not any(g["content"]["context"].get("gate_request") == key for g in self.gates.all()):
+            self.gates.open(request["checkpoint_type"], "L3", [unit_id], request["decision_prompt"], options,
+                            artifact_ref=request.get("artifact_ref") or "none", decisions=decisions or None,
+                            context={"gate_request": key})
+        self.units.transition(unit_id, "blocked", f"waiting on a gate: {request['decision_prompt']}")
+        return True
 
     def _on_failure(self, unit_id, state, result):
         cause = result.failure_class or "defect"
@@ -361,7 +390,17 @@ class RunEngine:
                     self.units.transition(unit_id, "cancelled", f"gate {content['checkpoint_id']} answered cancel",
                                           cancelled_by=response["by"])
                 elif state["state"] == "blocked" and self._last_gate(unit_id) == content["checkpoint_id"]:
+                    if content["context"].get("gate_request"):
+                        self._append_note(unit_id, self._answer_note(content, response))
                     self.units.transition(unit_id, "ready", f"gate {content['checkpoint_id']} answered {option}")
+
+    def _answer_note(self, content, response):
+        """What the next session's brief says about the gate this unit asked for."""
+        parts = [f"The human answered: {content['decision_prompt']} Answer: {response['option']}."]
+        if response.get("free_text"):
+            parts.append(f"Notes: {response['free_text']}")
+        parts += [f"{d['prompt']} {d['response']}" for d in content.get("decisions", []) if d.get("response")]
+        return " ".join(parts)
 
     def _last_gate(self, unit_id):
         gates = self.gates.holding(unit_id)
@@ -499,7 +538,9 @@ class RunEngine:
         request = SpawnRequest(unit_id=unit_id, session_id=session_id, agent=spec["agent"],
                                role_prompt_ref=spec["role_prompt_ref"], model_tier=tier, brief=brief,
                                allowlist=tuple(spec["allowlist"]), mcp_config_ref=spec["mcp_config_ref"],
-                               cwd=self.worktrees.path(unit_id), session_dir=store.dir(session_id))
+                               cwd=self.worktrees.path(unit_id), session_dir=store.dir(session_id),
+                               env={"SPRINGER_PROJECT_DIR": str(self.project_path), "SPRINGER_RUN_ID": self.run_id,
+                                    "SPRINGER_SESSION_DIR": str(store.dir(session_id))})
         handle = self.provider.spawn(request)
         self.handles[(unit_id, session_id)] = handle
         store.create(self.provider.name, handle.model, tier, handle.pid, handle.provider_session_id, session_id)

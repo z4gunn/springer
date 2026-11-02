@@ -84,6 +84,71 @@ class SessionLifecycleTest(EngineCase):
         self.assertEqual(engine.sessions("U-0001").get("S-0001")["outcome"], "killed")
 
 
+class GateRequestTest(EngineCase):
+    """A headless session has nobody to ask, so it leaves a file and returns."""
+
+    REQUEST = {"checkpoint_type": "scope-change", "decision_prompt": "Drop the export feature?",
+               "options": [{"option": "drop", "consequence": "It goes."}, {"option": "keep", "consequence": "It stays."}],
+               "decisions": [{"decision_id": "D1", "kind": "question", "prompt": "Which format?"}]}
+
+    def run_until_blocked(self, request=None):
+        engine = self.engine([batch(unit("a"))])
+        self.provider.script["spgr-agent-backend-developer"] = [Attempt(ticks=2), Attempt()]
+        engine.tick()
+        session_dir = engine.sessions("U-0001").dir("S-0001")
+        session_dir.mkdir(parents=True, exist_ok=True)
+        (session_dir / "gate-request.json").write_text(json.dumps(request or self.REQUEST))
+        return engine
+
+    def test_it_opens_an_l3_gate_holding_the_unit_and_the_answer_reaches_the_next_brief(self):
+        engine = self.run_until_blocked()
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")
+        gate = engine.gates.open_gates()[0]["content"]
+        self.assertEqual((gate["level"], gate["holds"], gate["checkpoint_type"]), ("L3", ["U-0001"], "scope-change"))
+        self.assertEqual(list((engine.run_dir / "artifacts").glob("E-*.json")), [], "asking is not an escalation")
+        self.assertEqual(engine.units.state("U-0001")["retries_spent"], 0)
+        engine.gates.answer(gate["checkpoint_id"], "keep", "human", free_text="Users asked for it.",
+                            decisions=[{"decision_id": "D1", "response": "CSV"}])
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+        brief = self.provider.spawned[-1].brief
+        for needle in ("Drop the export feature?", "keep", "Users asked for it.", "Which format? CSV"):
+            self.assertIn(needle, brief)
+
+    def test_check_running_again_after_a_crash_opens_one_gate(self):
+        engine = self.run_until_blocked()
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")
+        state = engine.units.state("U-0001")
+        engine.units.save({**state, "state": "checking"})
+        engine.check()
+        self.assertEqual(len(engine.gates.all()), 1)
+
+    def test_a_malformed_request_is_a_defect_not_a_gate(self):
+        for bad in ({"checkpoint_type": "made-up", "decision_prompt": "x", "options": [{"option": "a", "consequence": "b"}]},
+                    {"checkpoint_type": "scope-change", "decision_prompt": "x", "options": []},
+                    {"checkpoint_type": "scope-change", "decision_prompt": "x", "options": [{"option": "a"}]},
+                    {**self.REQUEST, "decisions": [{"decision_id": "D1", "kind": "nope", "prompt": "x"}]}):
+            with self.subTest(bad):
+                shutil.rmtree(self.project / "runs", ignore_errors=True)
+                engine = self.run_until_blocked(bad)
+                self.tick_until(engine, lambda: len(engine.units.state("U-0001")["sessions"]) > 1
+                                or self.states(engine)["U-0001"] == "done")
+                self.assertEqual(engine.gates.all(), [])
+
+    @unittest.skipUnless(HAVE_JSONSCHEMA, "jsonschema not installed in this interpreter")
+    def test_the_gate_it_opens_validates(self):
+        engine = self.run_until_blocked()
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")
+        self.assertEqual(schema_errors("hil-checkpoint-v2", engine.gates.all()[0]), [])
+
+    def test_a_session_learns_where_the_run_store_is(self):
+        engine = self.engine([batch(unit("a"))])
+        engine.tick()
+        env = self.provider.spawned[0].env
+        self.assertEqual(env["SPRINGER_PROJECT_DIR"], str(self.project))
+        self.assertEqual(env["SPRINGER_RUN_ID"], "demo")
+        self.assertEqual(env["SPRINGER_SESSION_DIR"], str(engine.sessions("U-0001").dir("S-0001")))
+
+
 class FailureTest(EngineCase):
     def test_defect_spends_retries_goes_one_tier_up_then_blocks_with_a_gate(self):
         self.provider.script["spgr-agent-backend-developer"] = [Attempt(result=fail_result("defect"))]
@@ -555,6 +620,13 @@ class CannedRunTest(EngineCase):
                 if not gate["content"]["response"] and not gate["content"]["digest"]:
                     engine.gates.answer(gate["content"]["checkpoint_id"], gate["content"]["options"][0]["option"], "human")
             self.assertEqual(schema_errors("run-state-v2", engine.project(), reg), [])
+
+    def test_a_cycle_records_its_units_and_reads_pending_until_act(self):
+        engine = self.engine([batch(unit("a"))])
+        engine.tick()
+        content = engine.cycles.all()[0]["content"]
+        self.assertEqual(content["plan"]["routed_batch"][0]["unit_id"], "U-0001")
+        self.assertEqual(content["do"]["dispatched"][0]["status"], "pending")
 
     def test_the_projection_rebuilds_the_same_from_files_alone(self):
         engine = self.engine(canned_batches())

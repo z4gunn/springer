@@ -378,6 +378,48 @@ class MergeSettingsTest(unittest.TestCase):
         self.assertEqual(len(once["hooks"]["PostToolUse"]), 1)
 
 
+class SetProfileTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.source = Path(self.tmp.name) / "springer"
+        self.target = Path(self.tmp.name) / "app"
+        self.source.mkdir()
+        self.target.mkdir()
+        make_source(self.source)
+        original = up.SOURCE
+        self.addCleanup(setattr, up, "SOURCE", original)
+        up.SOURCE = self.source
+        with contextlib.redirect_stdout(io.StringIO()):
+            instantiate(self.source, self.target, "small")
+
+    def set(self, profile):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return up.cmd_set_profile(self.target, profile)
+
+    def test_it_stamps_the_ruleset_and_an_update_then_has_nothing_to_do(self):
+        self.assertEqual(self.set("saas"), 0)
+        self.assertIn("Default profile for this project: `saas`.", (self.target / "CLAUDE.md").read_text())
+        manifest = json.loads((self.target / up.MANIFEST_REL).read_text())
+        self.assertEqual(manifest["profile"], "saas")
+        plan = up.plan_update(self.target, self.source, manifest)
+        self.assertEqual(plan["template_merge"], [], "the stamp is not a local edit")
+        self.assertIn("CLAUDE.md", plan["template_unchanged"])
+
+    def test_a_ruleset_the_instance_edited_is_left_alone(self):
+        path = self.target / "CLAUDE.md"
+        path.write_text(path.read_text() + "My own rule.\n")
+        self.assertEqual(self.set("saas"), 0)
+        self.assertIn("My own rule.", path.read_text())
+        self.assertIn("`small`", path.read_text())
+        self.assertEqual(json.loads((self.target / up.MANIFEST_REL).read_text())["profile"], "saas")
+
+    def test_setting_the_same_profile_changes_nothing(self):
+        before = (self.target / up.MANIFEST_REL).read_text()
+        self.assertEqual(self.set("small"), 0)
+        self.assertEqual((self.target / up.MANIFEST_REL).read_text(), before)
+
+
 class NewProjectIntegrationTest(unittest.TestCase):
     """The real new-project.sh on the real checkout: the sed render and the
     Python render must agree, and a fresh instance must need no update."""

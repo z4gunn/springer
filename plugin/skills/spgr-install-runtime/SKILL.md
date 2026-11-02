@@ -24,7 +24,7 @@ Springer runs from a copy of its runtime inside each project, because its agents
    - `.claude/springer-manifest.json` exists: update. Run `python3 <root>/scripts/update-project.py status <target>`, show the person the summary, ask through the question tool whether to apply it, and on yes run `update <target>`.
    - The target is empty or does not exist: new instance. Ask for the profile with the four questions from the run-profiles rule (an app store, money or tenants, a user interface, otherwise `api`), then run `bash <root>/scripts/new-project.sh <target> <profile>`.
    - Anything else: adopt. Ask for the profile the same way, then run `python3 <root>/scripts/update-project.py adopt <target> --profile <profile>`. A refusal lists the runtime paths that already hold different content. Show the list and ask whether to move them aside or rerun with `--force`. Never pass `--force` without that answer.
-3. Report what the script printed, the default lane (`build` for a new instance, `polish` for an adopted repository), and the next step: start a run with the spgr-run-harness skill in the project.
+3. Report what the script printed, the default lane (`build` for a new instance, `polish` for an adopted repository), and the next step: run `springer` in a terminal and write the brief.
 
 ## Notes
 

@@ -23,6 +23,7 @@ class SpawnRequest:
     cwd: Path
     session_dir: Path
     attempt: int = 1
+    env: dict = field(default_factory=dict)  # set in the session's environment
 
 
 @dataclass(frozen=True)

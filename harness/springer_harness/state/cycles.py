@@ -29,9 +29,8 @@ class CycleStore:
         cycle["content"] = {
             "cycle_id": cycle_id, "cycle_number": int(cycle_id.rsplit("-", 1)[1]), "run_id": self.run_id,
             "phase": phase, "plan": {"routed_batch": routed_batch, "rationale": rationale},
-            # The schema requires a dispatch per routed unit. Each reads skipped until Act
-            # records what actually happened, so a cycle is valid while it is open.
-            "do": {"dispatched": [{"agent": i["agent"], "unit_id": i.get("unit_id"), "status": "skipped"}
+            # The schema requires a dispatch per routed unit, and Act records what happened.
+            "do": {"dispatched": [{"agent": i["agent"], "unit_id": i.get("unit_id"), "status": "pending"}
                                   for i in routed_batch]},
             "check": {"verdict": "gate", "validations": [], "audits": []},
             "act": {"transition": "pause", "state_changes": [], "versioned_refs": [], "escalation_ref": None,

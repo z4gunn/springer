@@ -29,7 +29,9 @@ REPO_ROOT = SCHEMA_DIR.parent
 try:
     import jsonschema  # noqa: F401
 except ImportError:
-    venv_py = REPO_ROOT / ".venv" / "bin" / "python"
+    # An instance holds this file at schemas/, and a Springer checkout at runtime/schemas/.
+    venv_py = next((p for p in (root / ".venv" / "bin" / "python" for root in (REPO_ROOT, REPO_ROOT.parent))
+                    if p.exists()), REPO_ROOT / ".venv" / "bin" / "python")
     # Re-exec once into the venv interpreter (kept as the symlink so pyvenv.cfg is
     # honored). The sentinel prevents an infinite loop if the import still fails.
     if venv_py.exists() and not os.environ.get("SPGR_VALIDATE_REEXEC"):

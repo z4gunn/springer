@@ -1,7 +1,7 @@
 # Springer Harness State Model
 
 Date: 2026-11-01
-Status: reference for the harness daemon, with its schemas under runtime/schemas/. Two edits it calls for land at step 5 of the branch sequence, because existing runtime files are not rewritten before then: the barrier paragraph in pdca-harness.md, and unit_id on work_item in pdca-cycle-v1. The in-session harness keeps the barrier rule until that edit.
+Status: reference for the harness daemon, with its schemas under runtime/schemas/.
 
 ## Contents
 
@@ -36,7 +36,7 @@ This reference defines the durable state the Springer harness daemon reads and w
 ## What changes
 
 1. The unit becomes a first-class entity with an id, a directory, a lifecycle, and its own records. Today a unit is a work_item nested in a cycle record with no identity of its own.
-2. Cycles may overlap. The current rule, no new cycle is planned while any prior dispatch lacks a completion, exists because the main session cannot know which files an in-flight unit touches. The daemon can, from the unit spec, so it plans a new cycle whenever the ready queue is non-empty and WIP and usage-window room exist, and checks disjointness against in-flight units. A cycle still closes only when every unit it routed is terminal. This is the one rule change to pdca-harness.md, and it displaces the barrier paragraph it replaces.
+2. Cycles may overlap. The current rule, no new cycle is planned while any prior dispatch lacks a completion, exists because the main session cannot know which files an in-flight unit touches. The daemon can, from the unit spec, so it plans a new cycle whenever the ready queue is non-empty and WIP and usage-window room exist, and checks disjointness against in-flight units. A cycle still closes only when every unit it routed is terminal. This is the one rule change to pdca-harness.md, and it displaced the barrier paragraph.
 3. Gates carry a risk level (L0 to L3) and the list of unit ids they hold. hil-checkpoint-v2 adds level and narrows holds to unit ids. An L2 gate holds the merge of the units it names and nothing else.
 4. Sessions are tracked as their own records, because a unit may run across more than one session (a handoff at the context threshold) and a session may die without returning.
 5. The lock is daemon-level with a heartbeat, in the same file and format claim-run.py uses, so the in-session shim and any stray Claude Code session see the lock and refuse to write.
@@ -50,7 +50,7 @@ This reference defines the durable state the Springer harness daemon reads and w
 | Brief | brief_version | docs/brief.md, projected to runs/<run_id>/run-brief.json | human, daemon projection |
 | Cycle | CYCLE-nnnn | runs/<run_id>/artifacts/ as pdca-cycle artifacts, as today | daemon at Plan and at Act |
 | Unit | U-nnnn | runs/<run_id>/units/U-nnnn/ | daemon writes spec and state, the session writes outputs |
-| Session | S-nnnn | runs/<run_id>/units/U-nnnn/sessions/S-nnnn/ | daemon and the session |
+| Session | S-nnnn | runs/<run_id>/units/U-nnnn/sessions/S-nnnn/, including gate-request.json when the session needs a person | daemon and the session |
 | Gate | G-nnnn | runs/<run_id>/artifacts/ as hil-checkpoint-v2 | daemon, answered through the API |
 | Escalation | E-nnnn | runs/<run_id>/artifacts/ as today | daemon |
 | Receipt | per gating command | runs/<run_id>/units/U-nnnn/receipts/ as today | receipt.py inside the session |
@@ -116,6 +116,8 @@ state.json holds: state, entered_at, history (state, at, reason), retries_spent,
 | exited | The process ended with a code and a return |
 | killed | The daemon ended it (cancel, budget, or shutdown) |
 | dead | The process is gone with no exit event, found at heartbeat or at daemon start |
+
+A session that needs a person writes gate-request.json in its session directory and returns. It holds a checkpoint_type, decision_prompt, and options, with artifact_ref and decisions optional, and Check opens the gate as L3 holding the unit. The answer goes into the next session's brief. A session holds no API token, so it can only ask.
 
 A unit in running has exactly one session not in a terminal state. A handoff spawns the next session for the same unit with handoff.md in its brief and the unit stays in running. A dead session puts the unit in abandoned.
 
@@ -203,7 +205,7 @@ Nothing in recovery asks a human. Everything it decides is written as events so 
 | run-state-v2.json | v1 plus the fields listed above |
 | usage-window-v1.json | the per-provider window file |
 
-pdca-cycle-v1 is unchanged. The work_item definition gains an optional unit_id so a cycle can reference the units it routed, and a cycle written by the daemon always sets it.
+pdca-cycle-v1 stays v1. The work_item definition gains an optional unit_id so a cycle can reference the units it routed, and a cycle written by the daemon always sets it. A dispatch status gains pending, because the daemon writes the cycle at Plan, before anything has run.
 
 ## Validation and evals
 

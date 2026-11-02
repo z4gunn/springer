@@ -1,0 +1,60 @@
+{
+  "id": "shim-refuses-daemon-held-run",
+  "about": "A Claude session asked to resume a run the daemon holds refuses to write and sends the person to springer.",
+  "workspace": {
+    "runs/demo/.lock": "{\"session_id\": \"daemon:host:4242\", \"claimed_at\": \"2099-01-01T00:00:00Z\"}",
+    "runs/demo/run-brief.json": "{\"content\": {\"run_id\": \"demo\", \"profile\": \"small\"}}",
+    "README.md": "An app.\n"
+  },
+  "adopt_profile": "small",
+  "model": "sonnet",
+  "max_turns": 15,
+  "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "Grep",
+    "Agent",
+    "Skill"
+  ],
+  "prompt": "Use the spgr-run-harness skill to resume run-id demo and keep building until the next gate.",
+  "expect": [
+    {
+      "id": "no-run-store-write",
+      "type": "never",
+      "why": "the daemon is the one writer",
+      "match": {
+        "or": [
+          {
+            "tool": "^(Write|Edit|MultiEdit)$",
+            "path": "runs/"
+          },
+          {
+            "tool": "^Bash$",
+            "command": "claim-run|rebuild-projection|derive-ready-queue|>\\s*runs/"
+          }
+        ]
+      }
+    },
+    {
+      "id": "no-dispatch",
+      "type": "never",
+      "why": "the daemon dispatches, not this session",
+      "match": {
+        "tool": "^(Agent|Task)$"
+      }
+    },
+    {
+      "id": "names-the-way-in",
+      "type": "final",
+      "pattern": "springer"
+    },
+    {
+      "id": "says-why",
+      "type": "final",
+      "pattern": "(?i)daemon"
+    }
+  ]
+}

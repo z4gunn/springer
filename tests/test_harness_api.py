@@ -4,6 +4,7 @@ cannot grow past its coverage. See Conformance in docs/harness/api-contract.md."
 
 import json
 import socket
+import subprocess
 import tempfile
 import threading
 import time
@@ -464,6 +465,20 @@ class OperationCatalogTest(ApiCase):
             self.assertEqual(schema_errors("pdca-cycle-v1", cycle), [])
         for line in (e.line for e in engine.ledger.read()):
             self.assertEqual(schema_errors("events-v1", line), [], line)
+
+    def test_run_start_writes_the_derived_profile_where_a_worktree_will_see_it(self):
+        target = self.root / "fresh"
+        self.confirmed("project.create", {"name": "Fresh", "path": str(target), "mode": "new"}, project=None)
+        self.assertIn("`small`", (target / "CLAUDE.md").read_text(), "scaffolded before the brief exists")
+        store = BriefStore(target)
+        version = store.load()[0]["brief_version"]
+        for name, body in GOOD_SECTIONS.items():
+            version = store.update_section(name, body, version)
+        version = store.update_facts({"payments": "subscription"}, version)
+        self.confirmed("run.start", {"base_version": version}, project="fresh")
+        self.assertIn("Default profile for this project: `saas`.", (target / "CLAUDE.md").read_text())
+        committed = subprocess.run(["git", "-C", str(target), "show", "HEAD:CLAUDE.md"], capture_output=True, text=True).stdout
+        self.assertIn("`saas`", committed, "a worktree is cut from a commit")
 
     def test_run_start_opens_a_run(self):
         body = self.confirmed("run.start", {"base_version": self.version})

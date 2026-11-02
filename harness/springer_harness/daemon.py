@@ -132,8 +132,28 @@ class Daemon:
         doc["content"] = {"run_id": run_id, "profile": derived["profile"], "kind": kind, "lane": derived["lane"],
                           "brief_version": front.get("brief_version", 1), "sections": sections}
         write_json(path / "runs" / run_id / "run-brief.json", doc)
+        if kind == "build":
+            self._stamp_profile(path, derived["profile"])
         self.engines[(slug, run_id)] = self._new_engine(slug, path, run_id, kind)
         return run_id
+
+    def _stamp_profile(self, path, profile):
+        """Scaffolding happens before the brief exists, so the ruleset learns its profile
+        here. It is committed because a unit's worktree is cut from a commit. A failure
+        is reported and does not stop the run, because the run reads the brief."""
+        files = ["CLAUDE.md", ".claude/springer-manifest.json"]
+        stamped = subprocess.run([sys.executable, str(SOURCE / "scripts" / "update-project.py"), "set-profile", str(path), profile],
+                                 capture_output=True, text=True)
+        if stamped.returncode:
+            sys.stderr.write(f"could not record profile {profile} in {path}: {stamped.stderr.strip()}\n")
+            return
+        changed = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "--", *files], capture_output=True, text=True)
+        if changed.stdout.strip():
+            committed = subprocess.run(["git", "-C", str(path), "-c", "user.name=Springer", "-c", "user.email=springer@local",
+                                        "commit", "-q", "-m", f"chore: record the {profile} profile", "--", *files],
+                                       capture_output=True, text=True)
+            if committed.returncode:
+                sys.stderr.write(f"could not commit profile {profile} in {path}: {committed.stderr.strip()}\n")
 
     # --- ticking ---
 

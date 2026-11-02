@@ -108,7 +108,8 @@ def detect_run_id(payload, project_dir):
 
 def main():
     payload = json.load(sys.stdin)
-    project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or "."
+    # A daemon session runs in a worktree, and the run store is not in a worktree.
+    project_dir = os.environ.get("SPRINGER_PROJECT_DIR") or os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or "."
     tool_input = payload.get("tool_input") or {}
     hook = payload.get("hook_event_name")
 
@@ -141,7 +142,7 @@ def main():
         match = AGENT_ID.search(json.dumps(payload.get("tool_response") or ""))
         event["agent_id"] = match.group(1) if match else None
 
-    run_id = detect_run_id(payload, project_dir)
+    run_id = os.environ.get("SPRINGER_RUN_ID") or detect_run_id(payload, project_dir)
     event["run_id"] = run_id
 
     if event["event"] == "agent_completed":
