@@ -153,6 +153,20 @@ class ProviderTest(FakeBinCase):
         self.assertEqual(args[args.index("--allowedTools") + 1], "Bash(pnpm test:*)")
         self.assertIn("Bash(git push --force:*)", args[args.index("--disallowedTools"):])
 
+    def test_a_directory_prefix_rule_becomes_one_rule_per_script(self):
+        """Claude Code matches a prefix rule on whole words, so a directory prefix never
+        matched a script inside it, and every receipt.py run was denied."""
+        scripts = self.root / ".claude/skills/spgr-run-harness/scripts"
+        scripts.mkdir(parents=True)
+        for name in ("receipt.py", "classify-failure.py"):
+            (scripts / name).write_text("")
+        (self.root / ".claude/settings.json").write_text(json.dumps({"permissions": {"allow": [
+            "Bash(python3 .claude/skills/spgr-run-harness/scripts/:*)", "Bash(npm:*)"]}}))
+        from springer_harness.providers.claude_code import permissions
+        allow, _ = permissions(self.root)
+        self.assertEqual(allow, ["Bash(python3 .claude/skills/spgr-run-harness/scripts/classify-failure.py:*)",
+                                 "Bash(python3 .claude/skills/spgr-run-harness/scripts/receipt.py:*)", "Bash(npm:*)"])
+
     def test_a_handoff_with_no_result_is_a_handoff(self):
         handle = ClaudeCodeProvider(str(self.claude)).spawn(self.request("handoff"))
         self.assertEqual(self.finish(handle).outcome, "handoff")

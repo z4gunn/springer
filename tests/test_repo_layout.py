@@ -3,6 +3,7 @@ so this checkout loads its own runtime, and an instance never sees either fact."
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -72,3 +73,16 @@ class ScaffoldTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HeadlessAllowlistTest(unittest.TestCase):
+    """A headless session cannot ask anyone to approve a command, and a Bash prefix rule
+    matches whole words, so every runtime script needs its own allow rule."""
+
+    def test_every_runtime_script_has_its_own_allow_rule(self):
+        allow = set(json.loads((REPO / "templates/project-settings.json").read_text())["permissions"]["allow"])
+        for script in sorted((REPO / "runtime/skills").glob("*/scripts/*.py")):
+            rel = script.relative_to(REPO / "runtime").as_posix()
+            self.assertIn(f"Bash(python3 .claude/{rel}:*)", allow, rel)
+        self.assertFalse([r for r in allow if re.search(r"/:\*\)$", r) and ".claude/skills/" in r],
+                         "a directory prefix rule matches no script inside it")

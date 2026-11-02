@@ -77,7 +77,23 @@ def permissions(cwd):
     except (OSError, ValueError):
         return [], []
     found = settings.get("permissions") or {}
-    return list(found.get("allow") or []), list(found.get("deny") or [])
+    return expand_directories(cwd, found.get("allow") or []), list(found.get("deny") or [])
+
+
+def expand_directories(cwd, rules):
+    """A Bash prefix rule matches whole words, so `Bash(python3 dir/:*)` never matches
+    `python3 dir/script.py`. Each such rule becomes one rule per file in the directory."""
+    import re
+    out = []
+    for rule in rules:
+        found = re.fullmatch(r"Bash\((\S+) (\S+/):\*\)", rule)
+        folder = Path(cwd) / found.group(2) if found else None
+        if folder and folder.is_dir():
+            out += [f"Bash({found.group(1)} {found.group(2)}{p.name}:*)" for p in sorted(folder.iterdir())
+                    if p.is_file() and not p.name.startswith(".")]
+        else:
+            out.append(rule)
+    return out
 
 
 def role_prompt(cwd, agent):
