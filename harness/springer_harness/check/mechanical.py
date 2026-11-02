@@ -74,7 +74,7 @@ def validate_artifacts(paths, project):
     return problems
 
 
-def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch):
+def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch, require_receipts=True):
     """A CheckResult for one returned session. The order is the in-session loop's:
     the result the session left, then receipts, then the artifacts it wrote."""
     session_dir, cwd = Path(session_dir), Path(cwd)
@@ -88,7 +88,7 @@ def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch)
         chosen = cls if cls in ("transient", "context", "environment") or not given else given
         detail = result.detail if has_result else f"no result.json. {evidence}"
         return replace(result, status="fail", failure_class=chosen, detail=detail.strip())
-    if result.outcome == "pr" and not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths):
+    if require_receipts and result.outcome == "pr" and not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths):
         problem = verify_receipts(session_dir, cwd)
         if problem:
             return replace(result, status="fail", failure_class="defect", detail=f"receipts do not hold: {problem}")

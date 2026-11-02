@@ -266,6 +266,8 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 | Type | Args | Confirm | Effect |
 |------|------|---------|--------|
 | project.create | `name`, `path` (absolute or starting with `~`), `mode` (new, adopt) | Yes | Scaffolds or adopts the repository and registers it. A client resolves a relative path against its own directory before sending it |
+| project.configure | `ci_signal` (receipts, self-hosted-actions, both), `staging` (`name`, `kind` static-dir or compose, then `source` and `path`, or `ssh`, `dir`, and `compose_file`, and an optional `health_url`), `clear_staging` | Yes | Sets the project's CI signal and staging host. Check requires receipts only when the signal includes them, and a merge waits for green Actions checks only when it includes them. A changed host is shown and confirmed again |
+| staging.deploy | `dry_run` | The first real deploy | A dry run lists the exact commands and runs nothing. A real deploy needs a dry run first, and its confirmation preview is those commands. Once confirmed, a merge deploys on its own |
 | project.archive | none | Yes | Hides the project and refuses a new run. Deletes nothing |
 | brief.update_section | `section`, `body`, `base_version` | After start | Writes the section and marks it confirmed. After `run.start` it opens a scope-change gate |
 | brief.update_facts | `facts`, `base_version` | After start | Writes the frontmatter and recomputes `derived`. After `run.start` it opens a scope-change gate |
@@ -308,6 +310,7 @@ This section is used to check the contract against what the target README promis
 |--------|---------|-----------|
 | Projects | List with status | GET /v1/projects, daemon stream |
 | Projects | New, open, archive | project.create, project.archive |
+| Projects | CI signal and staging, a dry run before the one deploy confirmation | project.configure, staging.deploy |
 | Brief | Editor, facts panel, derived profile | GET brief, brief.update_section, brief.update_facts |
 | Brief | Critique | GET brief/critique |
 | Brief | Every section as fields | GET brief, brief.update_section |

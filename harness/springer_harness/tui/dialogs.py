@@ -371,3 +371,61 @@ class FactsDialog(Dialog):
         facts["pinned"] = pinned
         self.dismiss(facts)
 
+
+
+CI_SIGNALS = ("receipts", "self-hosted-actions", "both")
+STAGING_KINDS = ("none", "static-dir", "compose")
+STAGING_FIELDS = (("name", "Host name", "a name for this host"),
+                  ("source", "Built dir", "static-dir: the folder in the repo to copy, e.g. site"),
+                  ("path", "Target path", "static-dir: where it goes on the host"),
+                  ("ssh", "SSH", "user@host, blank for this machine (static-dir)"),
+                  ("dir", "Host dir", "compose: the directory on the host"),
+                  ("compose_file", "Compose file", "compose: default compose.yml"),
+                  ("health_url", "Health URL", "checked after a deploy, optional"))
+
+
+class SettingsDialog(Dialog):
+    """A project's CI signal and staging host. Returns project.configure args."""
+
+    BINDINGS = [Binding("ctrl+s", "save", "Save", priority=True)]
+
+    def __init__(self, project, settings):
+        super().__init__()
+        self.project, self.settings = project, settings
+
+    def compose(self) -> ComposeResult:
+        staging = self.settings.get("staging") or {}
+        with Vertical(classes="dialog form"):
+            yield Static(f"Settings for {self.project}", classes="dialog-title", markup=False)
+            with Fields(classes="form-fields"):
+                with Horizontal(classes="form-row"):
+                    yield Label("CI signal")
+                    yield Select([(c, c) for c in CI_SIGNALS], id="set-ci", value=self.settings.get("ci_signal", "receipts"),
+                                 allow_blank=False, compact=True)
+                with Horizontal(classes="form-row"):
+                    yield Label("Staging")
+                    yield Select([(k, k) for k in STAGING_KINDS], id="set-kind", value=staging.get("kind", "none"),
+                                 allow_blank=False, compact=True)
+                for key, label, hint in STAGING_FIELDS:
+                    with Horizontal(classes="form-row"):
+                        yield Label(label)
+                        yield Input(str(staging.get(key, "")), id=f"set-{key}", placeholder=hint, compact=True)
+            yield Static("", id="form-error", markup=False)
+            yield Static(keys(("tab", "next"), ("ctrl+s", "save"), ("esc", "cancel")), classes="hint")
+
+    def on_input_submitted(self, event):
+        event.stop()
+        self.focus_next()
+
+    def action_save(self):
+        args = {"ci_signal": self.query_one("#set-ci", Select).value}
+        kind = self.query_one("#set-kind", Select).value
+        if kind == "none":
+            args["clear_staging"] = True
+        else:
+            host = {"kind": kind, **{key: self.query_one(f"#set-{key}", Input).value.strip()
+                                    for key, _, _ in STAGING_FIELDS}}
+            host = {k: v for k, v in host.items() if v}
+            if host != {**{k: v for k, v in (self.settings.get("staging") or {}).items() if v}}:
+                args["staging"] = host
+        self.dismiss(args)

@@ -688,6 +688,12 @@
             ],
             "title": "Runtime Version"
           },
+          "settings": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Settings",
+            "type": "object"
+          },
           "slug": {
             "title": "Slug",
             "type": "string"

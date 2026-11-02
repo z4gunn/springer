@@ -131,6 +131,10 @@ class MockSourceHost:
         self.merged = []
         self.retargeted = []
 
+    def checks(self, project, number):
+        """Scripted per PR in check_states, green by default."""
+        return getattr(self, "check_states", {}).get(number, ("pass", "mock checks"))
+
     def pr_state(self, project, number):
         return self.prs.get(number, "open")
 

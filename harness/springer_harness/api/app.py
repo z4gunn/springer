@@ -133,7 +133,7 @@ def create_app(daemon):
         return {"slug": slug, "name": record["name"], "path": record["path"], "profile": front.get("profile"),
                 "deploy": front.get("deploy"), "runtime_version": record.get("runtime_version"),
                 "archived": record.get("archived", False), "active_run": active,
-                "adopted": bool(record.get("adopted")), "lane": front.get("lane"),
+                "adopted": bool(record.get("adopted")), "lane": front.get("lane"), "settings": daemon.settings(slug),
                 "hand_merge": [p for p in record.get("hand_merge") or [] if (Path(record["path"]) / p).exists()]}
 
     def gate_view(engine, gate):

@@ -297,6 +297,32 @@ class MergePolicyTest(EngineCase):
         self.assertEqual(self.host.merged, [1])
         self.assertEqual(engine.gates.all(), [])
 
+    def actions_engine(self, deployed=None):
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        engine.settings = lambda: {"ci_signal": "self-hosted-actions", "staging": None}
+        engine.deployer = (lambda e: deployed.append(e.run_id)) if deployed is not None else None
+        return engine
+
+    def test_with_actions_as_the_ci_signal_the_merge_waits_for_green_checks(self):
+        self.host.check_states = {1: ("pending", "checks still running")}
+        deployed = []
+        engine = self.actions_engine(deployed)
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "gated")
+        for _ in range(3):
+            engine.tick()
+        self.assertEqual((self.states(engine)["U-0001"], self.host.merged), ("gated", []))
+        self.host.check_states = {1: ("pass", "2 check(s) green")}
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+        self.assertEqual((self.host.merged, deployed), ([1], [engine.run_id]), "a merge hands off to the deploy")
+
+    def test_a_failed_check_sends_the_unit_back_as_a_defect(self):
+        self.host.check_states = {1: ("fail", "failed: conformance")}
+        engine = self.actions_engine()
+        self.tick_until(engine, lambda: "U-0001" in engine.units.ids() and engine.units.state("U-0001")["retries_spent"] == 1)
+        self.assertEqual(self.host.merged, [])
+        notes = (engine.units.unit_dir("U-0001") / "redispatch-notes.txt").read_text()
+        self.assertIn("CI failed on PR 1: failed: conformance", notes)
+
     def test_l1_merges_alone_and_leaves_a_digest_entry_that_holds_nothing(self):
         engine = self.engine([batch(unit("a", agent="notable"))])
         self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")

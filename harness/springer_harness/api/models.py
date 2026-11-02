@@ -58,6 +58,7 @@ class ProjectSummary(BaseModel):
     adopted: bool = False
     hand_merge: list[str] = []  # renderings under .claude/springer-update/ awaiting a hand merge
     lane: str | None = None
+    settings: dict = {}  # ci_signal, staging, dry_run_seen, deploy_confirmed
 
 
 class SectionView(BaseModel):

@@ -57,6 +57,7 @@ class SpringerApp(App):
     DataTable > .datatable--hover { background: $background; }
     DataTable > .datatable--header-hover, DataTable > .datatable--header-cursor { background: $background; color: %(dim)s; }
     #projects, #backlog { height: 1fr; }
+    #project-notes { height: auto; padding: 0 2; }
     #board { height: 1fr; padding: 0 2; }
     #gates-box { height: auto; max-height: 50%%; background: %(card)s; border-left: thick %(you_bar)s; padding: 0 2; margin: 0 2; }
     #gates { height: auto; }

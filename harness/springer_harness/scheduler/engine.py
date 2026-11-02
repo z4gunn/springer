@@ -56,7 +56,7 @@ def overlaps(paths_a, paths_b):
 
 class RunEngine:
     def __init__(self, project_slug, project_path, run_id, provider, planner, source_host, worktrees, window, owner,
-                 now, in_flight_total=None):
+                 now, in_flight_total=None, settings=None, deployer=None):
         self.project_slug = project_slug
         self.project_path = Path(project_path)
         self.run_id = run_id
@@ -77,6 +77,8 @@ class RunEngine:
         self.lock = RunLock(self.run_dir, owner, now)
         self.handles = {}
         self.keys = self._load_keys()
+        self.settings = settings or (lambda: {"ci_signal": "receipts", "staging": None})
+        self.deployer = deployer
 
     # --- helpers ---
 
@@ -275,7 +277,8 @@ class RunEngine:
             return read_result(session_dir)
         record = self.sessions(unit_id).get(state["sessions"][-1])
         return mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path, unit_id,
-                                parse_iso(record["started_at"]))
+                                parse_iso(record["started_at"]),
+                                require_receipts=self.settings()["ci_signal"] in ("receipts", "both"))
 
     def _integrate(self, unit_id):
         """An artifact unit's commits (a PRD render, design directions) land on the
@@ -404,9 +407,13 @@ class RunEngine:
         if any(self.units.state(d)["state"] != "done" for d in deps):
             return
         number = state["pr"]["number"]
+        if not self._ci_green(unit_id, state, number):
+            return
         sha = self.source_host.merge(self.project_slug, number)
         self.ledger.append("merge", unit_id=unit_id, pr=number, sha=sha)
         self.units.transition(unit_id, "done", f"merged at {level}", merge={"sha": sha, "at": iso(self.now())})
+        if self.deployer:
+            self.deployer(self)
         if level == "L1":
             self.gates.open("routine-decision", "L1", [], f"{unit_id} merged at L1", [
                 {"option": "viewed", "consequence": "Closes this entry."}], artifact_ref=f"PR-{number}", digest=True)
@@ -415,6 +422,22 @@ class RunEngine:
                 base = self.worktrees.default_branch()
                 self.source_host.retarget(self.project_slug, other["pr"]["number"], base)
                 self.units.save({**other, "pr": {**other["pr"], "base": base}})
+
+    def _ci_green(self, unit_id, state, number):
+        """The merge waits for the project's CI signal. Receipts were verified at Check.
+        Actions checks are read from the PR: pending waits, a failure sends the unit
+        back as a defect, the same as a reviewer would."""
+        if self.settings()["ci_signal"] not in ("self-hosted-actions", "both") or not hasattr(self.source_host, "checks"):
+            return True
+        status, detail = self.source_host.checks(self.project_slug, number)
+        if status == "pass":
+            return True
+        if status == "fail":
+            self._append_note(unit_id, f"CI failed on PR {number}: {detail}")
+            self.units.transition(unit_id, "retry", f"defect: CI failed on PR {number}",
+                                  retries_spent=state["retries_spent"] + 1)
+            self._retire_merge_gates(unit_id)
+        return False
 
     def _apply_answers(self):
         """Carry out what each answered gate decided, once."""

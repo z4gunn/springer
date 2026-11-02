@@ -37,6 +37,24 @@ class GitHubSourceHost:
         self.sync(project)
         return sha
 
+    def checks(self, project, number):
+        """("pass" | "pending" | "fail", detail) over every check on the PR. A PR with
+        no checks at all is pending, because a configured CI signal that never reports
+        is not green."""
+        done = _run(["gh", "pr", "checks", str(number), "--json", "name,bucket"], self.project_path_of(project))
+        try:
+            checks = json.loads(done.stdout or "[]")
+        except ValueError:
+            return "pending", (done.stderr or "gh pr checks returned nothing").strip()[-300:]
+        if not checks:
+            return "pending", "no checks have reported yet"
+        failed = [c["name"] for c in checks if c.get("bucket") in ("fail", "cancel")]
+        if failed:
+            return "fail", "failed: " + ", ".join(failed)
+        if any(c.get("bucket") == "pending" for c in checks):
+            return "pending", "checks still running"
+        return "pass", f"{len(checks)} check(s) green"
+
     def retarget(self, project, number, base):
         self._gh(project, "pr", "edit", str(number), "--base", base)
 

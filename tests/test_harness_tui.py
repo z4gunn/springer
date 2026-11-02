@@ -37,7 +37,7 @@ if HAVE_TUI:
     from springer_harness.check.critique import critique, parse_flows, parse_users
     from springer_harness.tui import items
     from springer_harness.tui.dialogs import (NEW_USER, ConfirmDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog,
-                                              TextDialog)
+                                              SettingsDialog, TextDialog)
     from textual.widgets import Select
 
 GOOD = {"Problem": "Freelancers lose track of invoices.", "Users": "- Fran: a freelancer",
@@ -220,6 +220,31 @@ class ProjectsScreenTest(TuiCase):
             await self.create(pilot, "apps/fresh")
             await self.see(pilot, "Fresh")
         self.assertTrue((self.root / "apps" / "fresh" / ".claude").is_dir())
+
+    async def test_settings_and_a_dry_run_before_the_first_deploy(self):
+        (self.project / "site").mkdir()
+        (self.project / "site/index.html").write_text("hi")
+        served = self.root / "served"
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.see(pilot, "Acme", "receipts")
+            await pilot.press("e")
+            await self.dialog(pilot, SettingsDialog)
+            self.app.screen.query_one("#set-ci", Select).value = "both"
+            self.app.screen.query_one("#set-kind", Select).value = "static-dir"
+            for key, value in (("name", "box"), ("source", "site"), ("path", str(served))):
+                self.app.screen.query_one(f"#set-{key}", Input).value = value
+            await pilot.press("ctrl+s")
+            await self.dialog(pilot, ConfirmDialog)
+            await pilot.press("y")
+            await self.see(pilot, "both", "box static-dir (unconfirmed)", "Press D for a dry run")
+            await pilot.press("D")
+            await self.dialog(pilot, ConfirmDialog)
+            await self.see(pilot, "rsync -a --delete")
+            self.assertFalse(served.exists(), "nothing runs before the confirmation")
+            await pilot.press("y")
+            await self.until(pilot, lambda: (served / "index.html").exists())
+            await self.see(pilot, "box static-dir")
+            self.assertNotIn("(unconfirmed)", self.text())
 
     async def test_new_open_archive(self):
         target = self.root / "fresh"
@@ -972,6 +997,8 @@ class WholeRunTest(TuiCase):
 COVERAGE = {
     ("Projects", "List with status"): (ProjectsScreenTest, "test_list_with_status"),
     ("Projects", "New, open, archive"): (ProjectsScreenTest, "test_new_open_archive"),
+    ("Projects", "CI signal and staging, a dry run before the one deploy confirmation"):
+        (ProjectsScreenTest, "test_settings_and_a_dry_run_before_the_first_deploy"),
     ("Brief", "Editor, facts panel, derived profile"): (BriefScreenTest, "test_editor_facts_panel_and_derived_profile"),
     ("Brief", "Critique"): (BriefScreenTest, "test_critique"),
     ("Brief", "Every section as fields"): (BriefScreenTest, "test_core_flows_and_users_as_fields"),
@@ -1032,7 +1059,7 @@ class LookTest(unittest.TestCase):
     @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
     def test_terracotta_is_only_painted_on_what_needs_a_person(self):
         allowed = ("waiting on you", "needs you", "› ", "number", "waiting on provisioning", '"?"', "Discovery says",
-                   "unknowns", '"L2"')
+                   "unknowns", '"L2"', "Merge by hand")
         for name in ("panes.py", "app.py", "theme.py"):
             source = (REPO / "harness" / "springer_harness" / "tui" / name).read_text()
             for line in source.splitlines():
