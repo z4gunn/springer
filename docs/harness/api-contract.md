@@ -271,6 +271,7 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 | run.start | `base_version` | Yes | Commits the brief and opens the run. Fails with critique_errors while an error stands. Returns accepted |
 | run.pause | `reason` | No | Stops claiming and dispatching. In-flight sessions finish and Check still runs |
 | run.resume | none | No | Clears the pause |
+| run.cancel | none | Yes | Cancels every unfinished unit, closes its gates, and ends the run, so a new one can start. Open PRs stay open |
 | unit.cancel | `unit_id` | Yes | Kills the live session and moves the unit to cancelled |
 | unit.redispatch | `unit_id`, `model_tier` (optional, equal or higher) | Yes | Kills the live session if any and moves the unit to redispatch. No retry is spent |
 | gate.answer | `gate_id`, `option`, `decisions`, `free_text`, `rule_change` | With rule_change | Records the response and releases what the gate holds. `decisions` carries one `{decision_id, response}` per item of a one-sitting gate, and `free_text` carries the structure notes. `rule_change` updates the risk rules file |
@@ -317,7 +318,7 @@ This section is used to check the contract against what the target README promis
 | Run | Gate cards, recommended option first, consequences | GET {run}/gates, GET gate view, gate.answer |
 | Run | Risky merge diff | GET units/{unit_id}/diff |
 | Run | Feed of routine decisions | GET {run}/gates with `digest=true`, digest.mark_viewed |
-| Run | Cancel, re-dispatch, pause | unit.cancel, unit.redispatch, run.pause, run.resume |
+| Run | Cancel, re-dispatch, pause | unit.cancel, unit.redispatch, run.pause, run.resume, run.cancel |
 | Run | Waiting on usage window, list-price spend | `waiting_on`, GET /v1/usage, GET {run}/metrics |
 | Run | Design gate opens the browser | `design_session`, GET design-session |
 | All | Chat line | POST /v1/chat, catalog |

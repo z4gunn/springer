@@ -29,7 +29,11 @@ class CycleStore:
         cycle["content"] = {
             "cycle_id": cycle_id, "cycle_number": int(cycle_id.rsplit("-", 1)[1]), "run_id": self.run_id,
             "phase": phase, "plan": {"routed_batch": routed_batch, "rationale": rationale},
-            "do": {"dispatched": []}, "check": {"verdict": "gate", "validations": [], "audits": []},
+            # The schema requires a dispatch per routed unit. Each reads skipped until Act
+            # records what actually happened, so a cycle is valid while it is open.
+            "do": {"dispatched": [{"agent": i["agent"], "unit_id": i.get("unit_id"), "status": "skipped"}
+                                  for i in routed_batch]},
+            "check": {"verdict": "gate", "validations": [], "audits": []},
             "act": {"transition": "pause", "state_changes": [], "versioned_refs": [], "escalation_ref": None,
                     "checkpoint_ref": None, "pending_batch": None},
             "next_phase": next_phase, "closed": False,
@@ -42,9 +46,10 @@ class CycleStore:
         cycle = self.get(cycle_id)
         content = cycle["content"]
         by_unit = {i.get("unit_id"): i for i in content["plan"]["routed_batch"]}
-        content["do"]["dispatched"] = [
-            {"agent": by_unit[u]["agent"], "unit_id": u, "status": "completed" if s == "done" else "failed",
-             "produced_artifact_refs": []} for u, s in unit_states.items()]
+        if unit_states:
+            content["do"]["dispatched"] = [
+                {"agent": by_unit[u]["agent"], "unit_id": u, "status": "completed" if s == "done" else "failed",
+                 "produced_artifact_refs": []} for u, s in unit_states.items()]
         passed = all(s in ("done", "cancelled") for s in unit_states.values())
         content["check"]["verdict"] = "pass" if passed else "blocked"
         content["act"]["transition"] = transition if passed else "escalate"

@@ -534,6 +534,21 @@ class RunEngine:
         self.units.transition(unit_id, "cancelled", f"cancelled by {by}", cancelled_by=by)
         self._release(unit_id)
 
+    def cancel_run(self, by):
+        """Stop everything and end the run, so a new one can start. An open PR is left
+        open for the human, because closing it is a decision about the code."""
+        for state in self.open_units():
+            if state["state"] not in ("done", "cancelled"):
+                self.cancel_unit(state["unit_id"], by)
+        self.gates.close_for_cancelled_run(by)
+        self.close_cycles()
+        cycle_id = self.cycles.next_id()
+        no_work = {"agent": "spgr-agent-orchestrator", "expected_outcome": "no further work, the run was cancelled"}
+        self.cycles.plan(cycle_id, "cancelled", [no_work], f"Cancelled by {by}.")
+        self.cycles.close(cycle_id, {})
+        self.cycles.complete_run()
+        self.project()
+
     def redispatch_unit(self, unit_id):
         state = self.units.state(unit_id)
         if state["state"] == "running":

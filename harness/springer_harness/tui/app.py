@@ -276,8 +276,9 @@ class SpringerApp(App):
         """Phase, stones, and any state that changes what the run is doing."""
         complete = run.get("complete", False)
         laid = stones_laid(run["active_phase"], complete)
-        parts = [paint("complete" if complete else run["active_phase"], "stone")]
-        if laid is not None:
+        cancelled = run["active_phase"] == "cancelled"
+        parts = [paint("cancelled" if cancelled else "complete" if complete else run["active_phase"], "stone")]
+        if laid is not None and not cancelled:
             parts.append(paint(f"  ·  {laid} of {STONES} stones laid", "dim"))
         if run["paused"]:
             parts.append(paint("  ·  PAUSED", "text", bold=True))

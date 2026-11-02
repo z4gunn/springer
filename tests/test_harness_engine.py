@@ -541,6 +541,21 @@ class CannedRunTest(EngineCase):
         seqs = [line["seq"] for line in self.events(engine)]
         self.assertEqual(seqs, sorted(set(seqs)), "seq is monotonic")
 
+    @unittest.skipUnless(HAVE_JSONSCHEMA, "jsonschema not installed in this interpreter")
+    def test_records_validate_while_the_run_is_in_progress_too(self):
+        """A crash can leave any tick's files as the last word, so open records count."""
+        engine = self.engine(canned_batches())
+        reg = registry()
+        for _ in range(12):
+            engine.tick()
+            for cycle in engine.cycles.all():
+                self.assertEqual(schema_errors("pdca-cycle-v1", cycle, reg), [], cycle["artifact_id"])
+            for gate in engine.gates.all():
+                self.assertEqual(schema_errors("hil-checkpoint-v2", gate, reg), [], gate["artifact_id"])
+                if not gate["content"]["response"] and not gate["content"]["digest"]:
+                    engine.gates.answer(gate["content"]["checkpoint_id"], gate["content"]["options"][0]["option"], "human")
+            self.assertEqual(schema_errors("run-state-v2", engine.project(), reg), [])
+
     def test_the_projection_rebuilds_the_same_from_files_alone(self):
         engine = self.engine(canned_batches())
         self.drive(engine)

@@ -16,6 +16,13 @@ from .client import ApiError, run_path
 from .dialogs import EditDialog, FormDialog, TextDialog
 from .theme import COLUMN, RISK, join, keys, lines, paint
 
+# Shown in an empty section, and never saved: the format these sections must take. They
+# are the API's to enforce, and these copies only show the shape.
+SECTION_TEMPLATES = {
+    "Core flows": "### Name of the flow\nWho: A name from Users\nTrigger: What starts it.\n1. First step\n2. Next step\n"
+                  "Outcome: How they know it worked.\nCritical: yes",
+    "Users": "- Name: who they are and what they want",
+}
 COLUMNS = ("ready", "in_progress", "in_review", "blocked", "done")
 TIERS = ("haiku", "sonnet", "opus")
 VIEWS = ("tree", "board", "graph")
@@ -232,6 +239,7 @@ class BriefPane(Pane):
         if self.section != section["name"] or editor.text != section["body"]:
             self.section = section["name"]
             self.loaded_body = section["body"]
+            editor.placeholder = SECTION_TEMPLATES.get(section["name"], "")
             editor.load_text(section["body"])
 
     def on_option_list_option_highlighted(self, event):
@@ -534,7 +542,8 @@ class RunPane(Pane):
                 Binding("tab", "next_gate", "next gate", priority=False), Binding("d", "diff", "diff"),
                 Binding("o", "design", "design"), Binding("n", "notes", "answer with notes"),
                 Binding("P", "pause", "pause"), Binding("c", "cancel_unit", "cancel"),
-                Binding("R", "redispatch", "re-dispatch"), Binding("v", "viewed", "clear routine")]
+                Binding("R", "redispatch", "re-dispatch"), Binding("X", "cancel_run", "cancel run"),
+                Binding("v", "viewed", "clear routine")]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -547,7 +556,7 @@ class RunPane(Pane):
         yield VerticalScroll(Static("", id="gates", markup=False), id="gates-box")
         yield Static("", id="run-title", classes="section", markup=False)
         yield DataTable(id="units", cursor_type="row")
-        yield Static(keys(("c", "cancel"), ("R", "one tier up"), ("enter", "live output"), ("P", "pause run")),
+        yield Static(keys(("c", "cancel"), ("R", "one tier up"), ("enter", "live output"), ("P", "pause run"), ("X", "cancel run")),
                      classes="hint")
         yield Static("", id="routine", markup=False)
 
@@ -692,6 +701,9 @@ class RunPane(Pane):
     def _unit_row(self):
         key = self.table_key(self.query_one("#units", DataTable))
         return key.split("/") if key else (None, None)
+
+    def action_cancel_run(self):
+        self._op("run.cancel")
 
     def action_cancel_unit(self):
         unit_id, _ = self._unit_row()

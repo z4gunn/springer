@@ -236,6 +236,11 @@ def noop(c):
     return {}
 
 
+def run_cancel(c):
+    c.engine.cancel_run(c.actor)
+    return {}
+
+
 def unit_cancel(c):
     c.engine.cancel_unit(c.args.unit_id, c.actor)
     return {}
@@ -356,6 +361,8 @@ CATALOG = {op.type: op for op in [
     Operation("run.pause", RunPause, noop, "Stops claiming and dispatching. In-flight sessions finish and Check still runs.",
               scope="run"),
     Operation("run.resume", NoArgs, noop, "Clears the pause.", scope="run"),
+    Operation("run.cancel", NoArgs, run_cancel, "Cancels every unfinished unit and ends the run, so a new one can start. "
+              "Open PRs stay open.", scope="run", confirm=True, confirm_rule="yes"),
     Operation("unit.cancel", UnitRef, unit_cancel, "Kills the live session and moves the unit to cancelled.",
               scope="run", confirm=True, confirm_rule="yes"),
     Operation("unit.redispatch", UnitRedispatch, unit_redispatch,

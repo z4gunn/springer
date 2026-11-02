@@ -294,6 +294,22 @@ class BriefScreenTest(TuiCase):
             await self.open_acme(pilot)
             await self.see(pilot, "! Core flows", "! Bad has no outcome.", "Start blocked: 2 error(s)")
 
+    async def test_prose_flows_are_refused_and_an_empty_section_shows_the_format(self):
+        store = BriefStore(self.project)
+        version = store.update_section("Core flows", "The user picks a diet, then we search.", self.version)
+        store.update_section("Glossary", "", version)
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.open_acme(pilot)
+            await self.see(pilot, "! Core flows", "Start blocked", "### heading")
+            self.assertNotIn("Ready to start", self.text())
+            store.update_section("Core flows", "", store.load()[0]["brief_version"])
+            self.app.mark_dirty()
+            await self.see(pilot, "Core flows is required")
+            await pilot.press("down", "down")
+            await self.until(pilot, lambda: self.app.query_one("#brief-pane").section == "Core flows")
+            await self.see(pilot, "### Name of the flow", "Critical: yes")
+            self.assertEqual(self.app.query_one("#editor", TextArea).text, "", "a template is not saved text")
+
     async def test_discovery_proposed_sections_and_go_or_no_go(self):
         store = BriefStore(self.project)
         front, sections = store.load()
@@ -604,6 +620,21 @@ class RunScreenTest(TuiCase):
             await self.see(pilot, "PAUSED")
             await pilot.press("P")
             await self.until(pilot, lambda: "PAUSED" not in self.text())
+
+    async def test_cancelling_the_run_ends_it_and_says_so(self):
+        self.daemon.provider.default.ticks = 50
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            run_id = await self.run_screen(pilot)
+            await self.tick(3)
+            await self.see(pilot, "U-0001", "X cancel run")
+            await pilot.press("X")
+            await self.dialog(pilot, ConfirmDialog)
+            await self.see(pilot, "Cancels every unfinished unit")
+            await pilot.press("y")
+            await self.see(pilot, "cancelled", timeout=8)
+            self.assertTrue(self.engine(run_id).cycles.is_complete())
+            await pilot.press("p")
+            await self.see(pilot, "no run")
 
     async def test_declining_a_confirmation_changes_nothing(self):
         self.daemon.provider.default.ticks = 50

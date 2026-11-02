@@ -412,6 +412,59 @@ class OperationCatalogTest(ApiCase):
         self.assertEqual(rules, {"flow-without-outcome", "unknown-user", "no-critical-flow"})
         self.assertEqual(self.get("/v1/projects/acme/runs"), [])
 
+    def test_prose_flows_block_the_start_and_say_what_to_write(self):
+        version = self.op("brief.update_section", {"section": "Core flows", "body": "The user picks a diet, then we search.",
+                                                   "base_version": self.version})["result"]["version"]
+        critique = self.get("/v1/projects/acme/brief/critique")
+        self.assertEqual([e["rule"] for e in critique["errors"]], ["flows-not-structured"])
+        self.assertIn("### heading", critique["errors"][0]["message"])
+        first = self.op("run.start", {"base_version": version})
+        self.op("run.start", {"base_version": version}, token=first["confirm_token"], expect=422)
+        self.assertEqual(self.get("/v1/projects/acme/runs"), [])
+
+    def test_a_user_missing_from_prose_users_says_how_to_write_one(self):
+        self.op("brief.update_section", {"section": "Users", "body": "Anyone who cooks.", "base_version": self.version})
+        errors = self.get("/v1/projects/acme/brief/critique")["errors"]
+        self.assertEqual(errors[0]["rule"], "unknown-user")
+        self.assertIn("- Name:", errors[0]["message"])
+
+    def test_run_cancel_ends_the_run_and_a_new_one_can_start(self):
+        self.daemon.provider.default.ticks = 50
+        run_id = self.start()
+        unit_id = self.tick_to_unit(run_id)["unit_id"]
+        engine = self.daemon.engine("acme", run_id)
+        gate_id = self._open_gate(run_id)
+        self.confirmed("run.cancel", run_id=run_id)
+        self.assertEqual(engine.units.state(unit_id)["state"], "cancelled")
+        self.assertEqual(engine.sessions(unit_id).all()[-1]["outcome"], "killed")
+        self.assertEqual(engine.gates.open_gates(), [])
+        self.assertEqual(engine.gates.get(gate_id)["content"]["response"]["option"], "run cancelled")
+        view = self.get(self.run_path(run_id))
+        self.assertTrue(view["complete"])
+        self.assertEqual(view["active_phase"], "cancelled")
+        self.assertIsNone(self.get("/v1/projects/acme")["active_run"])
+        version = self.get("/v1/projects/acme/brief")["version"]
+        second = self.confirmed("run.start", {"base_version": version})["result"]["run_id"]
+        self.assertNotEqual(second, run_id)
+        spawned = len(self.daemon.provider.spawned)
+        self.tick(3)
+        self.assertEqual(engine.units.state(unit_id)["state"], "cancelled", "a cancelled run stays down")
+        self.assertGreaterEqual(len(self.daemon.provider.spawned), spawned)
+
+    @unittest.skipUnless(HAVE_JSONSCHEMA, "jsonschema not installed in this interpreter")
+    def test_a_cancelled_runs_records_keep_their_schema(self):
+        run_id = self.start()
+        self.tick_to_unit(run_id)
+        self._open_gate(run_id)
+        self.confirmed("run.cancel", run_id=run_id)
+        engine = self.daemon.engine("acme", run_id)
+        for gate in engine.gates.all():
+            self.assertEqual(schema_errors("hil-checkpoint-v2", gate), [])
+        for cycle in engine.cycles.all():
+            self.assertEqual(schema_errors("pdca-cycle-v1", cycle), [])
+        for line in (e.line for e in engine.ledger.read()):
+            self.assertEqual(schema_errors("events-v1", line), [], line)
+
     def test_run_start_opens_a_run(self):
         body = self.confirmed("run.start", {"base_version": self.version})
         self.assertEqual(body["status"], "accepted")
@@ -577,6 +630,7 @@ COVERAGE = {
     "brief.run_discovery": "test_brief_run_discovery_returns_accepted_and_runs",
     "brief.dismiss_recommendation": "test_brief_dismiss_recommendation", "run.start": "test_run_start_opens_a_run",
     "run.pause": "test_run_pause_and_resume", "run.resume": "test_run_pause_and_resume",
+    "run.cancel": "test_run_cancel_ends_the_run_and_a_new_one_can_start",
     "unit.cancel": "test_unit_cancel", "unit.redispatch": "test_unit_redispatch",
     "gate.answer": "test_gate_answer_records_the_response_and_each_decision",
     "digest.mark_viewed": "test_digest_mark_viewed",
