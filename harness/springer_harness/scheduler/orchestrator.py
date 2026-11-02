@@ -241,9 +241,6 @@ class OrchestratorPlanner:
         for gate in output.get("gates", []):
             if gate["checkpoint_type"] not in GATE_TYPES:
                 found.append(f"{gate['checkpoint_type']} is not a gate type ({', '.join(GATE_TYPES)})")
-            for key in gate["holds"]:
-                if key not in keys and key not in used:
-                    found.append(f"a gate holds unknown key {key}")
         return found
 
     def _to_batch(self, output):
@@ -251,7 +248,12 @@ class OrchestratorPlanner:
                            declared_paths=tuple(u["declared_paths"]), depends_on=tuple(u["depends_on"]),
                            risk_baseline=u["risk_baseline"], model_tier=u["model_tier"],
                            executable_check=u.get("executable_check")) for u in output["units"]]
-        gates = [GateDraft(checkpoint_type=g["checkpoint_type"], prompt=g["prompt"], holds=tuple(g["holds"]),
+        # A gate may name work not planned yet (the direction review comes before the
+        # units that need its answer). It holds what exists, and nothing new is
+        # planned until it is answered, because the run state does not change.
+        known = set(read_json(self.run_dir / "unit-keys.json", {})) | {u.key for u in units}
+        gates = [GateDraft(checkpoint_type=g["checkpoint_type"], prompt=g["prompt"],
+                           holds=tuple(k for k in g["holds"] if k in known),
                            options=tuple(g["options"]), decisions=tuple(g.get("decisions") or ()),
                            artifact_ref=g.get("artifact_ref") or "none") for g in output["gates"]]
         if not units and not gates:

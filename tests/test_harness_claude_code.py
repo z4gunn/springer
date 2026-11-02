@@ -275,6 +275,13 @@ class OrchestratorTest(FakeBinCase):
         self.assertEqual((found["phase"], found["rationale"], found["units"][0]["model_tier"]),
                          ("planning", "PRD first.", "sonnet"))
 
+    def test_a_gate_may_name_work_not_planned_yet(self):
+        gate = {"checkpoint_type": "direction-review", "prompt": "Pick a direction.", "holds": ["skeleton"],
+                "options": [{"option": "accept", "consequence": "The skeleton is planned next."}]}
+        self.plan_file.write_text(json.dumps({**self.PLAN, "units": [], "gates": [gate]}))
+        batch = self.ask()
+        self.assertEqual([(g.checkpoint_type, g.holds) for g in batch.gates], [("direction-review", ())])
+
     def test_done_with_no_units_finishes_the_run(self):
         self.plan_file.write_text(json.dumps({**self.PLAN, "done": True, "units": []}))
         self.ask()
