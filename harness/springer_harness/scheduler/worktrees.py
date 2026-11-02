@@ -74,9 +74,13 @@ class Worktrees:
         if dirty:
             return "the main checkout has uncommitted changes"
         message = f"chore: integrate {branch}"
-        done = _git(self.project, "merge", "--no-edit", "--no-ff", "-m", message, branch)
+        # The harness authors this commit, as it does the brief and profile commits, so
+        # a machine with no git identity configured can still integrate.
+        merge = ("-c", "user.name=Springer", "-c", "user.email=springer@local", "merge", "--no-edit", "--no-ff",
+                 "-m", message, branch)
+        done = _git(self.project, *merge)
         if done.returncode and self._clear_identical_copies(branch, done.stderr):
-            done = _git(self.project, "merge", "--no-edit", "--no-ff", "-m", message, branch)
+            done = _git(self.project, *merge)
         if done.returncode:
             _git(self.project, "merge", "--abort")
             return done.stderr.strip() or done.stdout.strip() or "git merge failed"
