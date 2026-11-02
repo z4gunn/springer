@@ -27,10 +27,6 @@ class Args(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class AddWord(Args):
-    word: str = Field(min_length=1, max_length=64, pattern=r"^\S+$")
-
-
 class ProjectCreate(Args):
     name: str = Field(min_length=1)
     path: str = Field(min_length=1)
@@ -196,11 +192,6 @@ def project_create(c):
     return {"project": c.daemon.create_project(c.args.name, c.args.path, c.args.mode)}
 
 
-def dictionary_add_word(c):
-    c.daemon.proofreader.add_word(c.args.word)
-    return {"word": c.args.word}
-
-
 def project_archive(c):
     record = c.daemon.home.project(c.project)
     if c.daemon.active_run(c.project):
@@ -353,8 +344,6 @@ def _rule_change(c):
 CATALOG = {op.type: op for op in [
     Operation("project.create", ProjectCreate, project_create, "Scaffolds or adopts the repository and registers it.",
               scope="none", confirm=True, confirm_rule="yes"),
-    Operation("dictionary.add_word", AddWord, dictionary_add_word,
-              "Adds a word to ~/.springer/dictionary.txt, so proofreading stops flagging it.", scope="none"),
     Operation("project.archive", NoArgs, project_archive, "Hides the project and refuses a new run. Deletes nothing.",
               confirm=True, confirm_rule="yes"),
     Operation("brief.update_section", UpdateSection, update_section,

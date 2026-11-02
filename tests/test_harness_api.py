@@ -3,7 +3,6 @@ meta-test fails when a catalog operation or a GET path has no test, so the contr
 cannot grow past its coverage. See Conformance in docs/harness/api-contract.md."""
 
 import json
-import os
 import shutil
 import socket
 import subprocess
@@ -327,11 +326,6 @@ class ReadsTest(ApiCase):
 
 
 class OperationCatalogTest(ApiCase):
-    def test_dictionary_add_word(self):
-        self.assertEqual(self.op("dictionary.add_word", {"word": "Zorbu"}, project=None)["result"], {"word": "Zorbu"})
-        self.op("dictionary.add_word", {"word": "zorbu"}, project=None)
-        self.assertEqual((self.daemon.home.root / "dictionary.txt").read_text(), "Zorbu\n", "once, whatever the case")
-
     """One test per catalog entry, named in COVERED. See the meta-test below."""
 
 
@@ -671,7 +665,6 @@ class OperationCatalogTest(ApiCase):
 
 COVERAGE = {
     "project.create": "test_project_create_and_archive", "project.archive": "test_project_create_and_archive",
-    "dictionary.add_word": "test_dictionary_add_word",
     "brief.update_section": "test_brief_update_section_before_start_needs_no_confirmation",
     "brief.update_facts": "test_brief_update_facts_recomputes_the_derived_profile",
     "brief.confirm_section": "test_brief_confirm_section_clears_proposed",
@@ -805,44 +798,6 @@ class ChatActorTest(ApiCase):
         self.assertIn("not built", response.text)
         self.assertIn("event: done", response.text)
         self.assertNotIn("proposed_operation", response.text)
-
-
-class ProofreadTest(ApiCase):
-    def test_spelling_without_languagetool_and_the_dictionary(self):
-        body = {"texts": {"a": "Cooking is dificult in teh app.", "b": "Fran uses https://exmple.com and GLP1."}}
-        result = self.client.post("/v1/proofread", json=body).json()
-        self.assertEqual((result["engine"], result["preparing"]), ("spelling", False))
-        self.assertEqual([(i["text"], i["replacements"][0]) for i in result["issues"]["a"]],
-                         [("dificult", "difficult"), ("teh", "the")])
-        self.assertNotIn("b", result["issues"], "a name, a link, and a word with a digit are not misspelled")
-        issue = result["issues"]["a"][0]
-        self.assertEqual(body["texts"]["a"][issue["offset"]:issue["offset"] + issue["length"]], "dificult")
-        self.assertEqual(self.op("dictionary.add_word", {"word": "dificult"}, project=None)["status"], "applied")
-        result = self.client.post("/v1/proofread", json=body).json()
-        self.assertEqual([i["text"] for i in result["issues"]["a"]], ["teh"])
-        self.assertEqual((self.daemon.home.root / "dictionary.txt").read_text(), "dificult\n")
-        self.op("dictionary.add_word", {"word": "two words"}, project=None, expect=400)
-
-    def test_proofread_needs_the_token(self):
-        response = self.client.post("/v1/proofread", json={"texts": {}}, headers={"Authorization": "Bearer nope"})
-        self.assertEqual(response.status_code, 401)
-
-
-@unittest.skipUnless(os.environ.get("SPRINGER_TEST_LANGUAGETOOL"), "set SPRINGER_TEST_LANGUAGETOOL=1 to run LanguageTool")
-class LanguageToolTest(unittest.TestCase):
-    def test_grammar_and_spelling(self):
-        from springer_harness.proofread import Proofreader
-
-        with tempfile.TemporaryDirectory() as home:
-            reader = Proofreader(Path(home), languagetool=True)
-            deadline = time.time() + 900
-            while reader.state == "starting" and time.time() < deadline:
-                time.sleep(1)
-            self.assertEqual(reader.state, "ready")
-            result = reader.check({"a": "He go to the store and buy breaad."})
-            self.assertEqual(result["engine"], "languagetool")
-            self.assertTrue(any(not i["spelling"] for i in result["issues"]["a"]), "a grammar issue")
-            self.assertIn(("breaad", True), [(i["text"], i["spelling"]) for i in result["issues"]["a"]])
 
 
 class ContractDriftTest(ApiCase):

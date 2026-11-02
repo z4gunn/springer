@@ -6,7 +6,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Select, Static, TextArea
 
-from .theme import join, keys, lines, paint
+from .theme import join, keys, paint
 
 NEW_USER = "\0new-user"
 
@@ -371,83 +371,3 @@ class FactsDialog(Dialog):
         facts["pinned"] = pinned
         self.dismiss(facts)
 
-
-class ProofreadDialog(Dialog):
-    """Each spelling or grammar issue in turn, to fix, skip, or add to the dictionary.
-    Returns {"texts", "words"} with the fixes applied, or None to go back and edit."""
-
-    BINDINGS = [Binding("1", "fix(0)", show=False), Binding("2", "fix(1)", show=False),
-                Binding("3", "fix(2)", show=False), Binding("s", "skip", show=False),
-                Binding("d", "add_word", show=False), Binding("w", "write", show=False)]
-
-    def __init__(self, texts, issues, labels, preparing=False):
-        super().__init__()
-        self.texts, self.labels, self.preparing = dict(texts), labels, preparing
-        self.queue = [(key, issue) for key, found in issues.items() for issue in found]
-        self.fixes = {key: [] for key in texts}
-        self.words = []
-        self.at = 0
-
-    def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog"):
-            yield Static("", id="proof-title", classes="dialog-title", markup=False)
-            yield Static("", id="proof-body", markup=False)
-            yield Static(keys(("1-3", "replace"), ("s", "skip"), ("d", "add to dictionary"), ("w", "write the rest as is"),
-                              ("esc", "keep editing")), classes="hint")
-
-    def on_mount(self):
-        self._show()
-
-    def _current(self):
-        return self.queue[self.at]
-
-    def _show(self):
-        while self.at < len(self.queue) and self._current()[1]["text"].lower() in {w.lower() for w in self.words}:
-            self.at += 1
-        if self.at >= len(self.queue):
-            self.action_write()
-            return
-        key, issue = self._current()
-        text = self.texts[key]
-        start, end = issue["offset"], issue["offset"] + issue["length"]
-        before, after = text[max(0, start - 30):start], text[end:end + 30]
-        kind = "spelling" if issue["spelling"] else "grammar"
-        self.query_one("#proof-title", Static).update(
-            join(paint(f"Proofread  {self.at + 1} of {len(self.queue)}", "text", bold=True), paint(f"   {kind}", "dim")))
-        rows = [paint(self.labels.get(key, key), "dim"),
-                join(paint(("…" if start > 30 else "") + before.replace("\n", " ")),
-                     paint(text[start:end], "error", bold=True), paint(after.replace("\n", " ") + "…" * (end + 30 < len(text)))),
-                paint(issue["message"], "text"), paint("")]
-        if issue["replacements"]:
-            rows.append(join(*(paint(f"{n}  {r}    ", "text") for n, r in enumerate(issue["replacements"][:3], 1))))
-        else:
-            rows.append(paint("No suggestion. Skip it, or esc to edit the text.", "dim"))
-        if self.preparing:
-            rows += [paint(""), paint("LanguageTool is still getting ready, so this checked spelling only.", "dim")]
-        self.query_one("#proof-body", Static).update(lines(rows))
-
-    def action_fix(self, n):
-        key, issue = self._current()
-        if n < len(issue["replacements"]):
-            self.fixes[key].append((issue["offset"], issue["length"], issue["replacements"][n]))
-            self.at += 1
-            self._show()
-
-    def action_skip(self):
-        self.at += 1
-        self._show()
-
-    def action_add_word(self):
-        key, issue = self._current()
-        if issue["spelling"]:
-            self.words.append(issue["text"])
-        self.at += 1
-        self._show()
-
-    def action_write(self):
-        texts = {}
-        for key, text in self.texts.items():
-            for offset, length, replacement in sorted(self.fixes[key], reverse=True):
-                text = text[:offset] + replacement + text[offset + length:]
-            texts[key] = text
-        self.dismiss({"texts": texts, "words": self.words})

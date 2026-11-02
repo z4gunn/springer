@@ -198,31 +198,3 @@ def codec(section):
         return (lambda text: parse_list(section, text)), (lambda pre, found: write_list(section, pre, found))
     return None
 
-
-def prose_of(section, content):
-    """The text a person wrote, keyed by field, for proofreading. A name a person picked
-    from a list (who) and a path or link are not prose."""
-    if section == "Core flows":
-        texts = {"name": content["name"], "trigger": content["trigger"], "outcome": content["outcome"]}
-        texts.update({f"step-{n}": s for n, s in enumerate(content["steps"])})
-    elif section == "Inputs and references":
-        texts = {"use": content.get("use", "")}
-    else:
-        texts = dict(content)
-    return {k: v for k, v in texts.items() if isinstance(v, str) and v.strip()}
-
-
-def with_prose(section, content, texts):
-    """content with the proofread texts put back where prose_of took them."""
-    content = {**content, **{k: v for k, v in texts.items() if not k.startswith("step-")}}
-    if section == "Core flows":
-        content["steps"] = [texts.get(f"step-{n}", s) for n, s in enumerate(content["steps"])]
-    return content
-
-
-def apply_fixes(text, fixes):
-    """fixes is a list of (offset, length, replacement). Applied from the end, so an
-    earlier offset still points where it did."""
-    for offset, length, replacement in sorted(fixes, reverse=True):
-        text = text[:offset] + replacement + text[offset + length:]
-    return text

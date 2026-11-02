@@ -37,7 +37,7 @@ if HAVE_TUI:
     from springer_harness.check.critique import critique, parse_flows, parse_users
     from springer_harness.tui import items
     from springer_harness.tui.dialogs import (NEW_USER, ConfirmDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog,
-                                              ProofreadDialog, TextDialog)
+                                              TextDialog)
     from textual.widgets import Select
 
 GOOD = {"Problem": "Freelancers lose track of invoices.", "Users": "- Fran: a freelancer",
@@ -426,40 +426,6 @@ class BriefScreenTest(TuiCase):
             await self.until(pilot, lambda: BriefStore(self.project).load()[1]["Open questions"]
                              == "- Which currency\n  Who can answer: Fran")
             await self.see(pilot, "Which currency  who can answer Fran")
-
-    async def test_proofread_before_a_section_is_written(self):
-        store = BriefStore(self.project)
-        async with self.app.run_test(size=(80, 28)) as pilot:
-            await self.open_acme(pilot)
-            await self.see(pilot, "✓ Problem")
-            await pilot.press("enter", "enter")
-            await self.dialog(pilot, FieldsDialog)
-            self.app.screen.query_one("#f-hard", TextArea).load_text("Cooking at home is dificult.")
-            self.app.screen.query_one("#f-who", Input).value = "Home cooks on a GLP1 diet, like Zorbu"
-            self.app.screen.query_one("#f-now", Input).value = "They repeat the same meals and get boored."
-            await pilot.press("ctrl+s")
-            await self.dialog(pilot, ProofreadDialog)
-            await self.see(pilot, "Proofread  1 of 2", "What is hard today", "dificult", "1  difficult")
-            self.assertNotIn("GLP1", self.app.screen.query_one("#proof-body", Static).render().plain)
-            await pilot.press("escape")
-            await self.dialog(pilot, FieldsDialog)
-            self.assertEqual(self.app.screen.query_one("#f-hard", TextArea).text, "Cooking at home is dificult.",
-                             "going back keeps what was typed")
-            self.assertEqual(store.load()[1]["Problem"], GOOD["Problem"], "nothing is written before the proofread")
-            await pilot.press("ctrl+s")
-            await self.dialog(pilot, ProofreadDialog)
-            await pilot.press("1")
-            await self.see(pilot, "2 of 2", "boored")
-            await pilot.press("d")
-            await self.until(pilot, lambda: "What is hard today: Cooking at home is difficult." in store.load()[1]["Problem"])
-            self.assertIn("get boored.", store.load()[1]["Problem"])
-            self.assertIn("boored", (self.daemon.home.root / "dictionary.txt").read_text())
-            await pilot.press("enter")
-            await self.dialog(pilot, FieldsDialog)
-            await pilot.press("ctrl+s")
-            await self.until(pilot, lambda: not isinstance(self.app.screen, FieldsDialog))
-            await pilot.pause(0.3)
-            self.assertNotIsInstance(self.app.screen, ProofreadDialog, "a word in the dictionary is not flagged again")
 
     async def test_users_as_fields_and_prose_kept_as_notes(self):
         store = BriefStore(self.project)
@@ -1009,7 +975,6 @@ COVERAGE = {
     ("Brief", "Editor, facts panel, derived profile"): (BriefScreenTest, "test_editor_facts_panel_and_derived_profile"),
     ("Brief", "Critique"): (BriefScreenTest, "test_critique"),
     ("Brief", "Every section as fields"): (BriefScreenTest, "test_core_flows_and_users_as_fields"),
-    ("Brief", "Proofread before a section is written"): (BriefScreenTest, "test_proofread_before_a_section_is_written"),
     ("Brief", "Discovery, proposed sections, go or no-go"): (BriefScreenTest, "test_discovery_proposed_sections_and_go_or_no_go"),
     ("Brief", "Interview"): (BriefScreenTest, "test_interview"),
     ("Brief", "Start run"): (BriefScreenTest, "test_start_run"),

@@ -131,7 +131,6 @@ Reads are grouped by the resource they return. Paths under a run are abbreviated
 | GET {run}/gates/{gate_id} | The gate view |
 | GET {run}/metrics | `product_checks_per_100_dispatches`, `failure_class_mix`, `dispatches`, `list_price_spend_usd`, `daily_cap_usd` |
 | GET /v1/projects/{slug}/design-session | `url`, `expires_at`. See Design review surface |
-| POST /v1/proofread | Spelling and grammar issues for `texts`, a map of a client's own keys to text. See below |
 
 ### Project summary
 
@@ -159,8 +158,6 @@ The brief view is used by the Brief screen, and it splits `docs/brief.md` into t
  "sections": [{"name": "Problem", "required": true, "confidence": "confirmed", "body": "..."}],
  "recommendation": {"verdict": "go", "summary": "...", "dismissed": false}}
 ```
-
-`POST /v1/proofread` is a read that takes a body, because the text it checks is not yet written. It returns `engine` (languagetool or spelling), `preparing` (true while LanguageTool downloads or starts), and `issues`, a map from the request's keys to lists of `{"offset", "length", "text", "message", "replacements", "spelling"}`, with offsets into that key's text. LanguageTool runs on the daemon's machine, so no text leaves it. Until it is ready, or when it cannot run, a dictionary check reports spelling alone. A client proofreads before `brief.update_section` and shows each issue to accept, skip, or add to the dictionary. The write does not depend on it.
 
 `confidence` takes the values confirmed, proposed, and needs-human-input. `recommendation` is null unless Discovery produced one. The critique returns `errors`, `warnings`, and `info`, each a list of `{"rule": "flow-without-outcome", "section": "Core flows", "message": "..."}`.
 
@@ -265,7 +262,6 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 | Type | Args | Confirm | Effect |
 |------|------|---------|--------|
 | project.create | `name`, `path` (absolute or starting with `~`), `mode` (new, adopt) | Yes | Scaffolds or adopts the repository and registers it. A client resolves a relative path against its own directory before sending it |
-| dictionary.add_word | `word` | No | Adds the word to `~/.springer/dictionary.txt`, so proofreading stops flagging it |
 | project.archive | none | Yes | Hides the project and refuses a new run. Deletes nothing |
 | brief.update_section | `section`, `body`, `base_version` | After start | Writes the section and marks it confirmed. After `run.start` it opens a scope-change gate |
 | brief.update_facts | `facts`, `base_version` | After start | Writes the frontmatter and recomputes `derived`. After `run.start` it opens a scope-change gate |
@@ -311,7 +307,6 @@ This section is used to check the contract against what the target README promis
 | Brief | Editor, facts panel, derived profile | GET brief, brief.update_section, brief.update_facts |
 | Brief | Critique | GET brief/critique |
 | Brief | Every section as fields | GET brief, brief.update_section |
-| Brief | Proofread before a section is written | POST /v1/proofread, dictionary.add_word |
 | Brief | Discovery, proposed sections, go or no-go | brief.run_discovery, brief.confirm_section, brief.dismiss_recommendation, gate.answer |
 | Brief | Interview | POST /v1/chat, writing through brief.update_section |
 | Brief | Start run | run.start |

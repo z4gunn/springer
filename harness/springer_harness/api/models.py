@@ -79,25 +79,6 @@ class BriefView(BaseModel):
     recommendation: dict | None
 
 
-class ProofreadRequest(BaseModel):
-    texts: dict[str, str]
-
-
-class ProofreadIssue(BaseModel):
-    offset: int
-    length: int
-    text: str
-    message: str
-    replacements: list[str]
-    spelling: bool
-
-
-class Proofread(BaseModel):
-    engine: Literal["languagetool", "spelling"]
-    preparing: bool
-    issues: dict[str, list[ProofreadIssue]]
-
-
 class CritiqueItem(BaseModel):
     rule: str
     section: str

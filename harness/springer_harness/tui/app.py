@@ -77,7 +77,7 @@ class SpringerApp(App):
     #facts { width: 32; height: 100%%; padding: 0 1; border-left: solid %(border)s; }
     #recommendation { height: auto; padding: 0 2; }
     #critique { height: auto; max-height: 8; padding: 0 2; margin-top: 1; }
-    ConfirmDialog, FormDialog, TextDialog, EditDialog, FlowDialog, FieldsDialog, FactsDialog, ProofreadDialog { align: center middle; background: $background 60%%; }
+    ConfirmDialog, FormDialog, TextDialog, EditDialog, FlowDialog, FieldsDialog, FactsDialog { align: center middle; background: $background 60%%; }
     .dialog { width: 70; height: auto; max-height: 80%%; background: %(card)s; border-left: thick %(you_bar)s; padding: 1 2; }
     .dialog.wide { width: 90%%; height: 80%%; }
     .dialog-title { text-style: bold; color: %(text)s; margin-bottom: 1; }

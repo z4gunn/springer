@@ -13,7 +13,7 @@ from textual.widgets.option_list import Option
 
 from .client import ApiError, run_path
 from . import items
-from .dialogs import ConfirmDialog, EditDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog, ProofreadDialog, TextDialog
+from .dialogs import ConfirmDialog, EditDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog, TextDialog
 from .theme import COLUMN, RISK, join, keys, lines, paint
 
 # Shown in an empty section, and never saved: the format these sections must take. They
@@ -366,29 +366,20 @@ class BriefPane(Pane):
         elif option_id == "preamble":
             text = await self.app.push_screen_wait(EditDialog(f"{self.section}: text kept as written", preamble))
             if text is not None:
-                checked = await self._proofread({"notes": text}, {"notes": "notes"})
-                if checked is not None:
-                    await self._write(lambda pre, found: (checked["notes"].strip(), found))
+                await self._write(lambda pre, found: (text.strip(), found))
         else:
             await self._open_item(content[int(option_id.removeprefix("item-"))])
 
     async def _edit_form(self):
         section = self.section
         specs = items.FORMS[section]
-        values = self.parsed[1]
-        while True:
-            values = await self.app.push_screen_wait(FieldsDialog(section, specs, values))
-            if values is None:
-                return
-            checked = await self._proofread(items.prose_of(section, values), {k: l for k, l, _ in specs})
-            if checked is not None:
-                await self._write(lambda pre, old: (pre, items.with_prose(section, values, checked)), section=section)
-                return
+        values = await self.app.push_screen_wait(FieldsDialog(section, specs, self.parsed[1]))
+        if values is not None:
+            await self._write(lambda pre, old: (pre, values), section=section)
 
     async def _open_item(self, item):
         """Add when item is None, else edit it. Items are matched by name when written,
-        so an edit lands on the right one even if the brief moved underneath. A form
-        whose proofread is sent back reopens with what was typed."""
+        so an edit lands on the right one even if the brief moved underneath."""
         section = self.section
         if section == "Core flows":
             await self._open_flow(item)
@@ -399,58 +390,24 @@ class BriefPane(Pane):
         original = item[first] if item else None
         values = dict(item) if item else {key: "" for key, _, _ in specs}
         noun = items.NOUNS[section]
-        while True:
-            values = await self.app.push_screen_wait(
-                FieldsDialog(f"Edit {noun}" if item else f"New {noun}", specs, values, required=first))
-            if values is None:
-                return
-            checked = await self._proofread(items.prose_of(section, values), {k: l for k, l, _ in specs})
-            if checked is not None:
-                final = items.with_prose(section, values, checked)
-                await self._write(lambda pre, found: (pre, _put(found, original, final, first)), section=section)
-                return
+        values = await self.app.push_screen_wait(
+            FieldsDialog(f"Edit {noun}" if item else f"New {noun}", specs, values, required=first))
+        if values is not None:
+            await self._write(lambda pre, found: (pre, _put(found, original, values, first)), section=section)
 
     async def _open_flow(self, item):
         original = item["name"] if item else None
-        flow = item or items.blank_flow()
-        while True:
-            users = items.parse_users(self._body_of("Users"))[1]
-            answer = await self.app.push_screen_wait(FlowDialog(flow, users, title="Edit flow" if item else "New flow"))
-            if answer is None:
-                return
-            flow = answer["flow"]
-            labels = {"name": "name", "trigger": "trigger", "outcome": "outcome"}
-            labels.update({f"step-{n}": f"step {n + 1}" for n in range(len(flow["steps"]))})
-            checked = await self._proofread(items.prose_of("Core flows", flow), labels)
-            if checked is None:
-                continue
-            flow = items.with_prose("Core flows", flow, checked)
-            new_users = answer["new_users"]
-            if new_users and not await self._write(
-                    lambda pre, found: (pre, found + [u for u in new_users if not _named(found, u["name"])]),
-                    section="Users"):
-                return
-            await self._write(lambda pre, found: (pre, _put(found, original, flow)), section="Core flows")
-            return
-
-    async def _proofread(self, texts, labels):
-        """Spelling and grammar before a write. Returns the texts with the fixes the
-        person took, or None when they chose to go back and edit."""
-        if not texts:
-            return {}
-        try:
-            result = await self.client.post("/v1/proofread", {"texts": texts})
-        except ApiError as exc:
-            self.app.notify(f"Not proofread: {exc.message}", severity="warning")
-            return texts
-        if not result["issues"]:
-            return texts
-        answer = await self.app.push_screen_wait(ProofreadDialog(texts, result["issues"], labels, result["preparing"]))
+        users = items.parse_users(self._body_of("Users"))[1]
+        answer = await self.app.push_screen_wait(
+            FlowDialog(item or items.blank_flow(), users, title="Edit flow" if item else "New flow"))
         if answer is None:
-            return None
-        for word in answer["words"]:
-            await self.app.apply("dictionary.add_word", {"word": word})
-        return answer["texts"]
+            return
+        new_users = answer["new_users"]
+        if new_users and not await self._write(
+                lambda pre, found: (pre, found + [u for u in new_users if not _named(found, u["name"])]),
+                section="Users"):
+            return
+        await self._write(lambda pre, found: (pre, _put(found, original, answer["flow"])), section="Core flows")
 
     def _body_of(self, name):
         return next((s["body"] for s in self.brief["sections"] if s["name"] == name), "")
@@ -514,18 +471,11 @@ class BriefPane(Pane):
         self._body().focus()
 
     async def _save(self):
-        """Write plain text typed in the editor, proofread first. False when the text
-        stays unsaved, so a caller does not move on from it."""
+        """Write plain text typed in the editor. False when the text stays unsaved, so a
+        caller does not move on from it."""
         if not self._dirty():
             return True
         text = self.query_one("#editor", TextArea).text
-        checked = await self._proofread({"text": text}, {"text": self.section})
-        if checked is None:
-            self.query_one("#editor", TextArea).focus()
-            return False
-        text = checked.get("text", text)
-        if text != self.query_one("#editor", TextArea).text:
-            self.query_one("#editor", TextArea).load_text(text)
         args = {"section": self.section, "body": text, "base_version": self.version}
         try:
             outcome = await self.app.apply("brief.update_section", args, project=self.app.project, reraise=True)

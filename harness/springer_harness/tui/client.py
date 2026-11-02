@@ -63,10 +63,6 @@ class ApiClient:
         params = {k: v for k, v in params.items() if v is not None}
         return (await self._request("GET", path, params=params)).json()
 
-    async def post(self, path, body):
-        """A read that takes a body (e.g. proofreading text not yet written)."""
-        return (await self._request("POST", path, json=body)).json()
-
     async def get_text(self, path):
         return (await self._request("GET", path)).text
 
