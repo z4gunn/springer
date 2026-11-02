@@ -7,7 +7,9 @@ import socket
 import tempfile
 import threading
 import unittest
+import urllib.request
 from pathlib import Path
+from unittest import mock
 
 from harness_support import git_project
 
@@ -52,6 +54,22 @@ class DaemonLifecycleTest(unittest.TestCase):
         (self.home / "daemon.json").write_text(json.dumps({"port": 1, "pid": 999999}))
         self.assertIsNone(cli.running(self.home))
         self.assertNotEqual(cli.ensure_daemon(self.home)["pid"], 999999)
+
+    def test_a_daemon_running_older_code_is_replaced(self):
+        first = cli.ensure_daemon(self.home)
+        with mock.patch.object(cli, "build_id", return_value="newer-code"):
+            second = cli.ensure_daemon(self.home)
+        self.assertNotEqual(second["pid"], first["pid"])
+        self.assertEqual(cli.running(self.home)["pid"], second["pid"])
+
+    def test_a_daemon_with_a_stream_open_still_stops(self):
+        record = cli.ensure_daemon(self.home)
+        token = (self.home / "api-token").read_text().strip()
+        request = urllib.request.Request(f"http://127.0.0.1:{record['port']}/v1/events",
+                                         headers={"Authorization": f"Bearer {token}"})
+        with urllib.request.urlopen(request, timeout=5):
+            self.assertTrue(cli.stop_daemon(self.home))
+            self.assertIsNone(cli.running(self.home))
 
     def test_stop_ends_it_and_says_when_there_was_nothing_to_stop(self):
         cli.ensure_daemon(self.home)

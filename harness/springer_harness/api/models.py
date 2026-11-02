@@ -26,6 +26,7 @@ class Health(BaseModel):
     status: str
     api_version: str
     harness_version: str
+    build: str
 
 
 class DaemonView(BaseModel):

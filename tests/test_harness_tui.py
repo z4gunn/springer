@@ -748,6 +748,13 @@ class AllScreensTest(TuiCase):
                         await pilot.press("slash", *how, "enter")
                     await self.until(pilot, lambda: self.app._exit)
 
+    async def test_an_80_column_terminal_keeps_the_whole_header(self):
+        run_id = self.start_run()
+        self.app = SpringerApp(self.client, open_url=self.opened.append)
+        async with self.app.run_test(size=(80, 28)) as pilot:
+            await self.open_acme(pilot)
+            await self.see(pilot, f"acme · {run_id}", "q quit", "X cancel run")
+
     async def test_typing_a_sentence_with_quit_in_it_does_not_quit(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.see(pilot, "Acme")
@@ -813,7 +820,7 @@ class WholeRunTest(TuiCase):
                 await self.tick()
                 await pilot.pause(0.15)
                 screen = self.text()
-                if "complete" in screen.splitlines()[1]:
+                if "complete" in "\n".join(screen.splitlines()[:4]):
                     break
                 match = re.search(r"(?:› |needs you   )(G-\d+) ·", screen)
                 if match and match.group(1) not in answered and "1 " in screen:
@@ -872,6 +879,18 @@ class LookTest(unittest.TestCase):
                     self.assertTrue(any(word in line for word in allowed), f"{name}: {line.strip()}")
 
     @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
+    def test_the_256_color_palette_is_exact_xterm_colors(self):
+        """Anything else gets rounded by the terminal, which is how terracotta became pink."""
+        from rich.color import EIGHT_BIT_PALETTE
+        from springer_harness.tui import theme
+        exact = {"#%02x%02x%02x" % tuple(c) for c in EIGHT_BIT_PALETTE}
+        for palette in (theme.DARK_256, theme.LIGHT_256):
+            for name, value in palette.items():
+                self.assertIn(value, exact, name)
+        self.assertEqual(theme.DARK_256.keys(), theme.DARK.keys())
+        self.assertEqual(theme.LIGHT_256.keys(), theme.LIGHT.keys())
+
+    @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
     def test_every_phase_the_stones_know_is_within_the_arch(self):
         from springer_harness.tui.theme import STONES, STONES_LAID, stones_laid
         self.assertTrue(all(0 <= laid <= STONES for laid in STONES_LAID.values()))
@@ -879,11 +898,17 @@ class LookTest(unittest.TestCase):
         self.assertIsNone(stones_laid("a phase nobody named"))
 
     @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
-    def test_the_mark_is_the_arch_in_two_lines(self):
-        from springer_harness.tui.theme import MARK_SPRINGER, mark
+    def test_the_mark_curves_and_the_springers_start_the_curve(self):
+        from springer_harness.tui.theme import MARK, MARK_COLORS, mark
         rendered = mark()
-        self.assertEqual(len(rendered.plain.splitlines()), 2)
-        self.assertIn(MARK_SPRINGER.lower(), " ".join(str(s.style) for s in rendered.spans).lower())
+        self.assertEqual(len(rendered.plain.splitlines()), 4)
+        self.assertIn(MARK_COLORS["T"].lower(), " ".join(str(s.style) for s in rendered.spans).lower())
+        first = [next(i for i, ch in enumerate(row) if ch != ".") for row in MARK]
+        self.assertEqual(first[:4], sorted(first[:4], reverse=True), "the crown steps out to the springers")
+        self.assertEqual(len(set(first[:3])), 3, "a curve, not a flat top")
+        rows = [i for i, row in enumerate(MARK) if "T" in row]
+        self.assertGreater(min(i for i, row in enumerate(MARK) if "P" in row), max(rows), "springers sit on the piers")
+        self.assertTrue(all(row == row[::-1] for row in MARK), "the arch is symmetric")
 
 
 class AcceptanceListTest(unittest.TestCase):

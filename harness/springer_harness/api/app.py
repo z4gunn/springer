@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from ..build import build_id
 from ..check.critique import critique
 from ..common import iso, parse_iso, read_json
 from ..errors import HarnessError, NotFound
@@ -58,6 +59,7 @@ def create_app(daemon):
     operations = Operations(daemon)
     app.state.operations = operations
     token = daemon.home.token()
+    build = build_id()
     design_codes = {}
     design_cookies = {}
 
@@ -138,7 +140,7 @@ def create_app(daemon):
 
     @app.get("/v1/health", response_model=m.Health)
     def health():
-        return {"status": "ok", "api_version": API_VERSION, "harness_version": HARNESS_VERSION}
+        return {"status": "ok", "api_version": API_VERSION, "harness_version": HARNESS_VERSION, "build": build}
 
     @app.get("/v1/daemon", response_model=m.DaemonView, dependencies=secured)
     def daemon_view():

@@ -15,9 +15,25 @@ DARK = {"text": "#E4DED2", "dim": "#7D786E", "stone": "#B7AE9E", "you": "#E08A5A
 LIGHT = {"text": "#2A2620", "dim": "#6E675A", "stone": "#5F584C", "you": "#A8521F", "you_bar": "#C26A3C",
          "selected": "#EFEAE0", "card": "#F6EEE6", "border": "#D8D2C6", "error": "#B8432C", "success": "#4F7A3A",
          "background": "#FBF9F5", "surface": "#F3F0EA"}
-# The icon's own stones, the same on either background.
-MARK_RING, MARK_SPRINGER, MARK_PIER = "#CFC7B8", "#C26A3C", "#B7AE9E"
-MARK = (".SSSSSS.", "SS....SS", "TT....TT", "PP....PP")
+# macOS Terminal and others have 256 colors, and rounding the palette above to the nearest
+# one turns terracotta into rose pink. Every value here is an exact xterm color, so what
+# they show is what was chosen.
+DARK_256 = {"text": "#dadada", "dim": "#767676", "stone": "#afaf87", "you": "#d7875f", "you_bar": "#d75f00",
+            "selected": "#1c1c1c", "card": "#262626", "border": "#3a3a3a", "error": "#d75f5f", "success": "#87af87",
+            "background": "#121212", "surface": "#1c1c1c"}
+LIGHT_256 = {"text": "#262626", "dim": "#6c6c6c", "stone": "#5f5f5f", "you": "#af5f00", "you_bar": "#d75f00",
+             "selected": "#e4e4e4", "card": "#eeeeee", "border": "#d0d0d0", "error": "#af0000", "success": "#5f875f",
+             "background": "#ffffff", "surface": "#eeeeee"}
+# The arch in pixels. S is a stone, K the keystone, P a pier, and T a springer: the two
+# orange stones where the curve leaves the piers, flaring as they do in the icon.
+MARK = ("....KKKK....",
+        "..SSS..SSS..",
+        ".SS......SS.",
+        "TTT......TTT",
+        "TT........TT",
+        "PP........PP",
+        "PP........PP",
+        "PP........PP")
 
 
 def is_light():
@@ -30,9 +46,18 @@ def is_light():
     return background in ("7", "15")
 
 
-C = LIGHT if is_light() else DARK
+def has_truecolor():
+    return os.environ.get("COLORTERM", "").lower() in ("truecolor", "24bit")
 
-THEME = Theme(name="springer", dark=C is DARK, primary=C["you_bar"], secondary=C["stone"], accent=C["you_bar"],
+
+if has_truecolor():
+    C = LIGHT if is_light() else DARK
+    MARK_COLORS = {"S": "#CFC7B8", "K": "#B7AE9E", "T": "#C26A3C", "P": "#B7AE9E"}  # the icon's own stones
+else:
+    C = LIGHT_256 if is_light() else DARK_256
+    MARK_COLORS = {"S": "#d7d7af", "K": "#afaf87", "T": "#d75f00", "P": "#afaf87"}
+
+THEME = Theme(name="springer", dark=not is_light(), primary=C["you_bar"], secondary=C["stone"], accent=C["you_bar"],
               warning=C["you"], error=C["error"], success=C["success"], foreground=C["text"],
               background=C["background"], surface=C["surface"], panel=C["selected"])
 
@@ -77,10 +102,10 @@ def keys(*pairs):
 
 
 def mark():
-    """The arch in two terminal lines, each cell two square pixels."""
-    colors = {"S": MARK_RING, "T": MARK_SPRINGER, "P": MARK_PIER}
+    """The arch in terminal cells, each cell two square pixels."""
+    colors = MARK_COLORS
     rows = []
-    for top, bottom in ((MARK[0], MARK[1]), (MARK[2], MARK[3])):
+    for top, bottom in zip(MARK[::2], MARK[1::2]):
         row = Text()
         for upper, lower in zip(top, bottom):
             a, b = colors.get(upper), colors.get(lower)

@@ -22,7 +22,7 @@ from ..state.units import MAX_RETRIES, TIERS, UnitStore, is_terminal
 from .plan import Snapshot
 
 MERGE_OPTIONS = [
-    {"option": "approve", "consequence": "The PR merges and work stacked on it can merge after.",
+    {"option": "approve", "consequence": "It merges, and stacked work can follow.",
      "recommended_because": "Reviewed and green. Read the findings first."},
     {"option": "send_back", "consequence": "A fresh session fixes it. One retry is spent."},
 ]

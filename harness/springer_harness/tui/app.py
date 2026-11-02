@@ -15,7 +15,7 @@ from textual.widgets import ContentSwitcher, Input, Static
 from .client import ApiError, ConnectionLost, run_path
 from .dialogs import ConfirmDialog
 from .panes import BacklogPane, BriefPane, ProjectsPane, RunPane
-from .theme import C, STONES, THEME, join, lines, mark, paint, stones_laid
+from .theme import C, STONES, THEME, join, mark, paint, stones_laid
 
 REFRESH_SECONDS = 0.25
 IDLE_REFRESH_SECONDS = 5
@@ -29,10 +29,12 @@ class SpringerApp(App):
     TITLE = "Springer"
     CSS = """
     Screen { background: $background; }
-    #topbar { height: 2; padding: 0 2; margin-bottom: 1; }
-    #mark { width: 10; height: 2; }
-    #where { width: 1fr; height: 2; }
-    #nav { width: auto; height: 2; }
+    #topbar { height: 4; padding: 0 2; margin-bottom: 1; }
+    #mark { width: 14; height: 4; }
+    #header { width: 1fr; height: 2; margin-top: 1; }
+    .header-row { height: 1; }
+    #brand, #where { width: 1fr; height: 1; }
+    #nav, #progress { width: auto; height: 1; }
     #banner { height: auto; background: $error 20%%; color: $error; padding: 0 2; display: none; }
     #banner.lost { display: block; }
     #panes { height: 1fr; }
@@ -100,8 +102,13 @@ class SpringerApp(App):
     def compose(self) -> ComposeResult:
         with Horizontal(id="topbar"):
             yield Static(mark(), id="mark", markup=False)
-            yield Static("", id="where", markup=False)
-            yield Static("", id="nav", markup=False)
+            with Vertical(id="header"):
+                with Horizontal(classes="header-row"):
+                    yield Static(paint("springer", "text", bold=True), id="brand", markup=False)
+                    yield Static("", id="nav", markup=False)
+                with Horizontal(classes="header-row"):
+                    yield Static("", id="where", markup=False)
+                    yield Static("", id="progress", markup=False)
         yield Static(LOST, id="banner", markup=False)
         with ContentSwitcher(initial="projects", id="panes"):
             yield ProjectsPane(id="projects-pane")
@@ -254,8 +261,7 @@ class SpringerApp(App):
             resets = calendar.timegm(time.strptime(usage[0]["resets_at"], "%Y-%m-%dT%H:%M:%SZ"))
             window = f"window {'unknown' if used is None else f'{used:.0%}'}, resets {time.strftime('%H:%M', time.localtime(resets))}"
         where = " · ".join(x for x in (self.project, self.run_id) if x)
-        self.main.query_one("#where", Static).update(
-            lines([paint("springer", "text", bold=True), paint(where, "dim")]))
+        self.main.query_one("#where", Static).update(paint(where, "dim"))
         current = self.main.query_one("#panes", ContentSwitcher).current.removesuffix("-pane")
         tabs = []
         for key, name in (("p", "projects"), ("b", "brief"), ("k", "backlog"), ("r", "run"), ("q", "quit")):
@@ -269,7 +275,8 @@ class SpringerApp(App):
             status.append(f"${metrics['list_price_spend_usd']:.2f} at list price")
             progress = self._progress(run)
         status.append(f"daemon {state['state']}")
-        self.main.query_one("#nav", Static).update(lines([join(*tabs), progress]))
+        self.main.query_one("#nav", Static).update(join(*tabs))
+        self.main.query_one("#progress", Static).update(progress)
         self.main.query_one("#statusline", Static).update(paint("  ·  ".join(s for s in status if s), "dim"))
 
     def _progress(self, run):

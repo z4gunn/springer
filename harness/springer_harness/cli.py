@@ -17,6 +17,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from .build import build_id
+
 DEFAULT_PORT = 7337
 START_TIMEOUT_SECONDS = 15
 
@@ -43,7 +45,7 @@ def running(home):
             body = json.loads(response.read())
     except (OSError, ValueError, KeyError, urllib.error.URLError):
         return None
-    return record if body.get("status") == "ok" and body.get("api_version") else None
+    return {**record, "build": body.get("build")} if body.get("status") == "ok" and body.get("api_version") else None
 
 
 def _free_port():
@@ -65,8 +67,13 @@ def ensure_daemon(home):
     with open(home / "daemon.lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         record = running(home)
-        if record:
+        if record and record["build"] == build_id():
             return record
+        if record:
+            # Code the TUI knows and the daemon does not fails in confusing ways, so the
+            # daemon is replaced. Its sessions are recovered at the next start, with no
+            # retry spent.
+            stop_daemon(home)
         log_path = home / "daemon.log"
         package_parent = str(Path(__file__).resolve().parents[1])
         env = {**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [package_parent, os.environ.get("PYTHONPATH")]))}
@@ -96,6 +103,8 @@ def stop_daemon(home):
     deadline = time.time() + 5
     while time.time() < deadline and running(home):
         time.sleep(0.1)
+    if running(home):
+        os.kill(record["pid"], signal.SIGKILL)
     return True
 
 
@@ -114,7 +123,8 @@ def serve(home, port):
     app = create_app(daemon)
     daemon.home.write_port(port)
     daemon.start()
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    # A TUI's open event stream must not hold the daemon's shutdown.
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning", timeout_graceful_shutdown=1)
     return 0
 
 

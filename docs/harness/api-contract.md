@@ -111,7 +111,7 @@ Reads are grouped by the resource they return. Paths under a run are abbreviated
 
 | Path | Returns |
 |------|---------|
-| GET /v1/health | `status`, `api_version`, `harness_version` |
+| GET /v1/health | `status`, `api_version`, `harness_version`, `build` (a fingerprint of the running code) |
 | GET /v1/daemon | `state` (running, parked), `parked_until`, `started_at`, `degradations` (e.g. a missing optional tool, as `springer doctor` reports them) |
 | GET /v1/usage | One `usage-window-v1` record per provider account |
 | GET /v1/operations/catalog | Every operation with its args JSON Schema, confirmation rule, and actor rule |

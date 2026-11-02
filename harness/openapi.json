@@ -382,6 +382,10 @@
             "title": "Api Version",
             "type": "string"
           },
+          "build": {
+            "title": "Build",
+            "type": "string"
+          },
           "harness_version": {
             "title": "Harness Version",
             "type": "string"
@@ -394,7 +398,8 @@
         "required": [
           "status",
           "api_version",
-          "harness_version"
+          "harness_version",
+          "build"
         ],
         "title": "Health",
         "type": "object"
