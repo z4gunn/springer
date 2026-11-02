@@ -134,6 +134,8 @@ def create_app(daemon):
                 "deploy": front.get("deploy"), "runtime_version": record.get("runtime_version"),
                 "archived": record.get("archived", False), "active_run": active,
                 "adopted": bool(record.get("adopted")), "lane": front.get("lane"), "settings": daemon.settings(slug),
+                "adopted_brief_version": record.get("adopted_brief_version"),
+                "has_design": (Path(record["path"]) / "docs" / "design" / "index.html").exists(),
                 "hand_merge": [p for p in record.get("hand_merge") or [] if (Path(record["path"]) / p).exists()]}
 
     def gate_view(engine, gate):

@@ -179,23 +179,26 @@ class Daemon:
             raise InvalidArgs(str(exc))
         manifest = read_json(target / ".claude" / "springer-manifest.json") or {}
         merges = sorted(w for w in written if w.startswith(adopt.UPDATE_DIR))
+        brief = BriefStore(target).load()[0] if BriefStore(target).exists() else {}
         self.home.save_project(slug, {"slug": slug, "name": name, "path": str(target), "archived": False,
                                       "runtime_version": (manifest.get("source_commit") or "")[:7],
-                                      "adopted": True, "hand_merge": merges})
+                                      "adopted": True, "hand_merge": merges,
+                                      "adopted_brief_version": brief.get("brief_version")})
         return slug
 
     def history(self, slug):
         """Runs from before the daemon, imported at adoption, newest last."""
         return read_json(self.home.root / "index" / f"{slug}.json", {"runs": [], "learnings": []})
 
-    def start_run(self, slug, kind, sections=None):
+    def start_run(self, slug, kind, sections=None, lane=None, issue=None):
         front, _ = self.brief(slug).load()
         count = len(self.run_ids(slug)) + 1
         run_id = f"{slug}-{kind}-{count}" if kind != "build" else f"{slug}-{count}"
         path = self.project_path(slug)
         derived = derive(front)
         doc = artifact_header(f"run-brief-{run_id}", "run-brief", "run_brief", "v1", self.now())
-        doc["content"] = {"run_id": run_id, "profile": derived["profile"], "kind": kind, "lane": derived["lane"],
+        doc["content"] = {"run_id": run_id, "profile": derived["profile"], "kind": kind, "lane": lane or derived["lane"],
+                          "issue": issue,
                           "brief_version": front.get("brief_version", 1), "sections": sections,
                           "pinned_rulings": list(front.get("pinned_rulings") or [])}
         write_json(path / "runs" / run_id / "run-brief.json", doc)

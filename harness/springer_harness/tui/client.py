@@ -59,9 +59,9 @@ class ApiClient:
         self._raise_for(response)
         return response
 
-    async def get(self, path, **params):
+    async def get(self, route, **params):
         params = {k: v for k, v in params.items() if v is not None}
-        return (await self._request("GET", path, params=params)).json()
+        return (await self._request("GET", route, params=params)).json()
 
     async def get_text(self, path):
         return (await self._request("GET", path)).text

@@ -13,8 +13,8 @@ from textual.widgets.option_list import Option
 
 from .client import ApiError, run_path
 from . import items
-from .dialogs import (ConfirmDialog, EditDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog, SettingsDialog,
-                      TextDialog)
+from .dialogs import (AdoptDialog, ConfirmDialog, EditDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog,
+                      RunsDialog, SettingsDialog, StartDialog, TextDialog, imported_text)
 from .theme import COLUMN, RISK, join, keys, lines, paint
 
 # Shown in an empty section, and never saved: the format these sections must take. They
@@ -69,6 +69,23 @@ def _put(found, original, item, first="name"):
     return found + [item]
 
 
+async def show_runs(app, slug):
+    """The runs list: the daemon's runs, then history imported at adoption."""
+    runs = await app.client.get(f"/v1/projects/{slug}/runs")
+    history = await app.client.get(f"/v1/projects/{slug}/history")
+    picked = await app.push_screen_wait(RunsDialog(runs, history))
+    if not picked:
+        return
+    kind, value = picked
+    if kind == "run":
+        if app.project != slug:
+            await app.open_project(slug)
+        app.select_run(value)
+        app.show("run")
+    else:
+        await app.push_screen_wait(TextDialog(f"{value['run_id']} (imported)", imported_text(value, history["learnings"])))
+
+
 def staging_of(project):
     staging = (project.get("settings") or {}).get("staging")
     if not staging:
@@ -119,13 +136,14 @@ class Pane(Vertical):
 class ProjectsPane(Pane):
     focus_id = "#projects"
     BINDINGS = [Binding("n", "new", "new"), Binding("a", "adopt", "adopt"), Binding("x", "archive", "archive"),
-                Binding("e", "settings", "settings"), Binding("D", "deploy", "deploy")]
+                Binding("e", "settings", "settings"), Binding("D", "deploy", "deploy"),
+                Binding("o", "design", "design"), Binding("l", "runs", "runs")]
 
     def compose(self) -> ComposeResult:
         yield DataTable(id="projects", cursor_type="row", zebra_stripes=False)
         yield Static("", id="project-notes", markup=False)
         yield Static(keys(("n", "new"), ("a", "adopt"), ("enter", "open"), ("e", "settings"), ("D", "deploy"),
-                          ("x", "archive")), classes="hint")
+                          ("o", "design"), ("l", "runs"), ("x", "archive")), classes="hint")
 
     def on_mount(self):
         self.query_one("#projects", DataTable).add_columns("NAME", "PROFILE", "PHASE", "GATES", "CI", "STAGING", "STATUS")
@@ -205,8 +223,36 @@ class ProjectsPane(Pane):
         title = "New project" if mode == "new" else "Adopt an existing repository"
         form = await self.app.push_screen_wait(FormDialog(title, {"name": "", "path": ""},
                                                           placeholders={"name": "My App", "path": "~/Repos/my-app"}))
-        if form:
-            await self.app.apply("project.create", {**form, "path": self._resolve(form["path"]), "mode": mode})
+        if not form:
+            return
+        args = {**form, "path": self._resolve(form["path"]), "mode": mode}
+        if mode == "new":
+            await self.app.apply("project.create", args)
+            return
+        # Adopting shows everything it would derive and write before it writes anything,
+        # and that review is the confirmation.
+        preview = await self.client.get("/v1/adopt/preview", path=args["path"])
+        if await self.app.push_screen_wait(AdoptDialog(preview)):
+            await self.app.apply("project.create", args, reviewed=True)
+
+    def _selected(self):
+        return self.table_key(self.query_one("#projects", DataTable))
+
+    def action_design(self):
+        slug = self._selected()
+        if slug and self.projects.get(slug, {}).get("has_design"):
+            self.app.spawn(self._open_design(slug))
+        elif slug:
+            self.app.notify(f"{slug} has no docs/design/index.html yet.")
+
+    async def _open_design(self, slug):
+        session = await self.client.get(f"/v1/projects/{slug}/design-session")
+        self.app.open_url(session["url"])
+
+    def action_runs(self):
+        slug = self._selected()
+        if slug:
+            self.app.spawn(show_runs(self.app, slug))
 
     def _resolve(self, path):
         """A relative path means relative to where the person ran springer, which only
@@ -572,7 +618,19 @@ class BriefPane(Pane):
     async def _start(self):
         if not await self._save():
             return
-        outcome = await self.app.apply("run.start", {"base_version": self.version}, project=self.app.project)
+        args = {"base_version": self.version}
+        project = await self.client.get(f"/v1/projects/{self.app.project}")
+        if project.get("adopted"):
+            choice = await self.app.push_screen_wait(StartDialog())
+            if choice is None:
+                return
+            if choice["lane"] == "build" and self.version == project.get("adopted_brief_version"):
+                self.app.notify("Describe the change in the brief first: edit the sections it touches, then "
+                                "press s and choose build.", severity="warning")
+                self.query_one("#rail", OptionList).focus()
+                return
+            args.update({k: v for k, v in choice.items() if v})
+        outcome = await self.app.apply("run.start", args, project=self.app.project)
         if outcome and outcome.get("result", {}).get("run_id"):
             self.app.select_run(outcome["result"]["run_id"])
             self.app.show("run")
@@ -818,7 +876,7 @@ class RunPane(Pane):
                 Binding("o", "design", "design"), Binding("n", "notes", "answer with notes"),
                 Binding("P", "pause", "pause"), Binding("c", "cancel_unit", "cancel"),
                 Binding("R", "redispatch", "re-dispatch"), Binding("X", "cancel_run", "cancel run"),
-                Binding("v", "viewed", "clear routine")]
+                Binding("v", "viewed", "clear routine"), Binding("l", "runs", "runs")]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -996,6 +1054,10 @@ class RunPane(Pane):
         higher = TIERS[min(TIERS.index(tier) + 1, len(TIERS) - 1)]
         await self.app.apply("unit.redispatch", {"unit_id": unit_id, "model_tier": higher}, project=self.app.project,
                              run_id=self.app.run_id)
+
+    def action_runs(self):
+        if self.app.project:
+            self.app.spawn(show_runs(self.app, self.app.project))
 
     def action_viewed(self):
         if self.digest:

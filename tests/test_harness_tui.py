@@ -36,8 +36,9 @@ if HAVE_TUI:
     from springer_harness.tui.client import ApiClient
     from springer_harness.check.critique import critique, parse_flows, parse_users
     from springer_harness.tui import items
-    from springer_harness.tui.dialogs import (NEW_USER, ConfirmDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog,
-                                              SettingsDialog, TextDialog)
+    from springer_harness.tui.dialogs import (NEW_USER, AdoptDialog, ConfirmDialog, FactsDialog, FieldsDialog, FlowDialog,
+                                              FormDialog, RunsDialog, SettingsDialog, StartDialog, TextDialog)
+    from test_harness_adopt import build_instance
     from textual.widgets import Select
 
 GOOD = {"Problem": "Freelancers lose track of invoices.", "Users": "- Fran: a freelancer",
@@ -269,6 +270,92 @@ class ProjectsScreenTest(TuiCase):
             await pilot.pause(0.1)
             await pilot.press("enter")
             await self.see(pilot, "brief  v")
+
+
+class AdoptedProjectTest(TuiCase):
+    async def adopt(self, pilot):
+        await self.see(pilot, "Acme")
+        await pilot.press("a")
+        await self.dialog(pilot, FormDialog)
+        self.app.screen.query_one("#field-name", Input).value = "Shop"
+        self.app.screen.query_one("#field-path", Input).value = str(self.shop)
+        await pilot.press("enter")
+        await self.dialog(pilot, AdoptDialog)
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.shop = build_instance(self.root / "instances")
+        (self.shop / "docs/design").mkdir(parents=True, exist_ok=True)
+        (self.shop / "docs/design/index.html").write_text("<title>Existing directions</title>")
+
+    async def adopted(self, pilot):
+        await self.adopt(pilot)
+        await pilot.press("y")
+        await self.see(pilot, "Shop")
+        await self.until(pilot, lambda: "shop" in self.daemon.home.projects())
+
+    async def test_the_adopt_screen_shows_what_it_derives_then_adopts(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.adopt(pilot)
+            await self.see(pilot, "kept, edited here: .claude/references/pdca-harness.md",
+                           "CLAUDE.md: new rendering in .claude/springer-update/", "Derived facts, which run as small",
+                           "pinned rulings: 3", "Problem from the latest confirmed PRD", "Never written: Claude outputs")
+            self.assertEqual(self.daemon.home.projects().get("shop"), None, "the review writes nothing")
+            await pilot.press("y")
+            await self.until(pilot, lambda: "shop" in self.daemon.home.projects())
+            self.assertNotIsInstance(self.app.screen, ConfirmDialog, "the review was the confirmation")
+            await self.see(pilot, "Shop")
+            rows = [r.value for r in self.app.query_one("#projects", DataTable).rows]
+            self.app.query_one("#projects", DataTable).move_cursor(row=rows.index("shop"))
+            await self.see(pilot, "Merge by hand: .claude/springer-update/CLAUDE.md")
+
+    async def test_start_offers_polish_with_an_issue_and_build_waits_for_a_delta(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.adopted(pilot)
+            await pilot.press("down")
+            await pilot.press("enter")
+            await self.see(pilot, "brief  v")
+            await pilot.press("s")
+            await self.dialog(pilot, StartDialog)
+            await pilot.press("ctrl+b")
+            await self.see(pilot, "Describe the change in the brief first")
+            self.assertEqual(self.daemon.run_ids("shop"), [])
+            await pilot.press("s")
+            await self.dialog(pilot, StartDialog)
+            self.app.screen.query_one("#start-issue", TextArea).load_text("The footer link opens the wrong address.")
+            await pilot.press("ctrl+s")
+            await self.dialog(pilot, ConfirmDialog)
+            await self.see(pilot, "lane: polish")
+            await pilot.press("y")
+            await self.until(pilot, lambda: self.daemon.run_ids("shop"))
+            run_id = self.daemon.run_ids("shop")[0]
+            brief = json.loads((self.shop / "runs" / run_id / "run-brief.json").read_text())["content"]
+            self.assertEqual((brief["lane"], brief["issue"]), ("polish", "The footer link opens the wrong address."))
+            self.assertEqual(len(brief["pinned_rulings"]), 3)
+
+    async def test_the_design_page_serves_the_existing_mockups(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.adopted(pilot)
+            rows = [r.value for r in self.app.query_one("#projects", DataTable).rows]
+            self.app.query_one("#projects", DataTable).move_cursor(row=rows.index("shop"))
+            await pilot.press("o")
+            await self.until(pilot, lambda: self.opened)
+            import httpx
+            page = await asyncio.to_thread(httpx.get, self.opened[-1], follow_redirects=True)
+            self.assertIn("Existing directions", page.text)
+
+    async def test_the_runs_list_shows_imported_history(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.adopted(pilot)
+            rows = [r.value for r in self.app.query_one("#projects", DataTable).rows]
+            self.app.query_one("#projects", DataTable).move_cursor(row=rows.index("shop"))
+            await pilot.press("l")
+            await self.dialog(pilot, RunsDialog)
+            await self.see(pilot, "second  imported, 1 cycles  complete", "first  imported, 0 cycles")
+            await pilot.press("enter")
+            await self.dialog(pilot, TextDialog)
+            await self.see(pilot, "CYCLE-0001  development  pass -> complete  frontend-developer",
+                           "DEF-1 | the heading | accepted", "L-1 (process): Frozen lists help.")
 
 
 class BriefScreenTest(TuiCase):
@@ -997,6 +1084,13 @@ class WholeRunTest(TuiCase):
 COVERAGE = {
     ("Projects", "List with status"): (ProjectsScreenTest, "test_list_with_status"),
     ("Projects", "New, open, archive"): (ProjectsScreenTest, "test_new_open_archive"),
+    ("Projects", "Adopt an existing instance: derived facts, proposed sections, edited files, the CLAUDE.md merge"):
+        (AdoptedProjectTest, "test_the_adopt_screen_shows_what_it_derives_then_adopts"),
+    ("Projects", "Start on an adopted project: polish with an issue, or build a delta"):
+        (AdoptedProjectTest, "test_start_offers_polish_with_an_issue_and_build_waits_for_a_delta"),
+    ("Projects", "Design page serves an existing docs/design/index.html"):
+        (AdoptedProjectTest, "test_the_design_page_serves_the_existing_mockups"),
+    ("Projects", "Runs list with imported history"): (AdoptedProjectTest, "test_the_runs_list_shows_imported_history"),
     ("Projects", "CI signal and staging, a dry run before the one deploy confirmation"):
         (ProjectsScreenTest, "test_settings_and_a_dry_run_before_the_first_deploy"),
     ("Brief", "Editor, facts panel, derived profile"): (BriefScreenTest, "test_editor_facts_panel_and_derived_profile"),

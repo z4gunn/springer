@@ -65,6 +65,8 @@ class RunDiscovery(Args):
 
 class RunStart(Args):
     base_version: int
+    lane: Literal["build", "polish"] | None = None  # the brief's lane when absent
+    issue: str | None = Field(default=None, max_length=4000)  # the one issue a polish run takes
 
 
 class RunPause(Args):
@@ -277,12 +279,20 @@ def dismiss_recommendation(c):
 def run_start(c):
     c.brief.check_version(c.args.base_version)
     front, sections = c.brief.load()
-    result = critique(front, sections, c.daemon.home.config().get("staging_hosts", []))
+    if c.daemon.active_run(c.project):
+        raise IllegalTransition(f"{c.project} already has a run in progress")
+    if c.args.lane == "polish":
+        # A polish run takes one issue in the person's words. The brief describes a
+        # product that already exists, so it is context, not a gate on the start.
+        if not (c.args.issue or "").strip():
+            raise InvalidArgs("A polish run needs the issue, in your own words.")
+        return {"run_id": c.daemon.start_run(c.project, "build", lane="polish", issue=c.args.issue.strip())}
+    hosts = c.daemon.home.config().get("staging_hosts", []) + \
+        [h["name"] for h in [c.daemon.settings(c.project)["staging"]] if h]
+    result = critique(front, sections, hosts)
     if result["errors"]:
         raise CritiqueErrors("The brief has blocking errors.", {"critique": result})
-    if c.daemon.started(c.project) and c.daemon.active_run(c.project):
-        raise IllegalTransition(f"{c.project} already has a run in progress")
-    return {"run_id": c.daemon.start_run(c.project, "build")}
+    return {"run_id": c.daemon.start_run(c.project, "build", lane=c.args.lane)}
 
 
 def noop(c):

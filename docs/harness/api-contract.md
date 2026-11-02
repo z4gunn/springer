@@ -274,7 +274,7 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 | brief.confirm_section | `section`, `base_version` | No | Marks a proposed section confirmed unchanged |
 | brief.run_discovery | `sections` (list, or all) | Yes | Dispatches Discovery against the named sections. Returns accepted |
 | brief.dismiss_recommendation | none | No | Hides the go or no-go banner |
-| run.start | `base_version` | Yes | Commits the brief and opens the run. Fails with critique_errors while an error stands. Returns accepted |
+| run.start | `base_version`, `lane` (build, polish), `issue` | Yes | Commits the brief and opens the run. A build fails with critique_errors while an error stands. A polish run needs `issue`, the one change in the person's words, and the brief is its context rather than a gate. Every pinned ruling carries into the run brief. Returns accepted |
 | run.pause | `reason` | No | Stops claiming and dispatching. In-flight sessions finish and Check still runs |
 | run.resume | none | No | Clears the pause |
 | run.cancel | none | Yes | Cancels every unfinished unit, closes its gates, and ends the run, so a new one can start. Open PRs stay open |
@@ -311,6 +311,10 @@ This section is used to check the contract against what the target README promis
 | Projects | List with status | GET /v1/projects, daemon stream |
 | Projects | New, open, archive | project.create, project.archive |
 | Projects | CI signal and staging, a dry run before the one deploy confirmation | project.configure, staging.deploy |
+| Projects | Adopt an existing instance: derived facts, proposed sections, edited files, the CLAUDE.md merge | GET /v1/adopt/preview, project.create |
+| Projects | Start on an adopted project: polish with an issue, or build a delta | run.start with lane and issue |
+| Projects | Design page serves an existing docs/design/index.html | GET design-session |
+| Projects | Runs list with imported history | GET runs, GET history |
 | Brief | Editor, facts panel, derived profile | GET brief, brief.update_section, brief.update_facts |
 | Brief | Critique | GET brief/critique |
 | Brief | Every section as fields | GET brief, brief.update_section |

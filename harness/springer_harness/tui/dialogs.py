@@ -6,7 +6,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Select, Static, TextArea
 
-from .theme import join, keys, paint
+from .theme import join, keys, lines, paint
 
 NEW_USER = "\0new-user"
 
@@ -429,3 +429,134 @@ class SettingsDialog(Dialog):
             if host != {**{k: v for k, v in (self.settings.get("staging") or {}).items() if v}}:
                 args["staging"] = host
         self.dismiss(args)
+
+
+def _clip(text, width):
+    flat = " ".join(str(text).split())
+    return flat if len(flat) <= width else flat[:width - 1] + "…"
+
+
+class AdoptDialog(Dialog):
+    """The adopt preview: what is derived, what is written, what is never touched.
+    Confirming adopts. Returns True or None."""
+
+    BINDINGS = [Binding("y", "yes", "Adopt"), Binding("n", "cancel", "No")]
+
+    def __init__(self, preview):
+        super().__init__()
+        self.preview = preview
+
+    def compose(self) -> ComposeResult:
+        p = self.preview
+        rows = [paint(f"Adopt {p['path']}", "text", bold=True), paint("")]
+        if not p.get("instance"):
+            rows += [paint("Not a Springer instance yet. The runtime is installed beside the repository's own "
+                           "files and nothing it has is replaced.", "text")]
+        else:
+            runtime = p["runtime"]
+            rows += [paint("Runtime", "text", bold=True),
+                     paint(f"  {len(runtime['add'])} added, {len(runtime['replace'])} replaced (never edited here), "
+                           f"{runtime['unchanged']} unchanged, {len(runtime['remove'])} removed", "dim")]
+            rows += [paint(f"  kept, edited here: {path}", "you") for path in runtime["edited"]]
+            for path, what in p["templates"].items():
+                if what != "unchanged":
+                    rows.append(paint(f"  {path}: {what}", "you"))
+            facts = {k: v for k, v in p["facts"].items() if k != "pinned_rulings"}
+            rows += [paint(""), paint(f"Derived facts, which run as {p['derived']['profile']} in the "
+                                      f"{p['derived']['lane']} lane", "text", bold=True)]
+            rows += [join(paint(f"  {k} ", "dim"), paint(", ".join(v) if isinstance(v, list) else str(v), "text"),
+                          paint(f"  ({p['fact_sources'].get(k, '')})", "dim")) for k, v in facts.items()]
+            rows.append(paint(f"  pinned rulings: {len(p['facts'].get('pinned_rulings') or [])} from "
+                              f"{p['fact_sources'].get('pinned_rulings', '')}", "dim"))
+            rows += [paint(""), paint(f"Brief: {p['brief']}", "text", bold=True)]
+            if p["brief"].startswith("derived"):
+                rows += [join(paint(f"  {name} ", "text"), paint(f"from {p['section_sources'][name]}: ", "dim"),
+                              paint(_clip(body.split(':', 1)[-1], 70), "dim")) for name, body in p["sections"].items()]
+            history = p["history"]
+            rows += [paint(""), paint(f"DESIGN.md: {p['design_md']}", "text"),
+                     paint(f"History: {len(history['runs'])} run(s), "
+                           f"{sum(len(r['cycles']) for r in history['runs'])} cycles, "
+                           f"{len(history['learnings'])} learnings, read into the daemon index", "text")]
+        if p.get("project_owned"):
+            rows.append(paint("Never written: " + ", ".join(p["project_owned"]) + ", and everything outside the runtime",
+                              "dim"))
+        with Vertical(classes="dialog wide"):
+            with VerticalScroll():
+                yield Static(lines(rows), markup=False)
+            yield Static(keys(("y", "adopt"), ("n", "cancel")), classes="hint")
+
+    def action_yes(self):
+        self.dismiss(True)
+
+
+class StartDialog(Dialog):
+    """Start a run on a product that exists: polish one issue, or build a delta.
+    Returns {"lane", "issue"} or None."""
+
+    BINDINGS = [Binding("ctrl+s", "polish", "Polish", priority=True), Binding("ctrl+b", "build", "Build", priority=True)]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog form"):
+            yield Static("Start a run", classes="dialog-title", markup=False)
+            yield Static("Polish takes one issue in your words to one pull request. Build changes the product's "
+                         "brief: describe the delta in the brief first.", markup=False)
+            yield Label("The issue", classes="form-label")
+            yield TextArea("", id="start-issue", compact=True, classes="form-text",
+                           placeholder="e.g. The contact link in the footer opens the wrong address")
+            yield Static("", id="form-error", markup=False)
+            yield Static(keys(("ctrl+s", "polish this issue"), ("ctrl+b", "build a delta"), ("esc", "cancel")),
+                         classes="hint")
+
+    def action_polish(self):
+        issue = self.query_one("#start-issue", TextArea).text.strip()
+        if not issue:
+            self.query_one("#form-error", Static).update("Write the issue first, or press ctrl+b to build.")
+            return
+        self.dismiss({"lane": "polish", "issue": issue})
+
+    def action_build(self):
+        self.dismiss({"lane": "build", "issue": None})
+
+
+class RunsDialog(Dialog):
+    """Every run of a project: the daemon's, then those imported at adoption.
+    Returns ("run", run_id) or ("imported", run) or None."""
+
+    def __init__(self, runs, history):
+        super().__init__()
+        self.runs, self.history = runs, history
+
+    def compose(self) -> ComposeResult:
+        from textual.widgets import OptionList
+        from textual.widgets.option_list import Option
+        options = [Option(join(paint(r["run_id"], "text", bold=True), paint(f"  {r['phase']}", "stone"),
+                               paint("  complete" if r["complete"] else "", "dim")), id=f"run:{r['run_id']}")
+                   for r in self.runs]
+        options += [Option(join(paint(r["run_id"], "text"), paint(f"  imported, {len(r['cycles'])} cycles", "dim"),
+                                paint("  complete" if r["complete"] else "  ended open", "dim")),
+                           id=f"imported:{r['run_id']}") for r in reversed(self.history.get("runs") or [])]
+        with Vertical(classes="dialog wide"):
+            yield Static("Runs", classes="dialog-title", markup=False)
+            yield OptionList(*options, id="runs-list") if options else Static("No runs yet.", markup=False)
+            yield Static(keys(("enter", "open"), ("esc", "close")), classes="hint")
+
+    def on_option_list_option_selected(self, event):
+        kind, run_id = event.option.id.split(":", 1)
+        if kind == "run":
+            self.dismiss(("run", run_id))
+        else:
+            self.dismiss(("imported", next(r for r in self.history["runs"] if r["run_id"] == run_id)))
+
+
+def imported_text(run, learnings):
+    """An imported run, read only: its cycles, its defaults, and the learnings."""
+    out = [f"{run['run_id']}, imported at adoption ({run.get('profile') or 'profile unknown'}"
+           f"{', ' + run['lane'] if run.get('lane') else ''})", ""]
+    out += [f"{c['cycle_id']}  {c.get('phase') or '-'}  {c.get('verdict') or '-'} -> {c.get('transition') or '-'}"
+            f"  {', '.join(a.replace('spgr-agent-', '') for a in c['agents'])}" for c in run["cycles"]]
+    if run["defaults"]:
+        out += ["", "Defaults taken"] + [f"  {d}" for d in run["defaults"]]
+    mine = [l for l in learnings if l.get("run_id") == run["run_id"]]
+    if mine:
+        out += ["", "Learnings"] + [f"  {l['id']} ({l['category']}): {l['observation']}" for l in mine]
+    return "\n".join(out)

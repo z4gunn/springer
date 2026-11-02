@@ -87,6 +87,11 @@ Rules for the schema:
   billing, infra, or CI, L3 for a unit that must not start before a person decides.
 - gates: only the gates the autonomy level fires (under standard, one direction-review
   holding the units that need the picked option and direction). holds names unit keys.
+- When the run brief's lane is polish, the run takes the one issue in run_brief.issue,
+  per Lanes in the reference: one implementing unit, its review, at most two verticals by
+  the paths it touches, and the product check, ending in one pull request. Write no PRD,
+  story, criteria, or ADR artifact unless the change is on the gate list. Every ruling in
+  run_brief.pinned_rulings binds.
 - A unit in blocked, gated, or planned behind a gate is waiting on a person, and the
   answer resumes that same unit. Never route its work again under a new key.
 - done: true only when the profile's work is finished and nothing remains to route.

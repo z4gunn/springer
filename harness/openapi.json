@@ -624,6 +624,17 @@
             "title": "Adopted",
             "type": "boolean"
           },
+          "adopted_brief_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adopted Brief Version"
+          },
           "archived": {
             "title": "Archived",
             "type": "boolean"
@@ -646,6 +657,11 @@
             },
             "title": "Hand Merge",
             "type": "array"
+          },
+          "has_design": {
+            "default": false,
+            "title": "Has Design",
+            "type": "boolean"
           },
           "lane": {
             "anyOf": [

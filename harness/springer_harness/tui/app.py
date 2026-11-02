@@ -58,6 +58,7 @@ class SpringerApp(App):
     DataTable > .datatable--header-hover, DataTable > .datatable--header-cursor { background: $background; color: %(dim)s; }
     #projects, #backlog { height: 1fr; }
     #project-notes { height: auto; padding: 0 2; }
+    #runs-list { height: auto; max-height: 20; border: none; background: %(card)s; }
     #board { height: 1fr; padding: 0 2; }
     #gates-box { height: auto; max-height: 50%%; background: %(card)s; border-left: thick %(you_bar)s; padding: 0 2; margin: 0 2; }
     #gates { height: auto; }
@@ -78,7 +79,8 @@ class SpringerApp(App):
     #facts { width: 32; height: 100%%; padding: 0 1; border-left: solid %(border)s; }
     #recommendation { height: auto; padding: 0 2; }
     #critique { height: auto; max-height: 8; padding: 0 2; margin-top: 1; }
-    ConfirmDialog, FormDialog, TextDialog, EditDialog, FlowDialog, FieldsDialog, FactsDialog { align: center middle; background: $background 60%%; }
+    ConfirmDialog, FormDialog, TextDialog, EditDialog, FlowDialog, FieldsDialog, FactsDialog, SettingsDialog, AdoptDialog, StartDialog,
+    RunsDialog { align: center middle; background: $background 60%%; }
     .dialog { width: 70; height: auto; max-height: 80%%; background: %(card)s; border-left: thick %(you_bar)s; padding: 1 2; }
     .dialog.wide { width: 90%%; height: 80%%; }
     .dialog-title { text-style: bold; color: %(text)s; margin-bottom: 1; }
@@ -221,14 +223,16 @@ class SpringerApp(App):
 
     # --- writes: one path, with the confirmation flow ---
 
-    async def apply(self, kind, args=None, project=None, run_id=None, reraise=False):
+    async def apply(self, kind, args=None, project=None, run_id=None, reraise=False, reviewed=False):
         """Send an operation. A change that needs confirming shows the API's preview,
-        and on yes is sent again with its token. Returns the outcome, or None."""
+        and on yes is sent again with its token. reviewed means the person already
+        confirmed a fuller review of this exact change (e.g. the adopt screen), so the
+        generic preview is not shown a second time. Returns the outcome, or None."""
         op_id = str(uuid.uuid4())
         try:
             outcome = await self.client.op(kind, args, project, run_id, op_id=op_id)
             if outcome["status"] == "needs_confirmation":
-                if not await self.push_screen_wait(ConfirmDialog(outcome["preview"])):
+                if not reviewed and not await self.push_screen_wait(ConfirmDialog(outcome["preview"])):
                     return None
                 outcome = await self.client.op(kind, args, project, run_id, confirm_token=outcome["confirm_token"],
                                                op_id=op_id)
