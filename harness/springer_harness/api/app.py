@@ -1,12 +1,13 @@
 """The HTTP and SSE surface. See docs/harness/api-contract.md, which this implements."""
 
 import asyncio
+import html
 import json
 import secrets
 
 from fastapi import Depends, FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..build import build_id
@@ -44,6 +45,15 @@ def _error(status, code, message, details=None):
 def _frame(event, data, event_id=None):
     head = f"id: {event_id}\n" if event_id else ""
     return f"{head}event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def _design_message(status, title, body):
+    """The design surface is the one thing a person reads in a browser, so it answers
+    in a page and not in the API's JSON."""
+    return HTMLResponse(status_code=status, content=(
+        "<!doctype html><meta charset=utf-8><title>Springer</title>"
+        "<body style='background:#16171A;color:#E4DED2;font:16px/1.5 Menlo,monospace;padding:3rem;max-width:44rem'>"
+        f"<h1 style='font-size:1.1rem'>{html.escape(title)}</h1><p style='color:#B7AE9E'>{html.escape(body)}</p>"))
 
 
 def _page(items, cursor, limit):
@@ -400,7 +410,11 @@ def create_app(daemon):
         root = (daemon.project_path(slug) / "docs" / "design").resolve()
         target = (root / rel).resolve()
         if target != root and root not in target.parents:
-            raise NotFound("outside the design directory")
+            return _design_message(404, "Not a design file", "This page only serves the project's docs/design directory.")
+        if not root.is_dir():
+            return _design_message(404, f"No design files for {slug} yet",
+                                   "The design agent writes its mockups to docs/design, and none are there. "
+                                   "This page shows them once they exist.")
         if target.is_dir():
             index = target / "index.html"
             if index.exists():
@@ -408,7 +422,7 @@ def create_app(daemon):
             names = sorted(p.name + ("/" if p.is_dir() else "") for p in target.iterdir())
             return PlainTextResponse("\n".join(names))
         if not target.is_file():
-            raise NotFound(rel)
+            return _design_message(404, "That file is not there", f"{rel} is not in {slug}'s docs/design directory.")
         return FileResponse(target)
 
     @app.get("/design/{slug}/{rel:path}", include_in_schema=False)
@@ -416,7 +430,7 @@ def create_app(daemon):
         if code is not None:
             record = design_codes.pop(code, None)
             if record is None or record[0] != slug or daemon.now() > record[1]:
-                raise StarletteHTTPException(401, "The design code is expired or used.")
+                return _design_message(401, "This link has expired", "Press o on the gate in the TUI for a fresh one.")
             session = secrets.token_urlsafe(24)
             design_cookies[session] = (slug, daemon.now() + DESIGN_COOKIE_SECONDS)
             response = RedirectResponse(f"/design/{slug}/{rel}", status_code=303)
@@ -425,7 +439,7 @@ def create_app(daemon):
             return response
         record = design_cookies.get(request.cookies.get("springer_design", ""))
         if record is None or record[0] != slug or daemon.now() > record[1]:
-            raise StarletteHTTPException(401, "Open the design page from the TUI.")
+            return _design_message(401, "Open this from the TUI", "Press o on the gate in the TUI to sign this browser in.")
         return design_file(slug, rel)
 
     return app

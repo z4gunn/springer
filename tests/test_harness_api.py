@@ -3,6 +3,7 @@ meta-test fails when a catalog operation or a GET path has no test, so the contr
 cannot grow past its coverage. See Conformance in docs/harness/api-contract.md."""
 
 import json
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -291,6 +292,31 @@ class ReadsTest(ApiCase):
         self.assertIn("mockup", bare.get("/design/acme/").text)
         self.assertEqual(bare.get("/design/acme/..%2Fsecret.txt").status_code, 404)
         self.assertEqual(bare.get("/design/other/").status_code, 401, "the cookie is scoped to one project")
+
+    def test_a_project_with_no_design_files_gets_a_page_that_says_so(self):
+        shutil.rmtree(self.project_path / "docs" / "design")
+        browser = TestClient(self.app, base_url="http://127.0.0.1")
+        url = self.get("/v1/projects/acme/design-session")["url"]
+        response = browser.get(url.split("127.0.0.1", 1)[-1])
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("text/html", response.headers["content-type"])
+        self.assertIn("No design files for acme yet", response.text)
+        self.assertNotIn('"error"', response.text)
+
+    def test_design_refusals_are_pages_a_person_can_read(self):
+        bare = TestClient(self.app, base_url="http://127.0.0.1")
+        for path, words in (("/design/acme/", "Open this from the TUI"), ("/design/acme/?code=nope", "expired")):
+            response = bare.get(path)
+            self.assertEqual(response.status_code, 401)
+            self.assertIn("text/html", response.headers["content-type"])
+            self.assertIn(words, response.text)
+
+    def test_a_missing_file_name_cannot_inject_into_the_page(self):
+        browser = TestClient(self.app, base_url="http://127.0.0.1")
+        browser.get(self.get("/v1/projects/acme/design-session")["url"].split("127.0.0.1", 1)[-1])
+        response = browser.get("/design/acme/<script>alert(1)</script>")
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("<script>", response.text)
 
     def test_the_design_page_refuses_writes(self):
         bare = TestClient(self.app, base_url="http://127.0.0.1")
@@ -778,6 +804,27 @@ class ContractDriftTest(ApiCase):
     def test_the_served_schema_matches_the_committed_file(self):
         self.assertEqual(json.loads(current()), json.loads(OPENAPI_PATH.read_text()),
                          "run python -m springer_harness.api.export and review the diff")
+
+
+class MockDesignTest(ApiCase):
+    def test_the_canned_run_writes_a_mockup_the_review_can_open_and_keeps_an_existing_one(self):
+        run_id = self.start()
+        index = self.project_path / "docs" / "design" / "index.html"
+        for _ in range(30):
+            self.tick()
+            if index.exists():
+                break
+        self.assertIn("This is a mock", index.read_text())
+        browser = TestClient(self.app, base_url="http://127.0.0.1")
+        page = browser.get(self.get("/v1/projects/acme/design-session")["url"].split("127.0.0.1", 1)[-1])
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("This is a mock", page.text)
+        index.write_text("mine")
+        for _ in range(8):
+            self.tick()
+            for gate in self.get(self.run_path(run_id) + "/gates", state="open", digest=False)["items"]:
+                self.op("gate.answer", {"gate_id": gate["checkpoint_id"], "option": gate["options"][0]["option"]}, run_id=run_id)
+        self.assertEqual(index.read_text(), "mine")
 
 
 class FullRunTest(ApiCase):

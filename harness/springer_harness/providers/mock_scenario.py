@@ -5,8 +5,17 @@ from ..scheduler.plan import CannedPlanner, GateDraft, PlanBatch, UnitDraft
 from .mock import Attempt, pr_result
 
 
+MOCK_MOCKUP = """<!doctype html><meta charset=utf-8><title>Mock direction</title>
+<body style="background:#16171A;color:#E4DED2;font:16px/1.5 Menlo,monospace;padding:3rem">
+<h1 style="font-size:1.1rem">This is a mock, not a design</h1>
+<p style="color:#B7AE9E">The mock provider wrote this page so the review flow can be tried. A real design
+agent writes its directions here. Delete docs/design when you are done with the mock.</p>
+"""
+
+
 def demo_script():
     return {
+        "spgr-agent-design": [Attempt(writes={"docs/design/index.html": MOCK_MOCKUP})],
         "routine": [Attempt(ticks=2, result=pr_result(1, touched=("apps/web/page.tsx",)))],
         "notable": [Attempt(result=pr_result(2, touched=("packages/ui/b.tsx",), raised_level="L1"))],
         "risky": [Attempt(ticks=2, result=pr_result(3, touched=("packages/auth/session.ts",),

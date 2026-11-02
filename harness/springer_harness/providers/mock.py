@@ -20,6 +20,7 @@ class Attempt:
     end: str = "return"  # return, handoff, die, or hang
     result: dict = field(default_factory=lambda: {"status": "pass", "outcome": "artifact"})
     tools: tuple = ("Read", "Bash")
+    writes: dict = field(default_factory=dict)  # project-relative path to text, kept if already there
 
 
 def pr_result(number, branch=None, base="main", touched=(), **extra):
@@ -64,6 +65,12 @@ class MockSession:
         out = Path(self.request.session_dir)
         out.mkdir(parents=True, exist_ok=True)
         if end == "return":
+            project = self.request.env.get("SPRINGER_PROJECT_DIR")
+            for rel, text in self.attempt.writes.items() if project else ():
+                path = Path(project) / rel
+                if not path.exists():
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(text)
             result = dict(self.attempt.result or {})
             if result.get("pr") and not result["pr"].get("branch"):
                 result["pr"] = {**result["pr"], "branch": f"unit/{self.request.unit_id}"}
