@@ -5,8 +5,11 @@ is safe to run again. The engine keeps nothing durable in memory. Session handle
 the only in-memory state, and losing them is what a crash is.
 """
 
+import os
+import signal
 from pathlib import Path
 
+from ..check.mechanical import mechanical_check
 from ..check.risk import triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
 from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
@@ -250,7 +253,7 @@ class RunEngine:
         session_dir = self.sessions(unit_id).dir(state["sessions"][-1])
         if self._raise_requested_gate(unit_id, state["sessions"][-1], session_dir):
             return
-        result = read_result(session_dir)
+        result = self._result(unit_id, state, session_dir)
         if result.status != "pass":
             self._on_failure(unit_id, state, result)
             return
@@ -260,8 +263,33 @@ class RunEngine:
         if result.outcome == "pr" and result.pr:
             self.units.transition(unit_id, "gated", f"PR open, risk {level}", pr=result.pr)
         else:
+            self._integrate(unit_id)
             self.units.transition(unit_id, "done", "artifact confirmed")
         self._release(unit_id)
+
+    def _result(self, unit_id, state, session_dir):
+        """A real provider's session gets the mechanical Check. The mock writes the
+        result it was scripted to, so its result.json is the verdict."""
+        if not getattr(self.provider, "mechanical", False):
+            return read_result(session_dir)
+        record = self.sessions(unit_id).get(state["sessions"][-1])
+        return mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path, unit_id,
+                                parse_iso(record["started_at"]))
+
+    def _integrate(self, unit_id):
+        """An artifact unit's commits (a PRD render, design directions) land on the
+        default branch at once, so the docs and the design page read them before the
+        gate that needs them. Nothing here is code, so no PR and no review."""
+        if not self.worktrees.path(unit_id).exists():
+            return
+        reason = self.worktrees.integrate(unit_id)
+        if reason is None:
+            self.ledger.append("artifact_integrated", unit_id=unit_id, branch=f"unit/{unit_id}")
+            if hasattr(self.source_host, "publish"):
+                self.source_host.publish(self.project_slug, self.worktrees.default_branch())
+        elif reason != "nothing to integrate":
+            self.ledger.append("worktree_kept", unit_id=unit_id, path=str(self.worktrees.path(unit_id)),
+                               reason=f"not integrated: {reason}")
 
     def _raise_requested_gate(self, unit_id, session_id, session_dir):
         """A headless session asks for a person by leaving gate-request.json. A request
@@ -471,8 +499,11 @@ class RunEngine:
         room = self.window.read()["dispatch_rate"] - self.in_flight_total()
         if ready or room <= 0:
             return
+        moving = ("planned", "ready", "running", "returned", "checking", "retry", "redispatch")
         snapshot = Snapshot(in_flight=in_flight, nonterminal=sum(1 for s in states if not is_terminal(s)),
-                            open_gates=sum(1 for g in self.gates.open_gates() if not g["content"]["digest"]))
+                            open_gates=sum(1 for g in self.gates.open_gates() if not g["content"]["digest"]),
+                            active=sum(1 for s in states if s["state"] in moving
+                                       and not self.gates.held_at_start(s["unit_id"])))
         batch = self.planner.next_batch(snapshot)
         if batch is not None:
             self._write_batch(batch)
@@ -540,7 +571,8 @@ class RunEngine:
                                allowlist=tuple(spec["allowlist"]), mcp_config_ref=spec["mcp_config_ref"],
                                cwd=self.worktrees.path(unit_id), session_dir=store.dir(session_id),
                                env={"SPRINGER_PROJECT_DIR": str(self.project_path), "SPRINGER_RUN_ID": self.run_id,
-                                    "SPRINGER_SESSION_DIR": str(store.dir(session_id))})
+                                    "SPRINGER_SESSION_DIR": str(store.dir(session_id)),
+                                    "SPRINGER_BRANCH": f"unit/{unit_id}", "SPRINGER_BASE": self._base_for(unit_id)})
         handle = self.provider.spawn(request)
         self.handles[(unit_id, session_id)] = handle
         store.create(self.provider.name, handle.model, tier, handle.pid, handle.provider_session_id, session_id)
@@ -609,6 +641,18 @@ class RunEngine:
 
     # --- crash recovery ---
 
+    def _stop_orphan(self, record):
+        """A real session runs in its own process group and outlives a daemon that
+        stopped. Left alone it would keep writing the worktree its redispatch reuses."""
+        if not getattr(self.provider, "mechanical", False) or not record.get("pid"):
+            return
+        try:
+            os.killpg(record["pid"], signal.SIGTERM)
+            self.ledger.append("session_orphan_stopped", unit_id=record.get("unit_id"),
+                               session_id=record["session_id"], pid=record["pid"])
+        except (ProcessLookupError, PermissionError):
+            pass
+
     def recover(self):
         """Run at daemon start, and asks no human. Everything it decides is an event."""
         self.units.repair_from_ledger()
@@ -621,6 +665,7 @@ class RunEngine:
             store = self.sessions(unit_id)
             record = store.get(state["sessions"][-1]) if state["sessions"] else None
             if record is not None and record["state"] not in ("exited", "handoff", "killed", "dead"):
+                self._stop_orphan(record)
                 self._mark_dead(unit_id, store, record)
             elif record is not None and record["state"] == "exited":
                 continue  # join on the next tick reads what it left

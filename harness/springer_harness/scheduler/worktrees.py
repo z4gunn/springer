@@ -40,6 +40,24 @@ class Worktrees:
             raise OSError(f"git worktree add failed for {unit_id}: {done.stderr.strip()}")
         return path, branch
 
+    def integrate(self, unit_id):
+        """Merge the unit's branch into the default branch in the main checkout.
+        Returns None, "nothing to integrate", or why it was refused. A checkout with
+        a person's uncommitted work, or on another branch, is never touched."""
+        branch, base = f"unit/{unit_id}", self.default_branch()
+        ahead = _git(self.project, "rev-list", "--count", f"{base}..{branch}").stdout.strip()
+        if not ahead or ahead == "0":
+            return "nothing to integrate"
+        dirty = [line for line in _git(self.project, "status", "--porcelain").stdout.splitlines()
+                 if not line[3:].startswith(("runs/", ".worktrees/"))]
+        if dirty:
+            return "the main checkout has uncommitted changes"
+        done = _git(self.project, "merge", "--no-edit", "--no-ff", "-m", f"chore: integrate {branch}", branch)
+        if done.returncode:
+            _git(self.project, "merge", "--abort")
+            return done.stderr.strip() or done.stdout.strip() or "git merge failed"
+        return None
+
     def release(self, unit_id):
         """Returns None on success, or git's reason for refusing."""
         path = self.path(unit_id)

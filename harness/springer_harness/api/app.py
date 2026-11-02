@@ -154,7 +154,7 @@ def create_app(daemon):
 
     @app.get("/v1/daemon", response_model=m.DaemonView, dependencies=secured)
     def daemon_view():
-        return {**daemon.state(), "started_at": iso(daemon.started_at), "degradations": []}
+        return {**daemon.state(), "started_at": iso(daemon.started_at), "degradations": list(daemon.degradations)}
 
     @app.get("/v1/usage", response_model=list[m.Open], dependencies=secured)
     def usage():

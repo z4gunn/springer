@@ -12,6 +12,7 @@ Status: reference for the harness daemon, with its schemas under runtime/schemas
 - Unit lifecycle
 - Unit directory
 - Session lifecycle
+- Gate requests
 - Events
 - Gate record (hil-checkpoint-v2)
 - Run projection (run-state-v2)
@@ -94,9 +95,11 @@ runs/<run_id>/units/U-0412/
     S-0001/
       stream.jsonl   the session's stream-json, captured by the daemon
       usage.json     tokens, context percent at exit, cost at list price
+      brief.md       the unit's brief plus the output contract, written by the provider at spawn
       return.txt     the session's final text, as today
-      result.json    the typed result when a json schema was requested
+      result.json    the typed result Check reads: status, outcome, pr, touched_paths, failure_class, detail
       handoff.md     written by the session on a context-threshold exit
+      gate-request.json  written by the session when it needs a person, see Gate requests
   receipts/          as today
   review/            the review package and each reviewer's verdict JSON
   risk.json          baseline level from the rules file, raised by reviewers, never lowered
@@ -117,7 +120,7 @@ state.json holds: state, entered_at, history (state, at, reason), retries_spent,
 | killed | The daemon ended it (cancel, budget, or shutdown) |
 | dead | The process is gone with no exit event, found at heartbeat or at daemon start |
 
-A session that needs a person writes gate-request.json in its session directory and returns. It holds a checkpoint_type, decision_prompt, and options, with artifact_ref and decisions optional, and Check opens the gate as L3 holding the unit. The answer goes into the next session's brief. A session holds no API token, so it can only ask.
+A session that needs a person writes gate-request.json and returns. See Gate requests.
 
 A unit in running has exactly one session not in a terminal state. A handoff spawns the next session for the same unit with handoff.md in its brief and the unit stays in running. A dead session puts the unit in abandoned.
 
@@ -145,6 +148,24 @@ A human intervention is recorded as operation_applied rather than as a cycle rec
 ## Gate record (hil-checkpoint-v2)
 
 Changes from v1: checkpoint_type gains discovery-go-no-go, structure-confirmation, scope-review, taste-review, production-release, provisioning-required, and routine-decision, level (L0, L1, L2, L3) is added, holds narrows from phase names and ids to the unit ids whose merge or start waits and becomes required, options stay as they are and are ordered recommended first, digest (true when the gate is informational and closes on view) is added, channel_refs (where it was sent) is added, response (option chosen, free text, rule change, by, at) is added. A gate with holds empty and level L1 is a digest entry, not a pause, so a digest gate records pipeline_status resumed.
+
+## Gate requests
+
+This section is used to define how a headless session asks for a person. A session has no question tool and holds no API token, so it cannot open a gate or reach a channel. It can only leave a request, and the daemon decides what the request becomes.
+
+The session writes gate-request.json in its own session directory, sets result.json to status pass with detail waiting on a person, and exits. spgr-notify-human writes the file in this mode. The file is one JSON object.
+
+| Field | Required | Content |
+|-------|----------|---------|
+| checkpoint_type | Yes | A hil-checkpoint-v2 checkpoint_type (e.g. scope-change, security-compliance-flag) |
+| decision_prompt | Yes | The question, in one or two sentences |
+| options | Yes | One or more `{option, consequence, recommended_because}`, recommended first. recommended_because is optional |
+| decisions | No | `{decision_id, kind, prompt}` items, kind being question, prd-approval, architecture-options-selection, design-direction-selection, or default-review |
+| artifact_ref | No | The artifact the person should read, or none |
+
+Check reads gate-request.json before result.json, so a request is never treated as a pass. A valid request opens a gate at L3 holding the requesting unit, and the unit moves to blocked. The gate's context records `gate_request: U-nnnn/S-nnnn`, and Check opens no second gate for the same key, so a Check repeated after a crash asks once. A request the schema would refuse (an unknown checkpoint_type, no prompt, no options, an option without a consequence) is a defect in the session: Check ignores the file and judges result.json as usual.
+
+When the person answers, the unit returns to ready and the answer is appended to its redispatch notes as one line naming the prompt, the option chosen, any free text, and each decision's answer. The next session's brief carries that line, so the session that continues the work reads the decision rather than asking again.
 
 ## Run projection (run-state-v2)
 

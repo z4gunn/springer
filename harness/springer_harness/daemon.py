@@ -52,6 +52,8 @@ class Daemon:
         self.window = UsageWindow(self.home.root, provider.name, now, maximum)
         self._stop = threading.Event()
         self.started_at = now()
+        self.config = None  # set when onboarded
+        self.degradations = []  # what doctor found missing, shown in the TUI
 
     # --- projects and runs ---
 
@@ -134,6 +136,12 @@ class Daemon:
         write_json(path / "runs" / run_id / "run-brief.json", doc)
         if kind == "build":
             self._stamp_profile(path, derived["profile"])
+            if hasattr(self.source_host, "ensure_remote"):
+                private = (self.config or {}).get("private_repos", True)
+                try:
+                    self.source_host.ensure_remote(slug, private=private)
+                except RuntimeError as exc:
+                    raise InvalidArgs(f"the project has no GitHub repository and one could not be made: {exc}")
         self.engines[(slug, run_id)] = self._new_engine(slug, path, run_id, kind)
         return run_id
 
@@ -190,9 +198,15 @@ class Daemon:
 
     def start(self, seconds=TICK_SECONDS):
         self.recover()
+        if self.config is not None:
+            threading.Thread(target=self._find_degradations, daemon=True, name="springer-doctor").start()
         thread = threading.Thread(target=self.loop, args=(seconds,), daemon=True, name="springer-tick")
         thread.start()
         return thread
+
+    def _find_degradations(self):
+        from .setup import degradations
+        self.degradations = degradations(self.config)
 
     def stop(self):
         self._stop.set()

@@ -108,18 +108,44 @@ def stop_daemon(home):
     return True
 
 
+def build_daemon(home):
+    """Claude Code and GitHub once onboarded. Before that, the mock provider serves a
+    canned run, so springer can be tried with no tokens spent."""
+    from .daemon import Daemon
+    from .providers.secrets import KeyringSecrets
+    from .setup import load_config
+
+    config = load_config(home)
+    if config is None:
+        from .providers.mock import MockProvider, MockSourceHost
+        from .providers.mock_scenario import demo_planner_factory, demo_script
+
+        return Daemon(home, MockProvider(demo_script()), MockSourceHost(), demo_planner_factory(), KeyringSecrets(),
+                      time.time)
+    from .providers.claude_code import ClaudeCodeProvider
+    from .providers.github import GitHubSourceHost
+    from .scheduler.orchestrator import orchestrator_factory
+
+    holder = {}
+
+    def project_path_of(slug):
+        return holder["daemon"].project_path(slug)
+
+    daemon = Daemon(home, ClaudeCodeProvider(config["claude"]), GitHubSourceHost(project_path_of),
+                    orchestrator_factory(project_path_of, config["claude"]), KeyringSecrets(), time.time,
+                    maximum=int(config["max_sessions"]))
+    daemon.config = config
+    holder["daemon"] = daemon
+    return daemon
+
+
 def serve(home, port):
-    """Run the daemon in this process, on the loopback interface. The mock provider is
-    the only one until step 6, so this serves a canned run and spends no tokens."""
+    """Run the daemon in this process, on the loopback interface."""
     import uvicorn
 
     from .api.app import create_app
-    from .daemon import Daemon
-    from .providers.mock import MockProvider, MockSourceHost
-    from .providers.mock_scenario import demo_planner_factory, demo_script
-    from .providers.secrets import KeyringSecrets
 
-    daemon = Daemon(home, MockProvider(demo_script()), MockSourceHost(), demo_planner_factory(), KeyringSecrets(), time.time)
+    daemon = build_daemon(home)
     app = create_app(daemon)
     daemon.home.write_port(port)
     daemon.start()
@@ -178,6 +204,9 @@ def main(argv=None):
     parser.add_argument("--home", default=None, help="harness state directory, default ~/.springer")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("stop", help="stop the background daemon")
+    onboard_cmd = sub.add_parser("onboard", help="set up the coding agent, the source host, and the daemon, once")
+    onboard_cmd.add_argument("--yes", action="store_true", help="take every default without asking")
+    sub.add_parser("doctor", help="check the setup and repair what is safe to repair")
     run_daemon = sub.add_parser("daemon", help="run the daemon in the foreground")
     run_daemon.add_argument("--home", dest="daemon_home", default=None)
     run_daemon.add_argument("--port", type=int, default=DEFAULT_PORT)
@@ -185,6 +214,12 @@ def main(argv=None):
     home = args.home or getattr(args, "daemon_home", None) or default_home()
     if args.command == "daemon":
         return serve(home, args.port)
+    if args.command == "onboard":
+        from .setup import onboard
+        return onboard(home, assume_yes=args.yes)
+    if args.command == "doctor":
+        from .setup import doctor
+        return doctor(home)
     if args.command == "stop":
         stopped = stop_daemon(home)
         print("springer: daemon stopped." if stopped else "springer: no daemon is running.")

@@ -46,6 +46,7 @@ class Snapshot:
     in_flight: int
     nonterminal: int
     open_gates: int
+    active: int = 0  # units that will move with no person: planned, ready, running, checking, retrying
 
 
 class Planner(Protocol):

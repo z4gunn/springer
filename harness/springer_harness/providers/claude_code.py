@@ -1,0 +1,248 @@
+"""The Claude Code provider: one headless `claude -p` session per unit.
+
+It runs on the subscription session the CLI is logged into on this machine, never an
+API key, so ANTHROPIC_API_KEY is removed from every session's environment. A session
+runs as the unit's agent (`--agent`) inside the unit's worktree, so it loads that
+project's runtime, CLAUDE.md, hooks, and permission allowlist. Edits are accepted and
+a question to a person is not a tool it has: a session that needs one writes
+gate-request.json instead.
+
+The stream is stream-json, read on a thread. Each rate_limit_event carries the
+five-hour window's utilization and reset, which is the usage signal the scheduler
+budgets against. Cost is the CLI's list-price figure, shown as information.
+"""
+
+import json
+import os
+import shutil
+import signal
+import subprocess
+import threading
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+from .coding_agent import SessionExit, SpawnRequest, Usage
+
+CONTEXT_TOKENS = 200_000
+TIERS = {"haiku": "haiku", "sonnet": "sonnet", "opus": "opus"}
+PREAMBLE = Path(".claude/skills/spgr-run-harness/assets/dispatch-preamble.md")
+# What every session leaves for Check, in the session directory the brief names.
+OUTPUT_CONTRACT = """
+## Where your result goes
+
+The harness reads files, not your transcript. Before you stop, write these to the
+session directory {session_dir}:
+
+- result.json, one object:
+  {{"status": "pass" or "fail", "outcome": "artifact" or "pr",
+    "pr": {{"number": <int>, "branch": "<branch>", "base": "<base>"}} (only when outcome is pr),
+    "touched_paths": ["<repo-relative path>", ...],
+    "failure_class": "defect" | "blocked" | "environment" | "context" | "question" (only on fail),
+    "detail": "<one line>"}}
+- return.txt, your fifteen-line return.
+- handoff.md only if you are stopping before the work is done, saying where to continue.
+
+Use {session_dir} as the unit directory for receipt.py. Write run artifacts under
+{run_dir}/artifacts/. Work and commit on the branch you are on ({branch}). When the
+outcome is a pull request, push this branch and open the PR against {base} with
+spgr-create-pr, then put its number in result.json.
+
+If you need a person to decide something, do not ask in text: write gate-request.json
+to the session directory as spgr-notify-human describes, set status "pass" with
+detail "waiting on a person", and stop.
+"""
+
+
+def _iso(epoch):
+    return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def signal_from(info):
+    """{"used_fraction", "resets_at"} from a rate_limit_event, or None."""
+    if not isinstance(info, dict):
+        return None
+    windows = info.get("unifiedWindows") or {}
+    five = windows.get("five_hour") or {}
+    used = five.get("utilization")
+    resets = five.get("resetsAt") or info.get("resetsAt")
+    if info.get("status") == "rejected" or five.get("status") == "rejected":
+        used = 1.0
+    if used is None and resets is None:
+        return None
+    return {"used_fraction": used, "resets_at": _iso(resets) if resets else None}
+
+
+class ClaudeSession:
+    def __init__(self, request: SpawnRequest, command, env, on_signal):
+        self.request = request
+        self.model = TIERS.get(request.model_tier, request.model_tier)
+        self.provider_session_id = None
+        self._events = []
+        self._lock = threading.Lock()
+        self._usage = Usage()
+        self._final = None
+        self._on_signal = on_signal
+        out = Path(request.session_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        self._stream = open(out / "stream.jsonl", "a")
+        self._stderr = open(out / "stderr.txt", "a")
+        self.proc = subprocess.Popen(command, cwd=str(request.cwd), env=env, stdout=subprocess.PIPE,
+                                     stderr=self._stderr, stdin=subprocess.DEVNULL, text=True,
+                                     start_new_session=True)
+        self.pid = self.proc.pid
+        self._reader = threading.Thread(target=self._read, name=f"claude-{request.unit_id}", daemon=True)
+        self._reader.start()
+
+    def _read(self):
+        for line in self.proc.stdout:
+            self._stream.write(line)
+            self._stream.flush()
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            self._take(event)
+        self.proc.wait()
+        self._stream.close()
+        self._stderr.close()
+
+    def _take(self, event):
+        kind = event.get("type")
+        with self._lock:
+            if kind == "system" and event.get("subtype") == "init":
+                self.provider_session_id = event.get("session_id")
+                self.model = event.get("model") or self.model
+            elif kind == "rate_limit_event":
+                found = signal_from(event.get("rate_limit_info"))
+                if found:
+                    self._on_signal(found)
+            elif kind == "assistant":
+                message = event.get("message") or {}
+                usage = message.get("usage") or {}
+                context = sum(usage.get(k, 0) for k in ("input_tokens", "cache_read_input_tokens",
+                                                        "cache_creation_input_tokens"))
+                if context:
+                    self._usage.context_percent = round(100 * context / CONTEXT_TOKENS, 1)
+                self._usage.input_tokens += usage.get("input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
+                self._usage.output_tokens += usage.get("output_tokens", 0)
+                for block in message.get("content") or []:
+                    if block.get("type") == "tool_use":
+                        self._events.append({"type": "tool_use", "name": block.get("name")})
+                    elif block.get("type") == "text" and block.get("text", "").strip():
+                        self._events.append({"type": "text", "text": block["text"][:2000]})
+            elif kind == "result":
+                self._final = event
+                self._usage.cost_usd = round(event.get("total_cost_usd") or 0, 4)
+                self._events.append({"type": "result", "subtype": event.get("subtype"),
+                                     "is_error": event.get("is_error", False)})
+
+    def poll(self):
+        with self._lock:
+            events, self._events = self._events, []
+        return events
+
+    def usage(self):
+        with self._lock:
+            return Usage(self._usage.input_tokens, self._usage.output_tokens, self._usage.context_percent,
+                         self._usage.cost_usd)
+
+    def alive(self):
+        return self.proc.poll() is None or self._reader.is_alive()
+
+    def exit(self):
+        """The session ended on its own terms once the process exited and the stream
+        is read. A session that wrote a handoff and no result is a handoff."""
+        if self.proc.poll() is None or self._reader.is_alive():
+            return None
+        out = Path(self.request.session_dir)
+        final_text = (self._final or {}).get("result") or ""
+        if not (out / "return.txt").exists():
+            (out / "return.txt").write_text(final_text or self._tail_stderr())
+        if (out / "handoff.md").exists() and not (out / "result.json").exists():
+            return SessionExit("handoff", self.proc.returncode)
+        return SessionExit("return", self.proc.returncode)
+
+    def _tail_stderr(self):
+        path = Path(self.request.session_dir) / "stderr.txt"
+        return path.read_text()[-4000:] if path.exists() else ""
+
+    def kill(self):
+        if self.proc.poll() is None:
+            try:
+                os.killpg(self.proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+
+
+class ClaudeCodeProvider:
+    name = "claude-code"
+    mechanical = True  # Check runs receipts, classification, and schema validation
+
+    def __init__(self, binary="claude", extra_args=()):
+        self.binary = shutil.which(binary) or binary
+        self.extra_args = tuple(extra_args)
+        self._signal = None
+        self._signal_lock = threading.Lock()
+
+    def _record(self, found):
+        with self._signal_lock:
+            self._signal = found
+
+    def usage_signal(self):
+        with self._signal_lock:
+            return dict(self._signal) if self._signal else None
+
+    def prompt(self, request):
+        """The shared preamble, unchanged so repeat dispatches share a cached prefix,
+        then the line naming this unit's brief."""
+        brief_path = Path(request.session_dir) / "brief.md"
+        env = request.env
+        contract = OUTPUT_CONTRACT.format(session_dir=request.session_dir,
+                                          run_dir=Path(env.get("SPRINGER_PROJECT_DIR", ".")) / "runs" /
+                                          env.get("SPRINGER_RUN_ID", ""),
+                                          branch=env.get("SPRINGER_BRANCH", f"unit/{request.unit_id}"),
+                                          base=env.get("SPRINGER_BASE", "main"))
+        brief_path.write_text(request.brief.rstrip() + "\n" + contract)
+        preamble_file = Path(request.cwd) / PREAMBLE
+        preamble = preamble_file.read_text() if preamble_file.exists() else "Your brief:\n"
+        return preamble.rstrip() + f"\n{brief_path}\n"
+
+    def command(self, request):
+        return [self.binary, "-p", self.prompt(request), "--output-format", "stream-json", "--verbose",
+                "--agent", request.agent, "--model", TIERS.get(request.model_tier, request.model_tier),
+                "--permission-mode", "acceptEdits", "--disallowedTools", "AskUserQuestion",
+                *self.extra_args]
+
+    def environment(self, request):
+        env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "CLAUDECODE")}
+        env.update({k: str(v) for k, v in request.env.items()})
+        return env
+
+    def spawn(self, request):
+        Path(request.session_dir).mkdir(parents=True, exist_ok=True)
+        return ClaudeSession(request, self.command(request), self.environment(request), self._record)
+
+
+def run_once(binary, cwd, prompt, agent=None, model="sonnet", schema=None, timeout=1800, log=None):
+    """One blocking headless call that returns the final structured output or text.
+    Used for the judgment steps the daemon asks for outside a unit (e.g. Plan)."""
+    cmd = [shutil.which(binary) or binary, "-p", prompt, "--output-format", "json", "--model", model,
+           "--permission-mode", "acceptEdits", "--disallowedTools", "AskUserQuestion"]
+    if agent:
+        cmd += ["--agent", agent]
+    if schema:
+        cmd += ["--json-schema", json.dumps(schema)]
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "CLAUDECODE")}
+    started = time.time()
+    done = subprocess.run(cmd, cwd=str(cwd), env=env, capture_output=True, text=True, timeout=timeout)
+    if log:
+        Path(log).write_text(done.stdout + "\n--- stderr ---\n" + done.stderr)
+    try:
+        body = json.loads(done.stdout)
+    except ValueError:
+        raise RuntimeError(f"claude returned no JSON (exit {done.returncode}): {done.stderr[-500:]}")
+    if body.get("is_error"):
+        raise RuntimeError(body.get("result") or "claude reported an error")
+    return {"output": body.get("structured_output"), "text": body.get("result"),
+            "cost": body.get("total_cost_usd"), "seconds": round(time.time() - started)}
