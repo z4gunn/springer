@@ -55,6 +55,9 @@ class ProjectSummary(BaseModel):
     runtime_version: str | None
     archived: bool
     active_run: ActiveRun | None
+    adopted: bool = False
+    hand_merge: list[str] = []  # renderings under .claude/springer-update/ awaiting a hand merge
+    lane: str | None = None
 
 
 class SectionView(BaseModel):

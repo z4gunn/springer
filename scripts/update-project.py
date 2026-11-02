@@ -488,6 +488,20 @@ def cmd_adopt(target, profile, force):
     return 0
 
 
+def keep_ownership(new, previous, plan, force=False):
+    """A rebuilt manifest hashes every file now in the tree. An instance's edit must
+    stay an edit and a file the instance added must stay its own, or the next update
+    would overwrite the one and delete the other."""
+    recorded = previous.get("runtime", {})
+    if not force:
+        for rel in plan["keep_modified"] + plan["keep_modified_removed"]:
+            if rel in recorded:
+                new["runtime"][rel] = recorded[rel]
+    for rel in plan["keep_instance_only"]:
+        new["runtime"].pop(rel, None)
+    return new
+
+
 def cmd_update(target, dry_run, force):
     manifest = load_manifest(target)
     if manifest is None:
@@ -504,7 +518,8 @@ def cmd_update(target, dry_run, force):
     if dry_run:
         return 0
     apply_update(target, SOURCE, manifest, plan, force)
-    write_manifest(target, build_manifest(target, SOURCE, manifest.get("profile") or "saas", manifest))
+    write_manifest(target, keep_ownership(build_manifest(target, SOURCE, manifest.get("profile") or "saas", manifest),
+                                          manifest, plan, force))
     print(f"manifest refreshed at source {source_commit(SOURCE) or 'unknown'}")
     return 0
 

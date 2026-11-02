@@ -129,6 +129,22 @@ class UpdateProjectTest(unittest.TestCase):
         run_main("update", str(self.target), "--force")
         self.assertEqual((self.target / ".claude" / "skills" / "spgr-one" / "SKILL.md").read_text(), "one v2\n")
 
+    def test_an_edit_survives_two_updates_and_an_instance_file_is_never_owned(self):
+        """The rebuilt manifest used to hash every file in the tree, so after one update
+        an instance's edit read as unedited and the next update replaced it."""
+        skill = self.target / ".claude" / "skills" / "spgr-one" / "SKILL.md"
+        (self.source / "runtime" / "skills" / "spgr-one" / "SKILL.md").write_text("one v2\n")
+        skill.write_text("one edited here\n")
+        own = self.target / ".claude" / "skills" / "spgr-mine" / "SKILL.md"
+        own.parent.mkdir()
+        own.write_text("mine\n")
+        run_main("update", str(self.target))
+        (self.source / "runtime" / "skills" / "spgr-one" / "SKILL.md").write_text("one v3\n")
+        run_main("update", str(self.target))
+        self.assertEqual(skill.read_text(), "one edited here\n")
+        self.assertNotIn(".claude/skills/spgr-mine/SKILL.md", self.manifest()["runtime"])
+        self.assertTrue(own.exists())
+
     def test_new_source_file_is_added(self):
         (self.source / "runtime" / "skills" / "spgr-three").mkdir()
         (self.source / "runtime" / "skills" / "spgr-three" / "SKILL.md").write_text("three\n")

@@ -15,7 +15,8 @@ SECTION_ORDER = ("Idea", "Problem", "Users", "Core flows", "Non-goals", "Success
                  "Design preferences", "Inputs and references", "Glossary", "Open questions")
 NOT_FACTS = {"brief_version", "name", "profile", "lane", "proposed", "recommendation"}
 FACT_NAMES = {"surfaces", "backend", "accounts", "payments", "scale", "autonomy", "deploy", "staging", "reach",
-              "frameworks", "variants", "reference", "pinned", "budget", "live"}
+              "frameworks", "variants", "reference", "pinned", "budget", "live",
+              "pinned_rulings"}
 
 
 def derive(facts):

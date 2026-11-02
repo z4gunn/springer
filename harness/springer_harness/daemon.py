@@ -37,6 +37,11 @@ def slugify(name):
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "project"
 
 
+def _content_of(path):
+    doc = read_json(path) or {}
+    return doc.get("content", {}) if isinstance(doc, dict) else {}
+
+
 class Daemon:
     def __init__(self, home, provider, source_host, planner_factory, secrets, now, maximum=2):
         self.home = Home(home)
@@ -67,7 +72,10 @@ class Daemon:
         root = self.project_path(slug) / "runs"
         if not root.is_dir():
             return []
-        return sorted((p.name for p in root.iterdir() if (p / "run-brief.json").exists()),
+        # A run the daemon made carries kind in its run brief. A run written before the
+        # daemon (an adopted instance's history) is the project's, read from the index.
+        return sorted((p.name for p in root.iterdir() if (p / "run-brief.json").exists()
+                       and _content_of(p / "run-brief.json").get("kind")),
                       key=lambda r: (root / r / "run-brief.json").stat().st_mtime_ns)
 
     def run_brief(self, slug, run_id):
@@ -111,6 +119,8 @@ class Daemon:
         if mode == "new":
             done = subprocess.run(["bash", str(SOURCE / "scripts" / "new-project.sh"), str(target), "small"],
                                   capture_output=True, text=True)
+        elif (target / ".claude" / "springer-manifest.json").exists():
+            return self._adopt_instance(slug, name, target)
         else:
             done = subprocess.run([sys.executable, str(SOURCE / "scripts" / "update-project.py"), "adopt", str(target),
                                    "--profile", "small"], capture_output=True, text=True)
@@ -124,6 +134,25 @@ class Daemon:
             store.create(name)
         return slug
 
+    def _adopt_instance(self, slug, name, target):
+        """An existing Springer instance takes the update path: see adopt.py."""
+        from . import adopt
+        plan = adopt.plan(target)
+        try:
+            written = adopt.apply(target, plan, name, self.home.root, slug)
+        except RuntimeError as exc:
+            raise InvalidArgs(str(exc))
+        manifest = read_json(target / ".claude" / "springer-manifest.json") or {}
+        merges = sorted(w for w in written if w.startswith(adopt.UPDATE_DIR))
+        self.home.save_project(slug, {"slug": slug, "name": name, "path": str(target), "archived": False,
+                                      "runtime_version": (manifest.get("source_commit") or "")[:7],
+                                      "adopted": True, "hand_merge": merges})
+        return slug
+
+    def history(self, slug):
+        """Runs from before the daemon, imported at adoption, newest last."""
+        return read_json(self.home.root / "index" / f"{slug}.json", {"runs": [], "learnings": []})
+
     def start_run(self, slug, kind, sections=None):
         front, _ = self.brief(slug).load()
         count = len(self.run_ids(slug)) + 1
@@ -132,7 +161,8 @@ class Daemon:
         derived = derive(front)
         doc = artifact_header(f"run-brief-{run_id}", "run-brief", "run_brief", "v1", self.now())
         doc["content"] = {"run_id": run_id, "profile": derived["profile"], "kind": kind, "lane": derived["lane"],
-                          "brief_version": front.get("brief_version", 1), "sections": sections}
+                          "brief_version": front.get("brief_version", 1), "sections": sections,
+                          "pinned_rulings": list(front.get("pinned_rulings") or [])}
         write_json(path / "runs" / run_id / "run-brief.json", doc)
         if kind == "build":
             self._stamp_profile(path, derived["profile"])

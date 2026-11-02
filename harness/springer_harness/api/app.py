@@ -4,6 +4,7 @@ import asyncio
 import html
 import json
 import secrets
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
@@ -131,7 +132,9 @@ def create_app(daemon):
                       "waiting_on": content["waiting_on"], "externally_held": bool(engine.lock.externally_held())}
         return {"slug": slug, "name": record["name"], "path": record["path"], "profile": front.get("profile"),
                 "deploy": front.get("deploy"), "runtime_version": record.get("runtime_version"),
-                "archived": record.get("archived", False), "active_run": active}
+                "archived": record.get("archived", False), "active_run": active,
+                "adopted": bool(record.get("adopted")), "lane": front.get("lane"),
+                "hand_merge": [p for p in record.get("hand_merge") or [] if (Path(record["path"]) / p).exists()]}
 
     def gate_view(engine, gate):
         content = dict(gate["content"])
@@ -193,6 +196,21 @@ def create_app(daemon):
             if items:
                 return [{**i, "present": daemon.secrets.has(slug, i["secret_name"])} for i in items]
         return []
+
+    @app.get("/v1/adopt/preview", response_model=m.Open, dependencies=secured)
+    def adopt_preview(path: str):
+        """What adopting the repository at path would read, derive, and write. Writes nothing."""
+        from ..adopt import plan, public
+        from ..daemon import expand_path
+        target = expand_path(path)
+        if not target.is_dir():
+            raise NotFound(f"no directory at {path}")
+        return public(plan(target))
+
+    @app.get("/v1/projects/{slug}/history", response_model=m.Open, dependencies=secured)
+    def project_history(slug: str):
+        daemon.home.project(slug)
+        return daemon.history(slug)
 
     @app.get("/v1/projects/{slug}/runs", response_model=list[m.RunSummary], dependencies=secured)
     def runs(slug: str):

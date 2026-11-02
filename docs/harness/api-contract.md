@@ -121,7 +121,9 @@ Reads are grouped by the resource they return. Paths under a run are abbreviated
 | GET /v1/projects/{slug}/brief | The brief view |
 | GET /v1/projects/{slug}/brief/critique | The critique, computed on request from the file on disk. See below |
 | GET /v1/projects/{slug}/provisioning | Checklist items with `item_id`, `secret_name`, `needed_by`, `present`. Never a secret value |
-| GET /v1/projects/{slug}/runs | Run summaries, newest first |
+| GET /v1/adopt/preview?path= | What adopting the repository at `path` would read, derive, and write: `instance`, `runtime` (add, replace, remove, unchanged, edited, instance_only), `templates`, `facts` with `fact_sources`, `sections` with `section_sources`, `brief`, `design_md`, `history`, `project_owned`. Writes nothing |
+| GET /v1/projects/{slug}/history | Runs from before the daemon, imported at adoption: each with its cycles (a v1 cycle has agents and no unit ids), its defaults ledger, and `complete`, plus the last retrospective's `learnings` |
+| GET /v1/projects/{slug}/runs | Run summaries, newest first. Only runs the daemon made: an imported run is in history |
 | GET {run} | The run view |
 | GET {run}/backlog | The backlog view |
 | GET {run}/units | Unit summaries, filterable by `state` |
@@ -158,6 +160,8 @@ The brief view is used by the Brief screen, and it splits `docs/brief.md` into t
  "sections": [{"name": "Problem", "required": true, "confidence": "confirmed", "body": "..."}],
  "recommendation": {"verdict": "go", "summary": "...", "dismissed": false}}
 ```
+
+A project summary also carries `adopted`, `lane`, and `hand_merge`, the renderings under `.claude/springer-update/` that still wait for a hand merge. `project.create` with mode adopt on a repository that holds `.claude/springer-manifest.json` takes the update path: runtime files the instance never edited are replaced, edited ones are kept, every changed template is rendered beside the original for a hand merge, and the brief, `DESIGN.md`, and the history index are derived from the run store. Nothing else in the repository is written.
 
 `confidence` takes the values confirmed, proposed, and needs-human-input. `recommendation` is null unless Discovery produced one. The critique returns `errors`, `warnings`, and `info`, each a list of `{"rule": "flow-without-outcome", "section": "Core flows", "message": "..."}`.
 

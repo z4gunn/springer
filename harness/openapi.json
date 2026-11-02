@@ -619,6 +619,11 @@
               }
             ]
           },
+          "adopted": {
+            "default": false,
+            "title": "Adopted",
+            "type": "boolean"
+          },
           "archived": {
             "title": "Archived",
             "type": "boolean"
@@ -633,6 +638,25 @@
               }
             ],
             "title": "Deploy"
+          },
+          "hand_merge": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Hand Merge",
+            "type": "array"
+          },
+          "lane": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lane"
           },
           "name": {
             "title": "Name",
@@ -826,6 +850,62 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/v1/adopt/preview": {
+      "get": {
+        "description": "What adopting the repository at path would read, derive, and write. Writes nothing.",
+        "operationId": "adopt_preview_v1_adopt_preview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Open"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adopt Preview"
+      }
+    },
     "/v1/audit": {
       "get": {
         "operationId": "audit_v1_audit_get",
@@ -1452,6 +1532,61 @@
           }
         },
         "summary": "Design Session"
+      }
+    },
+    "/v1/projects/{slug}/history": {
+      "get": {
+        "operationId": "project_history_v1_projects__slug__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Open"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project History"
       }
     },
     "/v1/projects/{slug}/provisioning": {
