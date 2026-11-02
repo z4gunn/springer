@@ -25,6 +25,13 @@ from pathlib import Path
 from .coding_agent import SessionExit, SpawnRequest, Usage
 
 CONTEXT_TOKENS = 200_000
+# Read-only commands a headless session reaches for in nearly every compound command.
+# A person approves them in an interactive session, and a headless one has nobody to
+# ask, so they are allowed outright. None of them writes.
+READ_ONLY = ("Bash(ls:*)", "Bash(cat:*)", "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)", "Bash(grep:*)",
+             "Bash(rg:*)", "Bash(sort:*)", "Bash(uniq:*)", "Bash(diff:*)", "Bash(pwd)",
+             "Bash(echo:*)", "Bash(test:*)", "Bash(stat:*)", "Bash(file:*)", "Bash(jq:*)", "Bash(which:*)",
+             "Bash(git ls-files:*)", "Bash(git branch --show-current:*)")
 TIERS = {"haiku": "haiku", "sonnet": "sonnet", "opus": "opus"}
 PREAMBLE = Path(".claude/skills/spgr-run-harness/assets/dispatch-preamble.md")
 # What every session leaves for Check, in the session directory the brief names.
@@ -42,6 +49,11 @@ session directory {session_dir}:
     "detail": "<one line>"}}
 - return.txt, your fifteen-line return.
 - handoff.md only if you are stopping before the work is done, saying where to continue.
+
+Your shell already starts in your worktree, which is the repository you work in. Run
+commands from there with relative paths: do not cd first and do not use git -C, because
+a headless session cannot ask anyone to approve a command outside its allowlist, and a
+denied command is a failed unit. Validate with `python3 schemas/validate.py <path>`.
 
 Use {session_dir} as the unit directory for receipt.py. Write run artifacts to
 {run_dir}/artifacts/ by that absolute path, which is the run store the harness owns, and
@@ -256,8 +268,7 @@ class ClaudeCodeProvider:
             # The brief, the session directory, and the run artifacts live in the run
             # store in the main checkout, outside the worktree the session works in.
             command += ["--add-dir", str(Path(request.env["SPRINGER_PROJECT_DIR"]) / "runs" / request.env["SPRINGER_RUN_ID"])]
-        if allow:
-            command += ["--allowedTools", *allow]
+        command += ["--allowedTools", *allow, *READ_ONLY]
         return command + list(self.extra_args)
 
     def environment(self, request):

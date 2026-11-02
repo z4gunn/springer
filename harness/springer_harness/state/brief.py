@@ -26,7 +26,7 @@ def derive(facts):
     tenants = facts.get("accounts") == "multi-org"
     has_backend = facts.get("backend") not in ("none", None, False)
     if facts.get("scale") == "personal":
-        profile, why = "small", "A personal product takes the small ceremony on any surface"
+        profile, why = "small", "A personal product, on any surface,"
     elif "mobile" in surfaces:
         profile, why = "mobile", "A product with a mobile surface"
     elif money or tenants:
