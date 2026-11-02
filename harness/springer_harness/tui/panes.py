@@ -4,7 +4,6 @@ holds state a refetch would not rebuild, so a pane cannot drift from the daemon.
 import os
 import time
 
-import yaml
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -13,7 +12,8 @@ from textual.widgets import DataTable, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
 from .client import ApiError, run_path
-from .dialogs import EditDialog, FormDialog, TextDialog
+from . import items
+from .dialogs import ConfirmDialog, EditDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog, ProofreadDialog, TextDialog
 from .theme import COLUMN, RISK, join, keys, lines, paint
 
 # Shown in an empty section, and never saved: the format these sections must take. They
@@ -23,6 +23,8 @@ SECTION_TEMPLATES = {
                   "Outcome: How they know it worked.\nCritical: yes",
     "Users": "- Name: who they are and what they want",
 }
+# The API's message for a rule, said the way this screen fixes it.
+SCREEN_MESSAGES = {"flows-not-structured": "Core flows has text but no flow yet. Open Core flows and press a to add each one."}
 COLUMNS = ("ready", "in_progress", "in_review", "blocked", "done")
 TIERS = ("haiku", "sonnet", "opus")
 VIEWS = ("tree", "board", "graph")
@@ -46,6 +48,24 @@ def status_of(project):
     if run["waiting_on"] == "provisioning":
         return paint("● waiting on provisioning", "you")
     return paint("● running", "success")
+
+
+def _clip(text, width):
+    flat = " ".join(text.split())
+    return flat if len(flat) <= width else flat[:width - 1] + "…"
+
+
+def _named(found, name):
+    return any(i["name"].strip().lower() == name.strip().lower() for i in found)
+
+
+def _put(found, original, item, first="name"):
+    """Replace the item whose first field is original, or add it when original is None or gone."""
+    if original is not None:
+        for n, existing in enumerate(found):
+            if existing[first] == original:
+                return found[:n] + [{**existing, **item}] + found[n + 1:]
+    return found + [item]
 
 
 def age(iso_text):
@@ -142,6 +162,8 @@ class BriefPane(Pane):
     BINDINGS = [Binding("c", "check", "check"), Binding("s", "start", "start"), Binding("f", "facts", "facts"),
                 Binding("d", "discovery", "discovery"), Binding("y", "confirm_section", "confirm"),
                 Binding("v", "provisioning", "provisioning"), Binding("x", "dismiss_recommendation", "dismiss"),
+                Binding("a", "add_item", "add"), Binding("delete", "remove_item", "remove"),
+                Binding("backspace", "remove_item", "remove", show=False), Binding("t", "text_mode", "text"),
                 Binding("ctrl+s", "save", "save", priority=True), Binding("escape", "to_rail", "sections")]
 
     def __init__(self, **kwargs):
@@ -150,6 +172,8 @@ class BriefPane(Pane):
         self.section = None
         self.loaded_body = ""
         self.version = None
+        self.as_text = set()  # structured sections the person switched to plain text
+        self.parsed = ("", [])  # the preamble and items of the structured section shown
 
     def compose(self) -> ComposeResult:
         yield Static("", id="brief-title", classes="title")
@@ -157,14 +181,14 @@ class BriefPane(Pane):
         with Horizontal(id="brief-main"):
             yield OptionList(id="rail")
             with Vertical(id="brief-editor"):
+                yield OptionList(id="items")
                 yield TextArea(id="editor")
                 # The interview's proposals land here beside the human's text, to accept,
                 # edit, or drop. The interview itself is built after the TUI.
                 yield Static("", id="proposal", markup=False)
             yield Static("", id="facts", markup=False)
         yield Static("", id="critique", markup=False)
-        yield Static(keys(("enter", "edit"), ("esc", "sections"), ("ctrl+s", "save"), ("c", "check"), ("s", "start"),
-                          ("f", "facts"), ("d", "discover"), ("y", "confirm"), ("v", "provide")), classes="hint")
+        yield Static("", id="brief-keys", classes="hint")
 
     def _dirty(self):
         return self.section is not None and self.query_one("#editor", TextArea).text != self.loaded_body
@@ -206,7 +230,7 @@ class BriefPane(Pane):
         facts = self.brief["facts"]
         rows = [paint("facts", "dim", bold=True)]
         rows += [join(paint(f"{k} ", "dim"), ", ".join(map(str, v)) if isinstance(v, list) else str(v))
-                 for k, v in facts.items() if k not in ("pinned", "budget", "proposed")]
+                 for k, v in facts.items() if k not in ("pinned", "budget", "proposed") and v not in (None, [], "")]
         rows += [join(paint(f"pinned {k} ", "dim"), str(v)) for k, v in (facts.get("pinned") or {}).items()]
         rows += [Text(""), paint(self.brief["derived"]["sentence"], "stone")]
         self.query_one("#facts", Static).update(lines(rows))
@@ -215,7 +239,7 @@ class BriefPane(Pane):
             join(paint(f"Discovery says {recommendation['verdict']}: ", "you", bold=True), recommendation["summary"],
                  paint("   x dismiss", "dim"))
             if recommendation and not recommendation.get("dismissed") else "")
-        notes = [paint(f"! {e['message']}", "error") for e in critique["errors"]]
+        notes = [paint(f"! {SCREEN_MESSAGES.get(e['rule'], e['message'])}", "error") for e in critique["errors"]]
         notes += [paint(f"• {w['message']}", "stone") for w in critique["warnings"]]
         notes += [paint(f"i {i['message']}", "stone") for i in critique["info"]]
         if critique["errors"]:
@@ -228,7 +252,7 @@ class BriefPane(Pane):
         self._show_section()
 
     def _show_section(self):
-        """Refill the editor from the section, never over text the human is typing."""
+        """Refill the section from the brief, never over text the human is typing."""
         if not self.brief or self._dirty():
             return
         rail = self.query_one("#rail", OptionList)
@@ -241,9 +265,77 @@ class BriefPane(Pane):
             self.loaded_body = section["body"]
             editor.placeholder = SECTION_TEMPLATES.get(section["name"], "")
             editor.load_text(section["body"])
+        fields = self._fields()
+        editor.display = not fields
+        self.query_one("#items", OptionList).display = fields
+        if fields:
+            self._fill_items(section["body"])
+        self._show_keys(fields)
+
+    def _fields(self):
+        """True when the section shown is edited through fields, not as plain text."""
+        return self.section not in self.as_text and items.codec(self.section) is not None
+
+    def _is_form(self):
+        return self.section in items.FORMS
+
+    def _show_keys(self, fields):
+        common = (("c", "check"), ("s", "start"), ("f", "facts"), ("d", "discover"), ("y", "confirm"), ("v", "provide"))
+        if fields and self._is_form():
+            pairs = (("enter", "edit"), ("t", "as text"), ("esc", "sections"))
+        elif fields:
+            pairs = (("enter", "edit"), ("a", f"add {items.NOUNS[self.section]}"), ("del", "remove"), ("t", "as text"),
+                     ("esc", "sections"))
+        else:
+            pairs = (("enter", "edit"), ("ctrl+s", "save"), ("t", "as fields"), ("esc", "sections"))
+        self.query_one("#brief-keys", Static).update(keys(*pairs, *common))
+
+    def _fill_items(self, body):
+        parse, _ = items.codec(self.section)
+        self.parsed = parse(body)
+        preamble, content = self.parsed
+        options = []
+        if self._is_form():
+            for key, label, _ in items.FORMS[self.section]:
+                value = content.get(key, "")
+                options.append(Option(lines([paint(label, "dim"), Text(_clip(value, 200)) if value
+                                             else paint("not written yet", "dim"), Text("")]), id=f"field-{key}"))
+        else:
+            if preamble:
+                label = "text that is not a flow yet" if self.section == "Core flows" else "notes"
+                options.append(Option(join(paint("¶ ", "dim"), paint(f"{label}: ", "dim"), _clip(preamble, 60)),
+                                      id="preamble"))
+            options += [Option(self._item_label(item), id=f"item-{n}") for n, item in enumerate(content)]
+            options.append(Option(paint(f"+ add a {items.NOUNS[self.section]}", "dim"), id="add"))
+        listing = self.query_one("#items", OptionList)
+        highlighted = listing.highlighted
+        listing.clear_options()
+        listing.add_options(options)
+        listing.highlighted = min(highlighted or 0, len(options) - 1)
+
+    def _item_label(self, item):
+        if self.section == "Users":
+            return join(paint("✓ ", "success"), paint(item["name"], bold=True),
+                        paint(f"  {item['about']}" if item["about"] else "  no description yet", "dim"))
+        if self.section != "Core flows":
+            specs = items.LISTS[self.section]
+            rest = [f"{label.lower()} {item[key]}" for key, label, _ in specs[1:] if item.get(key)]
+            return join(paint("• ", "dim"), paint(item[specs[0][0]], bold=True),
+                        paint(("  " + " · ".join(rest)) if rest else "", "dim"))
+        gaps = items.missing(item)
+        steps = len([s for s in item["steps"] if s.strip()])
+        detail = [item["who"] or "nobody yet", f"{steps} step{'s' if steps != 1 else ''}"]
+        if item["critical"]:
+            detail.append("critical")
+        first = join(paint("! " if gaps else "✓ ", "error" if gaps else "success", bold=bool(gaps)),
+                     paint(item["name"], bold=True))
+        second = paint("    " + " · ".join(detail), "dim")
+        if gaps:
+            second = join(second, paint(f" · needs {', '.join(gaps)}", "error"))
+        return lines([first, second])
 
     def on_option_list_option_highlighted(self, event):
-        if self.brief is None or event.option.id == self.section:
+        if event.option_list.id != "rail" or self.brief is None or event.option.id == self.section:
             return
         if self._dirty():
             self.app.spawn(self._save_then_show())
@@ -254,13 +346,186 @@ class BriefPane(Pane):
         await self._save()
         self._show_section()
 
-    def on_option_list_option_selected(self):
-        self.query_one("#editor", TextArea).focus()
+    def on_option_list_option_selected(self, event):
+        if event.option_list.id == "items":
+            self.app.spawn(self._edit_item(event.option.id))
+        else:
+            self._body().focus()
+
+    def _body(self):
+        return self.query_one("#items" if self._fields() else "#editor")
+
+    # --- sections as fields ---
+
+    async def _edit_item(self, option_id):
+        preamble, content = self.parsed
+        if self._is_form():
+            await self._edit_form()
+        elif option_id == "add":
+            await self._open_item(None)
+        elif option_id == "preamble":
+            text = await self.app.push_screen_wait(EditDialog(f"{self.section}: text kept as written", preamble))
+            if text is not None:
+                checked = await self._proofread({"notes": text}, {"notes": "notes"})
+                if checked is not None:
+                    await self._write(lambda pre, found: (checked["notes"].strip(), found))
+        else:
+            await self._open_item(content[int(option_id.removeprefix("item-"))])
+
+    async def _edit_form(self):
+        section = self.section
+        specs = items.FORMS[section]
+        values = self.parsed[1]
+        while True:
+            values = await self.app.push_screen_wait(FieldsDialog(section, specs, values))
+            if values is None:
+                return
+            checked = await self._proofread(items.prose_of(section, values), {k: l for k, l, _ in specs})
+            if checked is not None:
+                await self._write(lambda pre, old: (pre, items.with_prose(section, values, checked)), section=section)
+                return
+
+    async def _open_item(self, item):
+        """Add when item is None, else edit it. Items are matched by name when written,
+        so an edit lands on the right one even if the brief moved underneath. A form
+        whose proofread is sent back reopens with what was typed."""
+        section = self.section
+        if section == "Core flows":
+            await self._open_flow(item)
+            return
+        specs = (("name", "Name", "line"), ("about", "Who they are and what they want", "line")) \
+            if section == "Users" else items.LISTS[section]
+        first = specs[0][0]
+        original = item[first] if item else None
+        values = dict(item) if item else {key: "" for key, _, _ in specs}
+        noun = items.NOUNS[section]
+        while True:
+            values = await self.app.push_screen_wait(
+                FieldsDialog(f"Edit {noun}" if item else f"New {noun}", specs, values, required=first))
+            if values is None:
+                return
+            checked = await self._proofread(items.prose_of(section, values), {k: l for k, l, _ in specs})
+            if checked is not None:
+                final = items.with_prose(section, values, checked)
+                await self._write(lambda pre, found: (pre, _put(found, original, final, first)), section=section)
+                return
+
+    async def _open_flow(self, item):
+        original = item["name"] if item else None
+        flow = item or items.blank_flow()
+        while True:
+            users = items.parse_users(self._body_of("Users"))[1]
+            answer = await self.app.push_screen_wait(FlowDialog(flow, users, title="Edit flow" if item else "New flow"))
+            if answer is None:
+                return
+            flow = answer["flow"]
+            labels = {"name": "name", "trigger": "trigger", "outcome": "outcome"}
+            labels.update({f"step-{n}": f"step {n + 1}" for n in range(len(flow["steps"]))})
+            checked = await self._proofread(items.prose_of("Core flows", flow), labels)
+            if checked is None:
+                continue
+            flow = items.with_prose("Core flows", flow, checked)
+            new_users = answer["new_users"]
+            if new_users and not await self._write(
+                    lambda pre, found: (pre, found + [u for u in new_users if not _named(found, u["name"])]),
+                    section="Users"):
+                return
+            await self._write(lambda pre, found: (pre, _put(found, original, flow)), section="Core flows")
+            return
+
+    async def _proofread(self, texts, labels):
+        """Spelling and grammar before a write. Returns the texts with the fixes the
+        person took, or None when they chose to go back and edit."""
+        if not texts:
+            return {}
+        try:
+            result = await self.client.post("/v1/proofread", {"texts": texts})
+        except ApiError as exc:
+            self.app.notify(f"Not proofread: {exc.message}", severity="warning")
+            return texts
+        if not result["issues"]:
+            return texts
+        answer = await self.app.push_screen_wait(ProofreadDialog(texts, result["issues"], labels, result["preparing"]))
+        if answer is None:
+            return None
+        for word in answer["words"]:
+            await self.app.apply("dictionary.add_word", {"word": word})
+        return answer["texts"]
+
+    def _body_of(self, name):
+        return next((s["body"] for s in self.brief["sections"] if s["name"] == name), "")
+
+    async def _write(self, change, section=None):
+        """Apply change(preamble, content) to the section as the daemon holds it now and
+        save. A save that lost a race is applied again to the newer brief, once."""
+        section = section or self.section
+        parse, write = items.codec(section)
+        for attempt in (1, 2):
+            body = write(*change(*parse(self._body_of(section))))
+            try:
+                outcome = await self.app.apply("brief.update_section",
+                                               {"section": section, "body": body, "base_version": self.version},
+                                               project=self.app.project, reraise=True)
+            except ApiError as exc:
+                if exc.code == "stale_version" and attempt == 1:
+                    self.brief = await self.client.get(f"/v1/projects/{self.app.project}/brief")
+                    self.version = self.brief["version"]
+                    continue
+                self.app.notify(exc.message, severity="error")
+                return False
+            if not outcome:
+                return False
+            self.version = outcome["result"]["version"]
+            await self.load()
+            return True
+
+    def action_add_item(self):
+        if self._fields() and not self._is_form():
+            self.app.spawn(self._open_item(None))
+
+    def action_remove_item(self):
+        listing = self.query_one("#items", OptionList)
+        if not self._fields() or self._is_form() or not listing.has_focus or listing.highlighted is None:
+            return
+        option_id = listing.get_option_at_index(listing.highlighted).id
+        if option_id.startswith("item-"):
+            self.app.spawn(self._remove(int(option_id.removeprefix("item-"))))
+
+    async def _remove(self, index):
+        section = self.section
+        item = self.parsed[1][index]
+        first = "name" if section in ("Core flows", "Users") else items.LISTS[section][0][0]
+        name = item[first]
+        preview = {"summary": f"Remove {_clip(name, 50)} from {section}?", "consequences": ["Nothing else changes."]}
+        if await self.app.push_screen_wait(ConfirmDialog(preview)):
+            await self._write(lambda pre, found: (pre, [i for i in found if i[first] != name]), section=section)
+
+    def action_text_mode(self):
+        """Switch a section to plain text and back. Unsaved text is saved first."""
+        if items.codec(self.section) is None:
+            return
+        self.app.spawn(self._toggle_text())
+
+    async def _toggle_text(self):
+        if not await self._save():
+            return
+        self.as_text ^= {self.section}
+        self._show_section()
+        self._body().focus()
 
     async def _save(self):
+        """Write plain text typed in the editor, proofread first. False when the text
+        stays unsaved, so a caller does not move on from it."""
         if not self._dirty():
-            return
+            return True
         text = self.query_one("#editor", TextArea).text
+        checked = await self._proofread({"text": text}, {"text": self.section})
+        if checked is None:
+            self.query_one("#editor", TextArea).focus()
+            return False
+        text = checked.get("text", text)
+        if text != self.query_one("#editor", TextArea).text:
+            self.query_one("#editor", TextArea).load_text(text)
         args = {"section": self.section, "body": text, "base_version": self.version}
         try:
             outcome = await self.app.apply("brief.update_section", args, project=self.app.project, reraise=True)
@@ -269,12 +534,14 @@ class BriefPane(Pane):
                 self.version = exc.details["current_version"]
                 self.app.notify(f"The brief changed elsewhere, now v{self.version}. Your text is kept. "
                                 "Save again to write over it.", severity="warning")
-                return
+                return False
             self.app.notify(exc.message, severity="error")
-            return
+            return False
         if outcome:
             self.loaded_body = text
             await self.load()
+            return True
+        return False
 
     def action_save(self):
         self.app.spawn(self._save())
@@ -290,7 +557,8 @@ class BriefPane(Pane):
         self.app.spawn(self._start())
 
     async def _start(self):
-        await self._save()
+        if not await self._save():
+            return
         outcome = await self.app.apply("run.start", {"base_version": self.version}, project=self.app.project)
         if outcome and outcome.get("result", {}).get("run_id"):
             self.app.select_run(outcome["result"]["run_id"])
@@ -300,16 +568,10 @@ class BriefPane(Pane):
         self.app.spawn(self._facts())
 
     async def _facts(self):
-        text = await self.app.push_screen_wait(EditDialog("Facts", yaml.safe_dump(self.brief["facts"], sort_keys=False)))
-        if text is None:
-            return
-        try:
-            facts = yaml.safe_load(text) or {}
-        except yaml.YAMLError as exc:
-            self.app.notify(f"That is not valid YAML: {exc}", severity="error")
-            return
-        await self.app.apply("brief.update_facts", {"facts": facts, "base_version": self.version},
-                             project=self.app.project)
+        facts = await self.app.push_screen_wait(FactsDialog(self.brief["facts"]))
+        if facts is not None:
+            await self.app.apply("brief.update_facts", {"facts": facts, "base_version": self.version},
+                                 project=self.app.project)
 
     def action_discovery(self):
         self.app.spawn(self.app.apply("brief.run_discovery", {"sections": [self.section] if self.section else "all"},

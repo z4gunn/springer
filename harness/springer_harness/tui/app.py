@@ -69,11 +69,15 @@ class SpringerApp(App):
     #brief-editor { width: 1fr; height: 100%%; border-left: solid %(border)s; padding: 0 1; }
     #editor { height: 1fr; border: none; padding: 0; background: $background; }
     #editor:focus { border: none; background-tint: transparent; }
+    #items { height: 1fr; border: none; padding: 0; background: $background; display: none; }
+    #items:focus { border: none; background-tint: transparent; }
+    #items > .option-list--option-highlighted { background: %(selected)s; color: %(text)s; text-style: none; }
+    #items:focus > .option-list--option-highlighted { background: %(selected)s; color: %(text)s; text-style: none; }
     #proposal { height: auto; display: none; }
     #facts { width: 32; height: 100%%; padding: 0 1; border-left: solid %(border)s; }
     #recommendation { height: auto; padding: 0 2; }
     #critique { height: auto; max-height: 8; padding: 0 2; margin-top: 1; }
-    ConfirmDialog, FormDialog, TextDialog, EditDialog { align: center middle; background: $background 60%%; }
+    ConfirmDialog, FormDialog, TextDialog, EditDialog, FlowDialog, FieldsDialog, FactsDialog, ProofreadDialog { align: center middle; background: $background 60%%; }
     .dialog { width: 70; height: auto; max-height: 80%%; background: %(card)s; border-left: thick %(you_bar)s; padding: 1 2; }
     .dialog.wide { width: 90%%; height: 80%%; }
     .dialog-title { text-style: bold; color: %(text)s; margin-bottom: 1; }
@@ -81,6 +85,27 @@ class SpringerApp(App):
     .dialog Input { border: none; border-bottom: solid %(border)s; height: 2; padding: 0; background: %(card)s; margin-bottom: 1; }
     .dialog Input:focus { border: none; border-bottom: solid %(you_bar)s; background: %(card)s; background-tint: transparent; }
     #dialog-editor { height: 1fr; border: none; background: %(card)s; }
+    .form { max-height: 100%%; }
+    .form-row { height: 1; }
+    .form-row.steps { height: 5; margin: 1 0; }
+    .form-row Label { width: 10; color: %(dim)s; }
+    .dialog .form-row Input { height: 1; border: none; margin: 0; padding: 0; background: %(selected)s; width: 1fr; }
+    .dialog .form-row Input:focus { border: none; background: %(selected)s; }
+    .form-row Select { width: 1fr; }
+    .form-row TextArea { height: 5; width: 1fr; background: %(selected)s; }
+    #flow-critical { width: 1fr; }
+    #flow-critical:focus { background: %(selected)s; }
+    #flow-error, #form-error { height: auto; color: $error; }
+    .form-fields { height: auto; max-height: 18; scrollbar-color: %(border)s; scrollbar-color-hover: %(dim)s;
+                   scrollbar-color-active: %(dim)s; scrollbar-background: %(card)s; scrollbar-size-vertical: 1; }
+    FactsDialog .form-row Label { width: 13; }
+    .form-label { color: %(dim)s; margin-top: 1; }
+    .dialog .form-line { height: 1; border: none; margin: 0; padding: 0; background: %(selected)s; }
+    .dialog .form-line:focus { border: none; background: %(selected)s; }
+    .form-text { height: 4; background: %(selected)s; }
+    .surface { width: auto; margin-right: 2; }
+    .surface:focus, #fact-live:focus { background: %(selected)s; }
+    #fact-live { width: 1fr; }
     """ % C
     BINDINGS = [Binding("p", "show('projects')", "projects"), Binding("b", "show('brief')", "brief"),
                 Binding("k", "show('backlog')", "backlog"), Binding("r", "show('run')", "run"),

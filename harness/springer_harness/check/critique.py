@@ -8,16 +8,6 @@ from ..state.brief import REQUIRED, derive
 PINNED_IDS = {"hosting", "db", "orm", "auth", "api", "jobs", "realtime", "billing", "email", "storage", "analytics",
               "errors", "tenancy"}
 MAX_FLOW_STEPS = 12
-# What a person types into an empty section, and what a refusal quotes back. The chat
-# interview will write this format for them once it exists.
-FLOW_TEMPLATE = """### Name of the flow
-Who: A name from Users
-Trigger: What starts it.
-1. First step
-2. Next step
-Outcome: How they know it worked.
-Critical: yes"""
-USERS_TEMPLATE = "- Name: who they are and what they want"
 
 
 def parse_flows(text):
@@ -64,7 +54,7 @@ def critique(front, sections, staging_hosts=()):
             add(errors, "flow-without-outcome", "Core flows", f"{flow['name']} has no outcome.")
         who = (flow.get("who") or "").lower()
         if who and who not in users:
-            add(errors, "unknown-user", "Core flows", f"{flow['name']} names {flow['who']}, who is not in Users. Write each user as: {USERS_TEMPLATE}")
+            add(errors, "unknown-user", "Core flows", f"{flow['name']} names {flow['who']}, who is not in Users. Add them to Users.")
         if flow.get("surface") and flow["surface"] not in surfaces:
             add(errors, "surface-contradiction", "Core flows",
                 f"{flow['name']} runs on {flow['surface']}, which is not a surface of this product.")

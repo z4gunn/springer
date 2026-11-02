@@ -682,6 +682,96 @@
         "title": "ProjectSummary",
         "type": "object"
       },
+      "Proofread": {
+        "properties": {
+          "engine": {
+            "enum": [
+              "languagetool",
+              "spelling"
+            ],
+            "title": "Engine",
+            "type": "string"
+          },
+          "issues": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/ProofreadIssue"
+              },
+              "type": "array"
+            },
+            "title": "Issues",
+            "type": "object"
+          },
+          "preparing": {
+            "title": "Preparing",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "engine",
+          "preparing",
+          "issues"
+        ],
+        "title": "Proofread",
+        "type": "object"
+      },
+      "ProofreadIssue": {
+        "properties": {
+          "length": {
+            "title": "Length",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "replacements": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Replacements",
+            "type": "array"
+          },
+          "spelling": {
+            "title": "Spelling",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "offset",
+          "length",
+          "text",
+          "message",
+          "replacements",
+          "spelling"
+        ],
+        "title": "ProofreadIssue",
+        "type": "object"
+      },
+      "ProofreadRequest": {
+        "properties": {
+          "texts": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Texts",
+            "type": "object"
+          }
+        },
+        "required": [
+          "texts"
+        ],
+        "title": "ProofreadRequest",
+        "type": "object"
+      },
       "ProvisioningItem": {
         "properties": {
           "item_id": {
@@ -2398,6 +2488,63 @@
           }
         },
         "summary": "Session Stream"
+      }
+    },
+    "/v1/proofread": {
+      "post": {
+        "description": "A read: it checks text and writes nothing, so it is not an operation.",
+        "operationId": "proofread_v1_proofread_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProofreadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proofread"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Proofread"
       }
     },
     "/v1/usage": {

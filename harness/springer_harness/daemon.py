@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .common import artifact_header, read_json, write_json
 from .errors import InvalidArgs, NotFound
+from .proofread import Proofreader
 from .registry import Home
 from .scheduler.engine import RunEngine
 from .scheduler.worktrees import Worktrees
@@ -38,8 +39,9 @@ def slugify(name):
 
 
 class Daemon:
-    def __init__(self, home, provider, source_host, planner_factory, secrets, now, maximum=2):
+    def __init__(self, home, provider, source_host, planner_factory, secrets, now, maximum=2, languagetool=False):
         self.home = Home(home)
+        self.proofreader = Proofreader(self.home.root, languagetool=languagetool)
         self.provider = provider
         self.source_host = source_host
         self.planner_factory = planner_factory

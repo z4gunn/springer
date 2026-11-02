@@ -34,7 +34,11 @@ if HAVE_TUI:
     from springer_harness.state.brief import BriefStore
     from springer_harness.tui.app import LOST, SpringerApp
     from springer_harness.tui.client import ApiClient
-    from springer_harness.tui.dialogs import ConfirmDialog, FormDialog, TextDialog
+    from springer_harness.check.critique import critique, parse_flows, parse_users
+    from springer_harness.tui import items
+    from springer_harness.tui.dialogs import (NEW_USER, ConfirmDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog,
+                                              ProofreadDialog, TextDialog)
+    from textual.widgets import Select
 
 GOOD = {"Problem": "Freelancers lose track of invoices.", "Users": "- Fran: a freelancer",
         "Core flows": "### Send an invoice\nWho: Fran\nTrigger: The work is done.\n1. Write it\nOutcome: Sent.\nCritical: yes\n",
@@ -246,15 +250,23 @@ class BriefScreenTest(TuiCase):
     async def test_editor_facts_panel_and_derived_profile(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            screen = await self.see(pilot, "brief  v", "✓ Problem", "facts", "runs as brochure")
+            screen = await self.see(pilot, "brief  v", "✓ Problem", "facts", "runs as brochure",
+                                    "What is hard today", GOOD["Problem"], "Why it matters now")
             self.assertNotIn("sentence", screen, "the derived sentence is not a fact")
-            self.assertEqual(self.app.query_one("#editor", TextArea).text, GOOD["Problem"])
-            await pilot.press("enter")
-            await pilot.pause(0.1)
-            await pilot.press("end", *" more")
+            await pilot.press("enter", "enter")
+            await self.dialog(pilot, FieldsDialog)
+            self.app.screen.query_one("#f-why", Input).value = "Tax season is close."
             await pilot.press("ctrl+s")
-            await self.until(pilot, lambda: BriefStore(self.project).load()[1]["Problem"].endswith("more"))
-            await self.see(pilot, f"v{self.version + 1}")
+            await self.until(pilot, lambda: "Why it matters now: Tax season is close." in BriefStore(self.project).load()[1]["Problem"])
+            self.assertIn(f"What is hard today: {GOOD['Problem']}", BriefStore(self.project).load()[1]["Problem"])
+            await self.see(pilot, f"v{self.version + 1}", "Tax season is close.")
+            await pilot.press("t")
+            await self.until(pilot, lambda: self.app.query_one("#editor", TextArea).display)
+            editor = self.app.query_one("#editor", TextArea)
+            editor.move_cursor(editor.document.end)
+            await pilot.press(*" More")
+            await pilot.press("ctrl+s")
+            await self.until(pilot, lambda: BriefStore(self.project).load()[1]["Problem"].endswith("More"))
 
     async def test_every_section_is_offered_even_when_empty(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
@@ -268,18 +280,22 @@ class BriefScreenTest(TuiCase):
             self.app.query_one("#editor", TextArea).load_text("Edited in place.")
             await pilot.press("down")
             await self.until(pilot, lambda: BriefStore(self.project).load()[1]["Problem"] == "Edited in place.")
-            await self.until(pilot, lambda: self.app.query_one("#editor", TextArea).text == GOOD["Users"])
+            await self.until(pilot, lambda: self.app.query_one("#brief-pane").section == "Users")
+            await self.see(pilot, "Fran  a freelancer", "+ add a user")
 
     async def test_facts_edit_recomputes_the_profile(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
             await self.see(pilot, "runs as brochure")
             await pilot.press("f")
-            await self.until(pilot, lambda: self.app.screen.query("#dialog-editor"))
-            editor = self.app.screen.query_one("#dialog-editor", TextArea)
-            editor.load_text(editor.text + "payments: subscription\n")
+            await self.dialog(pilot, FactsDialog)
+            await self.see(pilot, "Surfaces", "Payments", "Pinned decisions")
+            self.app.screen.query_one("#fact-payments", Select).value = "subscription"
+            self.app.screen.query_one("#fact-pinned", TextArea).load_text("db: postgres")
             await pilot.press("ctrl+s")
-            await self.see(pilot, "runs as saas")
+            await self.see(pilot, "runs as saas", "pinned db postgres")
+            front = BriefStore(self.project).load()[0]
+            self.assertEqual((front["payments"], front["pinned"], front["surfaces"]), ("subscription", {"db": "postgres"}, ["web"]))
 
     async def test_narrow_terminal_hides_the_facts_panel_and_keeps_the_editor(self):
         async with self.app.run_test(size=(90, 40)) as pilot:
@@ -294,21 +310,171 @@ class BriefScreenTest(TuiCase):
             await self.open_acme(pilot)
             await self.see(pilot, "! Core flows", "! Bad has no outcome.", "Start blocked: 2 error(s)")
 
-    async def test_prose_flows_are_refused_and_an_empty_section_shows_the_format(self):
+    async def test_prose_flows_are_refused_and_kept_beside_the_flows(self):
         store = BriefStore(self.project)
-        version = store.update_section("Core flows", "The user picks a diet, then we search.", self.version)
-        store.update_section("Glossary", "", version)
+        store.update_section("Core flows", "The user picks a diet, then we search.", self.version)
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.open_acme(pilot)
-            await self.see(pilot, "! Core flows", "Start blocked", "### heading")
+            await self.see(pilot, "! Core flows", "Start blocked", "press a to add each one")
             self.assertNotIn("Ready to start", self.text())
+            self.assertNotIn("### heading", self.text(), "the screen never asks for typed format")
+            await self.core_flows(pilot)
+            await self.see(pilot, "text that is not a flow yet: The user picks a diet", "+ add a flow")
             store.update_section("Core flows", "", store.load()[0]["brief_version"])
             self.app.mark_dirty()
             await self.see(pilot, "Core flows is required")
-            await pilot.press("down", "down")
-            await self.until(pilot, lambda: self.app.query_one("#brief-pane").section == "Core flows")
-            await self.see(pilot, "### Name of the flow", "Critical: yes")
-            self.assertEqual(self.app.query_one("#editor", TextArea).text, "", "a template is not saved text")
+            self.assertNotIn("text that is not a flow", self.text())
+
+    async def core_flows(self, pilot):
+        await self.see(pilot, "✓ Problem")
+        await pilot.press("down", "down")
+        await self.until(pilot, lambda: self.app.query_one("#brief-pane").section == "Core flows")
+        await self.see(pilot, "+ add a flow")
+
+    async def test_core_flows_and_users_as_fields(self):
+        """A flow is added, edited, and removed through a form, and the text it writes is
+        what the API parses, so the person never types the format."""
+        store = BriefStore(self.project)
+        async with self.app.run_test(size=(80, 28)) as pilot:
+            await self.open_acme(pilot)
+            await self.core_flows(pilot)
+            await self.see(pilot, "✓ Send an invoice", "Fran · 1 step · critical")
+            await pilot.press("enter")  # from the rail into the list
+            await pilot.press("a")
+            await self.dialog(pilot, FlowDialog)
+            await self.see(pilot, "New flow", "name", "trigger", "outcome", "critical")
+            await pilot.press(*"Chase a late invoice", "enter")
+            self.assertEqual(self.app.focused.id, "flow-who", "enter moves to the next field")
+            self.app.screen.query_one("#flow-who", Select).value = NEW_USER
+            await self.dialog(pilot, FormDialog)
+            await pilot.press(*"Ada", "enter", *"an accountant", "enter")
+            await self.dialog(pilot, FlowDialog)
+            self.assertEqual(self.app.screen.query_one("#flow-who", Select).value, "Ada")
+            self.app.screen.query_one("#flow-trigger", Input).value = "A due date passes."
+            self.app.screen.query_one("#flow-steps", TextArea).load_text("Find the invoice\n\nSend a reminder\n")
+            await pilot.press("ctrl+s")
+            await self.see(pilot, "! Chase a late invoice", "needs an outcome")
+            _, sections = store.load()
+            flows = parse_flows(sections["Core flows"])
+            self.assertEqual([f["name"] for f in flows], ["Send an invoice", "Chase a late invoice"])
+            self.assertEqual(flows[1], {"name": "Chase a late invoice", "steps": 2, "who": "Ada",
+                                        "trigger": "A due date passes.", "critical": "no"})
+            self.assertEqual(parse_users(sections["Users"]), {"fran", "ada"}, "someone new joins Users")
+            await self.see(pilot, "Chase a late invoice has no outcome.")
+
+            await self.until(pilot, lambda: self.app.focused and self.app.focused.id == "items")
+            await pilot.press("down")
+            await pilot.press("enter")
+            await self.dialog(pilot, FlowDialog)
+            self.assertEqual(self.app.screen.query_one("#flow-trigger", Input).value, "A due date passes.")
+            self.app.screen.query_one("#flow-outcome", Input).value = "The client pays."
+            await pilot.press("ctrl+s")
+            await self.see(pilot, "✓ Chase a late invoice", "Ready to start.")
+            self.assertEqual(critique(*store.load())["errors"], [])
+
+            await pilot.press("delete")
+            await self.dialog(pilot, ConfirmDialog)
+            await pilot.press("y")
+            await self.until(pilot, lambda: "Chase" not in store.load()[1]["Core flows"])
+            self.assertIn("### Send an invoice", store.load()[1]["Core flows"], "the other flow stays")
+
+            await pilot.press("t")
+            await self.until(pilot, lambda: self.app.query_one("#editor", TextArea).display)
+            self.assertIn("Who: Fran", self.app.query_one("#editor", TextArea).text)
+            await pilot.press("escape", "t")
+            await self.see(pilot, "✓ Send an invoice")
+
+    async def test_a_flow_needs_a_name_and_keys_do_not_leak_behind_the_form(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.open_acme(pilot)
+            await self.core_flows(pilot)
+            await pilot.press("a")
+            await self.dialog(pilot, FlowDialog)
+            toggle = self.app.screen.query_one("#flow-critical")
+            toggle.focus()
+            await pilot.press("p", "q")
+            await pilot.pause(0.1)
+            self.assertIsInstance(self.app.screen, FlowDialog)
+            await pilot.press("space")
+            await self.see(pilot, "[x] yes, the product fails without this flow")
+            self.assertTrue(toggle.value)
+            self.assertEqual(self.app.query_one("#brief-pane").section, "Core flows")
+            await pilot.press("ctrl+s")
+            await self.see(pilot, "Name the flow first.")
+            await pilot.press("escape")
+            await self.until(pilot, lambda: not isinstance(self.app.screen, FlowDialog))
+            self.assertEqual(BriefStore(self.project).load()[1]["Core flows"].strip(), GOOD["Core flows"].strip())
+
+    async def test_every_section_has_its_fields(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.open_acme(pilot)
+            await self.see(pilot, "✓ Problem")
+            for section, shown in (("Non-goals", "None yet."), ("Success criteria", "+ add a measure"),
+                                   ("Constraints", "+ add a constraint"), ("Design preferences", "Sites or apps you like"),
+                                   ("Inputs and references", "+ add a input"), ("Glossary", "+ add a term"),
+                                   ("Open questions", "+ add a question")):
+                rail = self.app.query_one("#rail", OptionList)
+                rail.highlighted = [s["name"] for s in self.app.query_one("#brief-pane").brief["sections"]].index(section)
+                await self.until(pilot, lambda: self.app.query_one("#brief-pane").section == section)
+                await self.see(pilot, shown)
+                self.assertFalse(self.app.query_one("#editor", TextArea).display, section)
+            rail.focus()
+            await pilot.press("enter", "a")
+            await self.dialog(pilot, FieldsDialog)
+            await pilot.press(*"Which currency", "enter", *"Fran")
+            await pilot.press("ctrl+s")
+            await self.until(pilot, lambda: BriefStore(self.project).load()[1]["Open questions"]
+                             == "- Which currency\n  Who can answer: Fran")
+            await self.see(pilot, "Which currency  who can answer Fran")
+
+    async def test_proofread_before_a_section_is_written(self):
+        store = BriefStore(self.project)
+        async with self.app.run_test(size=(80, 28)) as pilot:
+            await self.open_acme(pilot)
+            await self.see(pilot, "✓ Problem")
+            await pilot.press("enter", "enter")
+            await self.dialog(pilot, FieldsDialog)
+            self.app.screen.query_one("#f-hard", TextArea).load_text("Cooking at home is dificult.")
+            self.app.screen.query_one("#f-who", Input).value = "Home cooks on a GLP1 diet, like Zorbu"
+            self.app.screen.query_one("#f-now", Input).value = "They repeat the same meals and get boored."
+            await pilot.press("ctrl+s")
+            await self.dialog(pilot, ProofreadDialog)
+            await self.see(pilot, "Proofread  1 of 2", "What is hard today", "dificult", "1  difficult")
+            self.assertNotIn("GLP1", self.app.screen.query_one("#proof-body", Static).render().plain)
+            await pilot.press("escape")
+            await self.dialog(pilot, FieldsDialog)
+            self.assertEqual(self.app.screen.query_one("#f-hard", TextArea).text, "Cooking at home is dificult.",
+                             "going back keeps what was typed")
+            self.assertEqual(store.load()[1]["Problem"], GOOD["Problem"], "nothing is written before the proofread")
+            await pilot.press("ctrl+s")
+            await self.dialog(pilot, ProofreadDialog)
+            await pilot.press("1")
+            await self.see(pilot, "2 of 2", "boored")
+            await pilot.press("d")
+            await self.until(pilot, lambda: "What is hard today: Cooking at home is difficult." in store.load()[1]["Problem"])
+            self.assertIn("get boored.", store.load()[1]["Problem"])
+            self.assertIn("boored", (self.daemon.home.root / "dictionary.txt").read_text())
+            await pilot.press("enter")
+            await self.dialog(pilot, FieldsDialog)
+            await pilot.press("ctrl+s")
+            await self.until(pilot, lambda: not isinstance(self.app.screen, FieldsDialog))
+            await pilot.pause(0.3)
+            self.assertNotIsInstance(self.app.screen, ProofreadDialog, "a word in the dictionary is not flagged again")
+
+    async def test_users_as_fields_and_prose_kept_as_notes(self):
+        store = BriefStore(self.project)
+        store.update_section("Users", "Anyone who sends invoices.\n- Fran: a freelancer", self.version)
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.open_acme(pilot)
+            await self.see(pilot, "✓ Problem")
+            await pilot.press("down", "enter")
+            await self.see(pilot, "notes: Anyone who sends invoices.", "Fran  a freelancer")
+            await pilot.press("a")
+            await self.dialog(pilot, FieldsDialog)
+            await pilot.press(*"Bo", "enter", *"a bookkeeper")
+            await pilot.press("ctrl+s")
+            await self.until(pilot, lambda: "- Bo: a bookkeeper" in store.load()[1]["Users"])
+            self.assertTrue(store.load()[1]["Users"].startswith("Anyone who sends invoices."))
 
     async def test_discovery_proposed_sections_and_go_or_no_go(self):
         store = BriefStore(self.project)
@@ -842,6 +1008,8 @@ COVERAGE = {
     ("Projects", "New, open, archive"): (ProjectsScreenTest, "test_new_open_archive"),
     ("Brief", "Editor, facts panel, derived profile"): (BriefScreenTest, "test_editor_facts_panel_and_derived_profile"),
     ("Brief", "Critique"): (BriefScreenTest, "test_critique"),
+    ("Brief", "Every section as fields"): (BriefScreenTest, "test_core_flows_and_users_as_fields"),
+    ("Brief", "Proofread before a section is written"): (BriefScreenTest, "test_proofread_before_a_section_is_written"),
     ("Brief", "Discovery, proposed sections, go or no-go"): (BriefScreenTest, "test_discovery_proposed_sections_and_go_or_no_go"),
     ("Brief", "Interview"): (BriefScreenTest, "test_interview"),
     ("Brief", "Start run"): (BriefScreenTest, "test_start_run"),
@@ -863,6 +1031,34 @@ COVERAGE = {
     ("All", "Chat line"): (AllScreensTest, "test_chat_line"),
     ("All", "Audit of applied operations"): (AllScreensTest, "test_audit_of_applied_operations"),
 }
+
+
+class ItemsFormatTest(unittest.TestCase):
+    """The TUI writes the brief's text, and the API parses it. These hold the two to one format."""
+
+    @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
+    def test_what_the_form_writes_the_critique_reads(self):
+        flow = {**items.blank_flow(), "name": "Pick a diet", "who": "Home cook", "trigger": "First launch.",
+                "steps": ["See the diets", " ", "Pick one"], "outcome": "Searches use it.", "critical": True,
+                "surface": "web"}
+        text = items.write_flows("Kept prose.", [flow])
+        self.assertEqual(parse_flows(text), [{"name": "Pick a diet", "steps": 2, "who": "Home cook",
+                                              "trigger": "First launch.", "outcome": "Searches use it.",
+                                              "critical": "yes", "surface": "web"}])
+        self.assertEqual(items.parse_flows(text), ("Kept prose.", [{**flow, "steps": ["See the diets", "Pick one"]}]))
+        users = items.write_users("Notes.", [{"name": "Home cook", "about": "cooks on a diet"}, {"name": "Bo", "about": ""}])
+        self.assertEqual(parse_users(users), {"home cook", "bo"})
+        self.assertEqual(items.parse_users(users)[0], "Notes.")
+
+    def test_a_flow_typed_by_hand_is_read_leniently(self):
+        preamble, flows = items.parse_flows("### Diet interview\nwho: end user\nTrigger : new launch\n"
+                                            "1) Presents diets\n- Picks one\nCritical: Yes\nsee the mockup\n")
+        self.assertEqual(preamble, "")
+        self.assertEqual(flows[0]["who"], "end user")
+        self.assertEqual(flows[0]["steps"], ["Presents diets", "Picks one"])
+        self.assertTrue(flows[0]["critical"])
+        self.assertEqual(flows[0]["extra"], ["see the mockup"])
+        self.assertEqual(items.missing(flows[0]), ["an outcome"])
 
 
 class LookTest(unittest.TestCase):
@@ -926,11 +1122,13 @@ class AcceptanceListTest(unittest.TestCase):
 
     def test_the_tui_reaches_the_daemon_only_through_the_api(self):
         """Contract rule 5, and what lets the real provider slot in with no TUI change."""
-        allowed = {"client", "dialogs", "panes", "theme"}
+        allowed = {"client", "dialogs", "items", "panes", "theme"}
         for path in sorted((REPO / "harness" / "springer_harness" / "tui").glob("*.py")):
             for node in ast.walk(ast.parse(path.read_text())):
                 if isinstance(node, ast.ImportFrom) and node.level:
-                    self.assertIn(node.module, allowed, f"{path.name} imports {node.module}")
+                    for name in ([a.name for a in node.names] if node.module is None else [node.module]):
+                        self.assertIn(name, allowed, f"{path.name} imports {name}")
+                    self.assertIn(node.module or node.names[0].name, allowed, f"{path.name} imports {node.module}")
                     self.assertEqual(node.level, 1, f"{path.name} reaches outside tui/")
                 module = getattr(node, "module", None) or ""
                 self.assertNotIn("springer_harness", module, path.name)

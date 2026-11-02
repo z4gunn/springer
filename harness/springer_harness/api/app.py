@@ -392,6 +392,11 @@ def create_app(daemon):
         yield _frame("text", {"session_id": session_id, "text": "The chat agent is not built yet."})
         yield _frame("done", {"session_id": session_id})
 
+    @app.post("/v1/proofread", response_model=m.Proofread, dependencies=secured)
+    def proofread(body: m.ProofreadRequest):
+        """A read: it checks text and writes nothing, so it is not an operation."""
+        return daemon.proofreader.check(body.texts)
+
     @app.post("/v1/chat", dependencies=secured)
     def chat(body: m.ChatRequest):
         return StreamingResponse(chat_frames(body.session_id or secrets.token_urlsafe(8)), media_type="text/event-stream")

@@ -119,7 +119,8 @@ def serve(home, port):
     from .providers.mock_scenario import demo_planner_factory, demo_script
     from .providers.secrets import KeyringSecrets
 
-    daemon = Daemon(home, MockProvider(demo_script()), MockSourceHost(), demo_planner_factory(), KeyringSecrets(), time.time)
+    daemon = Daemon(home, MockProvider(demo_script()), MockSourceHost(), demo_planner_factory(), KeyringSecrets(), time.time,
+                    languagetool=True)
     app = create_app(daemon)
     daemon.home.write_port(port)
     daemon.start()
