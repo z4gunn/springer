@@ -178,6 +178,18 @@ class FailureTest(EngineCase):
                 self.assertEqual(engine.units.state("U-0001")["retries_spent"], 0)
                 self.assertEqual(len(engine.units.state("U-0001")["sessions"]), 2)
 
+    def test_a_cause_that_does_not_go_away_asks_a_person_on_the_third_time(self):
+        """A redispatch spends no retry, so without a bound an environment problem loops
+        for as long as the window allows. The first real run did this 26 times."""
+        self.provider.script["spgr-agent-backend-developer"] = [Attempt(result=fail_result("environment", "no venv"))]
+        engine = self.engine([batch(unit("a"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "blocked")
+        self.assertEqual(len(engine.units.state("U-0001")["sessions"]), 3)
+        gate = engine.gates.open_gates()[0]["content"]
+        self.assertIn("3 environment failures in a row", gate["decision_prompt"])
+        engine.gates.answer(gate["checkpoint_id"], "retry", "human")
+        self.tick_until(engine, lambda: len(engine.units.state("U-0001")["sessions"]) == 4)
+
     def test_a_builder_that_stops_to_ask_is_told_to_take_the_default(self):
         self.provider.script["spgr-agent-backend-developer"] = [Attempt(result=fail_result("question")), Attempt()]
         engine = self.engine([batch(unit("a"))])

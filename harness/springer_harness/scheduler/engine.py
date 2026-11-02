@@ -29,6 +29,7 @@ GATE_TYPES = ("direction-review", "architecture-options-selection", "architectur
               "structure-confirmation", "scope-review", "taste-review", "production-release", "provisioning-required")
 DECISION_KINDS = ("question", "prd-approval", "architecture-options-selection", "design-direction-selection",
                   "default-review")
+MAX_REDISPATCHES = 3
 MERGE_OPTIONS = [
     {"option": "approve", "consequence": "It merges, and stacked work can follow.",
      "recommended_because": "Reviewed and green. Read the findings first."},
@@ -318,7 +319,11 @@ class RunEngine:
         action = POLICY.get(cause, RETRY)
         if cause in ADDENDA:
             self._append_note(unit_id, ADDENDA[cause])
-        if action == REDISPATCH:
+        if action == REDISPATCH and self._repeats(state, cause) >= MAX_REDISPATCHES - 1:
+            # A redispatch spends no retry, so a cause that does not go away would
+            # loop forever. The third in a row asks a person instead.
+            self._block(unit_id, state, f"{MAX_REDISPATCHES} {cause} failures in a row: {result.detail}")
+        elif action == REDISPATCH:
             self.units.transition(unit_id, "redispatch", f"{cause}: {result.detail}")
         elif action == BLOCK:
             self._block(unit_id, state, f"blocked: {result.detail}")
@@ -328,6 +333,16 @@ class RunEngine:
         else:
             self.units.transition(unit_id, "retry", f"defect: {result.detail}",
                                   retries_spent=state["retries_spent"] + 1)
+
+    def _repeats(self, state, cause):
+        """Redispatches for this cause since a person last answered for the unit."""
+        count = 0
+        for entry in reversed(state["history"]):
+            if entry["state"] == "ready" and entry["reason"].startswith("gate "):
+                break
+            if entry["state"] == "redispatch" and entry["reason"].startswith(f"{cause}:"):
+                count += 1
+        return count
 
     def _block(self, unit_id, state, reason, **updates):
         """Blocked always has a card for the human: an escalation and a gate holding it."""
@@ -549,6 +564,11 @@ class RunEngine:
 
     def _claim(self, state):
         unit_id = state["unit_id"]
+        if getattr(self.provider, "mechanical", False) and not getattr(self, "_venv_ready", False):
+            problem = self.worktrees.ensure_venv()
+            if problem:
+                self.ledger.append("environment_degraded", detail=f"no venv for schemas/validate.py: {problem}")
+            self._venv_ready = problem is None
         path, branch = self.worktrees.claim(unit_id, self._base_for(unit_id))
         self.ledger.append("worktree_claimed", unit_id=unit_id, path=str(path), branch=branch)
         self.units.transition(unit_id, "running", "claimed")

@@ -4,6 +4,7 @@ A removal git refuses is logged and left for the human, never forced.
 """
 
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -18,6 +19,22 @@ class Worktrees:
 
     def path(self, unit_id):
         return self.root / unit_id
+
+    def ensure_venv(self):
+        """schemas/validate.py looks for a .venv in the repo root or its parent, and a
+        worktree's parent is this folder, so one venv with jsonschema serves every unit
+        of the project. None when ready, else why it could not be made."""
+        python = self.root / ".venv" / "bin" / "python"
+        if python.exists() and subprocess.run([str(python), "-c", "import jsonschema"],
+                                              capture_output=True).returncode == 0:
+            return None
+        self.root.mkdir(parents=True, exist_ok=True)
+        for step in ([sys.executable, "-m", "venv", str(self.root / ".venv")],
+                     [str(python), "-m", "pip", "install", "--quiet", "jsonschema"]):
+            done = subprocess.run(step, capture_output=True, text=True, timeout=600)
+            if done.returncode:
+                return (done.stderr or done.stdout).strip()[-300:]
+        return None
 
     def default_branch(self):
         return _git(self.project, "symbolic-ref", "--short", "HEAD").stdout.strip() or "main"
@@ -56,11 +73,33 @@ class Worktrees:
                  if not line[3:].startswith(("runs/", ".worktrees/"))]
         if dirty:
             return "the main checkout has uncommitted changes"
-        done = _git(self.project, "merge", "--no-edit", "--no-ff", "-m", f"chore: integrate {branch}", branch)
+        message = f"chore: integrate {branch}"
+        done = _git(self.project, "merge", "--no-edit", "--no-ff", "-m", message, branch)
+        if done.returncode and self._clear_identical_copies(branch, done.stderr):
+            done = _git(self.project, "merge", "--no-edit", "--no-ff", "-m", message, branch)
         if done.returncode:
             _git(self.project, "merge", "--abort")
             return done.stderr.strip() or done.stdout.strip() or "git merge failed"
         return None
+
+    def _clear_identical_copies(self, branch, error):
+        """git refuses a merge that would overwrite untracked files. A session that
+        wrote the run store and also committed a copy leaves exactly that, and when
+        each file is byte for byte the branch's copy, removing it loses nothing.
+        Returns True when it cleared every blocking file."""
+        if "untracked working tree files would be overwritten" not in error:
+            return False
+        paths = [line.strip() for line in error.splitlines() if line.startswith(("\t", "        "))]
+        if not paths:
+            return False
+        for rel in paths:
+            ours = (self.project / rel)
+            theirs = subprocess.run(["git", "-C", str(self.project), "show", f"{branch}:{rel}"], capture_output=True)
+            if theirs.returncode or not ours.is_file() or ours.read_bytes() != theirs.stdout:
+                return False
+        for rel in paths:
+            (self.project / rel).unlink()
+        return True
 
     def release(self, unit_id):
         """Returns None on success, or git's reason for refusing."""

@@ -330,3 +330,41 @@ class SetupTest(FakeBinCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IntegrateTest(unittest.TestCase):
+    """An artifact unit's branch lands on the default branch in the main checkout."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.project = git_project(root / "acme")
+        from springer_harness.scheduler.worktrees import Worktrees
+        self.trees = Worktrees(root / "home", "acme", self.project)
+        self.path, _ = self.trees.claim("U-0001", "main")
+
+    def commit(self, rel, text):
+        (self.path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (self.path / rel).write_text(text)
+        env = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+        subprocess.run(["git", "-C", str(self.path), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.path), *env, "commit", "-qm", "unit work"], check=True)
+
+    def test_docs_land_and_an_identical_run_store_copy_does_not_block(self):
+        self.commit("docs/prd.md", "PRD")
+        self.commit("runs/acme-1/artifacts/prd.json", "{}")
+        (self.project / "runs/acme-1/artifacts").mkdir(parents=True)
+        (self.project / "runs/acme-1/artifacts/prd.json").write_text("{}")
+        self.assertIsNone(self.trees.integrate("U-0001"))
+        self.assertEqual((self.project / "docs/prd.md").read_text(), "PRD")
+
+    def test_a_differing_untracked_copy_is_never_overwritten(self):
+        self.commit("runs/acme-1/artifacts/prd.json", "{}")
+        (self.project / "runs/acme-1/artifacts").mkdir(parents=True)
+        (self.project / "runs/acme-1/artifacts/prd.json").write_text('{"newer": true}')
+        self.assertIn("would be overwritten", self.trees.integrate("U-0001"))
+        self.assertEqual((self.project / "runs/acme-1/artifacts/prd.json").read_text(), '{"newer": true}')
+
+    def test_nothing_committed_is_nothing_to_integrate(self):
+        self.assertEqual(self.trees.integrate("U-0001"), "nothing to integrate")

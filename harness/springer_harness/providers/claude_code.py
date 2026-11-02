@@ -43,8 +43,10 @@ session directory {session_dir}:
 - return.txt, your fifteen-line return.
 - handoff.md only if you are stopping before the work is done, saying where to continue.
 
-Use {session_dir} as the unit directory for receipt.py. Write run artifacts under
-{run_dir}/artifacts/. Work and commit on the branch you are on ({branch}). When the
+Use {session_dir} as the unit directory for receipt.py. Write run artifacts to
+{run_dir}/artifacts/ by that absolute path, which is the run store the harness owns, and
+do not commit copies of anything under runs/ in your worktree. Commit everything else
+(docs/, source, tests) on the branch you are on ({branch}). When the
 outcome is a pull request, push this branch and open the PR against {base} with
 spgr-create-pr, then put its number in result.json.
 

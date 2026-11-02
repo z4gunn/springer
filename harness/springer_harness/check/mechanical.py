@@ -48,9 +48,17 @@ def verify_receipts(session_dir, cwd):
     return None if done.returncode == 0 else (done.stdout + done.stderr).strip()[-600:]
 
 
+HARNESS_OWNED = ("CYCLE-", "G-", "E-")  # the daemon writes these, never a session
+
+
 def changed_artifacts(run_dir, since):
+    """The artifacts the session wrote: changed since it started, and not one of the
+    records the daemon itself writes while the session runs."""
     folder = Path(run_dir) / "artifacts"
-    return sorted(p for p in folder.glob("*.json") if p.stat().st_mtime >= since) if folder.is_dir() else []
+    if not folder.is_dir():
+        return []
+    return sorted(p for p in folder.glob("*.json")
+                  if p.stat().st_mtime >= since and not p.name.startswith(HARNESS_OWNED))
 
 
 def validate_artifacts(paths, project):
