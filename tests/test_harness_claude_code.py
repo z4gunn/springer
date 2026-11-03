@@ -492,6 +492,10 @@ class IntegrateTest(unittest.TestCase):
         self.assertIn("would be overwritten", self.trees.integrate("U-0001"))
         self.assertEqual((self.project / "runs/acme-1/artifacts/prd.json").read_text(), '{"newer": true}')
 
+    def test_only_unit_worktrees_count_as_claimed(self):
+        (self.trees.root / ".venv").mkdir()
+        self.assertEqual(self.trees.claimed(), ["U-0001"])
+
     def test_nothing_committed_is_nothing_to_integrate(self):
         self.assertEqual(self.trees.integrate("U-0001"), "nothing to integrate")
 

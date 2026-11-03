@@ -172,7 +172,10 @@ class Worktrees:
         return done.stderr.strip() or "git refused" if done.returncode else None
 
     def claimed(self):
-        return sorted(p.name for p in self.root.iterdir() if p.is_dir()) if self.root.is_dir() else []
+        """Unit worktrees only. The shared .venv and a restack scratch tree live here too."""
+        if not self.root.is_dir():
+            return []
+        return sorted(p.name for p in self.root.iterdir() if p.is_dir() and p.name.startswith("U-"))
 
 
 def merge_index(ours, theirs):
