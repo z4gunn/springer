@@ -148,6 +148,14 @@
         "string",
         "null"
       ]
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^U-[0-9]{4,}$"
+      },
+      "description": "The review units opened for this unit's PR, oldest first. The PR waits while the newest is not terminal."
     }
   },
   "additionalProperties": false,

@@ -9,8 +9,9 @@ import os
 import signal
 from pathlib import Path
 
+from ..check import review
 from ..check.mechanical import mechanical_check
-from ..check.risk import triggers
+from ..check.risk import LEVELS, triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
 from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
 from ..errors import IllegalTransition, RunExternallyHeld
@@ -115,7 +116,11 @@ class RunEngine:
         return TIERS[index]
 
     def _base_for(self, unit_id):
-        """Main, or the open PR branch of a dependency for a stacked unit."""
+        """Main, or the open PR branch of a dependency for a stacked unit. A review
+        unit sits on the head of the PR it reviews."""
+        reviewed = self._spec(unit_id).get("review_of")
+        if reviewed:
+            return self.units.state(reviewed)["pr"]["branch"]
         for dep in self._spec(unit_id)["dependencies"]:
             dep_state = self.units.state(dep)
             if dep_state["state"] != "done" and dep_state.get("pr"):
@@ -259,6 +264,9 @@ class RunEngine:
         if result.status != "pass":
             self._on_failure(unit_id, state, result)
             return
+        if self._spec(unit_id).get("review_of"):
+            self._finish_review(unit_id, state, result)
+            return
         level = risk_for(result, self._spec(unit_id)["risk_baseline"])
         write_json(self.units.unit_dir(unit_id) / "risk.json",
                    {"level": level, "triggers": triggers(result.touched_paths), "findings": list(result.findings)})
@@ -278,6 +286,96 @@ class RunEngine:
         return mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path, unit_id,
                                 parse_iso(record["started_at"]),
                                 require_receipts=self.settings()["ci_signal"] in ("receipts", "both"))
+
+    # --- review ---
+
+    def _reviews(self):
+        """A provider that runs real sessions gets a Code Reviewer on every PR. The mock
+        opts in per test, so a scripted run is not made to script a reviewer."""
+        return getattr(self.provider, "reviews", False)
+
+    def _open_review(self, unit_id):
+        """A review unit for the PR the unit just opened. The PR waits on its verdict."""
+        state = self.units.state(unit_id)
+        spec = self._spec(unit_id)
+        pr = state["pr"]
+        review_id = next_id("U", self.units.ids())
+        out = self.units.unit_dir(review_id) / "review" / "package.md"
+        problem = review.cut_package(self.project_path, pr.get("base") or self.worktrees.default_branch(),
+                                     pr["branch"], out, spec["declared_paths"]) if self._mechanical() else None
+        session_dir = self.sessions(unit_id).dir(state["sessions"][-1])
+        report = session_dir / "return.txt"
+        brief = review.BRIEF.format(number=pr["number"], unit_id=unit_id, branch=pr["branch"], base=pr.get("base"),
+                                    expected=spec["expected_outcome"],
+                                    package=out if problem is None else f"not cut ({problem}), so read the diff",
+                                    report=report.read_text()[-4000:] if report.exists() else "(no report)",
+                                    artifacts=self.run_dir / "artifacts")
+        self.units.create({"unit_id": review_id, "cycle_id": spec["cycle_id"], "agent": review.REVIEWER,
+                           "role_prompt_ref": f".claude/agents/{review.REVIEWER}.md", "model_tier": "opus",
+                           "brief": brief, "input_artifact_refs": [], "expected_outcome": f"A verdict on PR {pr['number']}",
+                           "workstream": "review", "declared_paths": [], "allowlist": [], "mcp_config_ref": None,
+                           "budget": {"tokens": 200000, "wall_clock_seconds": 1800}, "risk_baseline": "L0",
+                           "dependencies": [], "executable_check": None, "review_of": unit_id,
+                           "review_session": state["sessions"][-1]})
+        self.units.save({**self.units.state(unit_id), "reviews": state.get("reviews", []) + [review_id]})
+        self.ledger.append("review_opened", unit_id=unit_id, review_unit=review_id, pr=pr["number"])
+
+    def _mechanical(self):
+        return getattr(self.provider, "mechanical", False)
+
+    def _reviewed_head(self, state):
+        """True when a review was opened for the PR's current attempt. A retry pushes a
+        new head from a new session, so a review of an earlier session does not count."""
+        reviews = state.get("reviews") or []
+        return bool(reviews) and self._spec(reviews[-1]).get("review_session") == state["sessions"][-1]
+
+    def _review_pending(self, state):
+        reviews = state.get("reviews") or []
+        return bool(reviews) and not is_terminal(self.units.state(reviews[-1]))
+
+    def _finish_review(self, review_id, state, result):
+        """The verdict moves the reviewed unit: approve lets the merge go on with the
+        findings attached, request_changes sends it back once, and after the re-review a
+        person decides."""
+        unit_id = self._spec(review_id)["review_of"]
+        if result.verdict not in ("approve", "request_changes"):
+            self._on_failure(review_id, state, type(result)(status="fail", failure_class="defect",
+                                                            detail="the review left no approve or request_changes verdict"))
+            return
+        tags = self.units.unit_dir(review_id) / "review" / "package.md.tags.json"
+        code_review = result.code_review and str(Path(result.code_review) if Path(result.code_review).is_absolute()
+                                                 else self.project_path / result.code_review)
+        missing = review.dispositions(self.project_path, tags, code_review) if self._mechanical() else None
+        if missing:
+            self._on_failure(review_id, state, type(result)(status="fail", failure_class="defect",
+                                                            detail=f"incomplete review: {missing}"))
+            return
+        write_json(self.units.unit_dir(unit_id) / "review" / f"{review_id}.json",
+                   {"verdict": result.verdict, "findings": list(result.findings), "code_review": result.code_review})
+        self.units.transition(review_id, "done", f"review: {result.verdict}")
+        self._release(review_id)
+        reviewed = self.units.state(unit_id)
+        if reviewed["state"] != "gated":
+            return
+        risk_path = self.units.unit_dir(unit_id) / "risk.json"
+        risk = read_json(risk_path) or {"level": "L0", "triggers": [], "findings": []}
+        risk["findings"] = list(risk.get("findings", [])) + list(result.findings)
+        risk["review"] = result.verdict
+        if result.raised_level and LEVELS.index(result.raised_level) > LEVELS.index(risk["level"]):
+            risk["level"] = result.raised_level
+        if result.verdict == "request_changes" and len(reviewed.get("reviews", [])) >= review.MAX_REVIEWS:
+            # The re-review still asks for changes, so a person decides the merge.
+            risk["level"] = max(risk["level"], "L2", key=LEVELS.index)
+        write_json(risk_path, risk)
+        self.ledger.append("review_finished", unit_id=unit_id, review_unit=review_id, verdict=result.verdict)
+        if result.verdict == "request_changes" and len(reviewed.get("reviews", [])) < review.MAX_REVIEWS:
+            findings = "; ".join(f"{f.get('severity', '')} {f.get('file', '')}: {f.get('detail', '')}".strip()
+                                 for f in result.findings if isinstance(f, dict))
+            self._append_note(unit_id, f"The code review requested changes. Fix these and push to the same branch: "
+                                       f"{findings or result.detail}")
+            self.units.transition(unit_id, "retry", "defect: the code review requested changes",
+                                  retries_spent=reviewed["retries_spent"] + 1)
+            self._retire_merge_gates(unit_id)
 
     def _integrate(self, unit_id):
         """An artifact unit's commits (a PRD render, design directions) land on the
@@ -378,6 +476,13 @@ class RunEngine:
         self._apply_answers()
         for state in self.units.by_state("gated"):
             unit_id = state["unit_id"]
+            # Opened here rather than at Check, so a crash between the two is repaired
+            # on the next tick, and a PR gated before reviews existed gets one too.
+            if self._reviews() and not self._reviewed_head(state):
+                self._open_review(unit_id)
+                continue
+            if self._review_pending(state):
+                continue
             level = self._level(unit_id)
             if level in ("L0", "L1"):
                 self._merge(unit_id, state, level)
@@ -396,7 +501,7 @@ class RunEngine:
         context = {"task": self._spec(unit_id)["expected_outcome"], "findings": risk.get("findings", []),
                    "triggers": risk.get("triggers", []),
                    "builder_response": response.read_text() if response.exists() else "",
-                   "unit_id": unit_id, "design_session": False}
+                   "unit_id": unit_id, "design_session": False, "review": risk.get("review")}
         self.gates.open("pr-merge", level, [unit_id], f"Merge PR {state['pr']['number']} for {unit_id}?",
                         MERGE_OPTIONS, artifact_ref=f"PR-{state['pr']['number']}", context=context)
 

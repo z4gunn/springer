@@ -25,6 +25,20 @@ from pathlib import Path
 from .coding_agent import SessionExit, SpawnRequest, Usage
 
 CONTEXT_TOKENS = 200_000
+# List price in dollars per million tokens: input, output, cache write, cache read. The
+# CLI reports a session's cost only when it ends, so a running session's cost is
+# estimated from these and replaced by the CLI's own figure at the end.
+PRICES = {"opus": (4.0, 20.0, 5.0, 0.20), "sonnet": (2.0, 10.0, 2.5, 0.20), "haiku": (0.10, 0.50, 0.125, 0.01)}
+
+
+def estimate_cost(model, usage):
+    """One assistant message's usage at list price. An unknown model is priced as opus,
+    so an estimate errs high rather than showing nothing."""
+    family = next((name for name in PRICES if name in (model or "")), "opus")
+    rate_in, rate_out, rate_write, rate_read = PRICES[family]
+    return (usage.get("input_tokens", 0) * rate_in + usage.get("output_tokens", 0) * rate_out
+            + usage.get("cache_creation_input_tokens", 0) * rate_write
+            + usage.get("cache_read_input_tokens", 0) * rate_read) / 1_000_000
 # Read-only commands a headless session reaches for in nearly every compound command.
 # A person approves them in an interactive session, and a headless one has nobody to
 # ask, so they are allowed outright. None of them writes.
@@ -42,11 +56,12 @@ The harness reads files, not your transcript. Before you stop, write these to th
 session directory {session_dir}:
 
 - result.json, one object:
-  {{"status": "pass" or "fail", "outcome": "artifact" or "pr",
+  {{"status": "pass" or "fail", "outcome": "artifact", "pr", or "review",
     "pr": {{"number": <int>, "branch": "<branch>", "base": "<base>"}} (only when outcome is pr),
     "touched_paths": ["<repo-relative path>", ...],
     "failure_class": "defect" | "blocked" | "environment" | "context" | "question" (only on fail),
     "detail": "<one line>"}}
+  A review unit also sets "verdict", "findings", and "code_review", as its brief says.
 - return.txt, your fifteen-line return.
 - handoff.md only if you are stopping before the work is done, saying where to continue.
 
@@ -56,8 +71,10 @@ a headless session cannot ask anyone to approve a command outside its allowlist,
 denied command is a failed unit. Validate with `python3 schemas/validate.py <path>`.
 
 Use {session_dir} as the unit directory for receipt.py. Write run artifacts to
-{run_dir}/artifacts/ by that absolute path, which is the run store the harness owns, and
-do not commit copies of anything under runs/ in your worktree. Commit everything else
+{run_dir}/artifacts/ by that absolute path, and do not commit copies of anything under
+runs/ in your worktree. Write and amend your artifacts there, including a decision-log
+line on an ADR. Never edit a cycle (CYCLE-), gate (G-), or escalation (E-) record, which
+only the harness writes. Commit everything else
 (docs/, source, tests) on the branch you are on ({branch}). When the
 outcome is a pull request, push this branch and open the PR against {base} with
 spgr-create-pr, then put its number in result.json.
@@ -146,6 +163,7 @@ class ClaudeSession:
         self._events = []
         self._lock = threading.Lock()
         self._usage = Usage()
+        self._estimate = 0.0
         self._final = None
         self._on_signal = on_signal
         out = Path(request.session_dir)
@@ -191,6 +209,8 @@ class ClaudeSession:
                     self._usage.context_percent = round(100 * context / CONTEXT_TOKENS, 1)
                 self._usage.input_tokens += usage.get("input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
                 self._usage.output_tokens += usage.get("output_tokens", 0)
+                self._estimate += estimate_cost(self.model, usage)
+                self._usage.cost_usd = round(self._estimate, 4)
                 for block in message.get("content") or []:
                     if block.get("type") == "tool_use":
                         self._events.append({"type": "tool_use", "name": block.get("name")})
@@ -243,6 +263,7 @@ class ClaudeSession:
 class ClaudeCodeProvider:
     name = "claude-code"
     mechanical = True  # Check runs receipts, classification, and schema validation
+    reviews = True  # every PR gets a Code Reviewer before it can merge
 
     def __init__(self, binary="claude", extra_args=()):
         self.binary = shutil.which(binary) or binary

@@ -376,6 +376,64 @@ class MergePolicyTest(EngineCase):
         self.assertEqual(engine.units.state("U-0001")["cancelled_by"], "human")
 
 
+class ReviewTest(EngineCase):
+    """Every PR gets a Code Reviewer before it can merge."""
+
+    def setUp(self):
+        super().setUp()
+        self.provider.reviews = True
+        self.provider.script["routine"] = [Attempt(result=pr_result(1, touched=("packages/ui/button.tsx",)))]
+
+    def review(self, *verdicts):
+        """The verdict of each review unit in turn. The first review is U-0002."""
+        for number, verdict in enumerate(verdicts, 2):
+            findings = [{"severity": "P1", "file": "a.ts", "detail": "fix it"}] if verdict != "approve" else []
+            self.provider.script[f"U-{number:04d}"] = [Attempt(result={
+                "status": "pass", "outcome": "review", "verdict": verdict, "findings": findings})]
+
+    def test_an_approved_review_lets_the_pr_merge(self):
+        self.review("approve")
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertEqual(self.states(engine)["U-0002"], "done")
+        self.assertEqual(engine.units.spec("U-0002")["review_of"], "U-0001")
+        self.assertEqual(engine.units.state("U-0001")["reviews"], ["U-0002"])
+        self.assertEqual(self.host.merged, [1])
+        merged_at = [e["seq"] for e in self.events(engine, "merge")][0]
+        reviewed_at = [e["seq"] for e in self.events(engine, "review_finished")][0]
+        self.assertLess(reviewed_at, merged_at, "the review comes before the merge")
+        if HAVE_JSONSCHEMA:
+            reg = registry()
+            self.assertEqual(schema_errors("unit-spec-v1", engine.units.spec("U-0002"), reg), [])
+            self.assertEqual(schema_errors("unit-state-v1", engine.units.state("U-0001"), reg), [])
+
+    def test_requested_changes_send_the_unit_back_with_the_findings(self):
+        self.review("request_changes", "approve")
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertEqual(engine.units.state("U-0001")["retries_spent"], 1)
+        self.assertEqual(len(engine.units.state("U-0001")["reviews"]), 2)
+        notes = (engine.units.unit_dir("U-0001") / "redispatch-notes.txt").read_text()
+        self.assertIn("P1 a.ts: fix it", notes)
+        self.assertEqual(self.host.merged, [1])
+
+    def test_a_second_request_for_changes_goes_to_a_person(self):
+        self.review("request_changes", "request_changes")
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: engine.gates.holding("U-0001", "pr-merge"))
+        gate = engine.gates.holding("U-0001", "pr-merge")[-1]["content"]
+        self.assertEqual((gate["level"], gate["context"]["review"]), ("L2", "request_changes"))
+        self.assertEqual(self.host.merged, [])
+
+    def test_a_review_with_no_verdict_is_a_defect_of_the_review(self):
+        self.provider.script["spgr-agent-code-reviewer"] = [Attempt(result={"status": "pass", "outcome": "review"}),
+                                                            Attempt(result={"status": "pass", "outcome": "review",
+                                                                            "verdict": "approve"})]
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertEqual(engine.units.state("U-0002")["retries_spent"], 1)
+
+
 class WindowTest(EngineCase):
     def test_an_exhausted_window_parks_then_resumes_after_the_reset(self):
         resets = iso(self.clock() + 600)

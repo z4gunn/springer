@@ -4,6 +4,7 @@ suite spends no tokens and touches no account."""
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -136,6 +137,7 @@ class ProviderTest(FakeBinCase):
         brief = (request.session_dir / "brief.md").read_text()
         self.assertIn("Write the PRD", brief)
         self.assertIn("result.json", brief, "the brief carries the output contract")
+        self.assertIn("including a decision-log", brief, "a session may amend its own artifacts in the run store")
         events = handle.poll()
         self.assertIn({"type": "tool_use", "name": "Edit"}, events)
         usage = handle.usage()
@@ -174,6 +176,15 @@ class ProviderTest(FakeBinCase):
     def test_a_rejected_window_reads_as_full(self):
         self.assertEqual(signal_from({"status": "rejected", "resetsAt": 1793640000})["used_fraction"], 1.0)
         self.assertIsNone(signal_from({}))
+
+
+class CostEstimateTest(unittest.TestCase):
+    def test_a_running_session_shows_a_list_price_estimate(self):
+        from springer_harness.providers.claude_code import estimate_cost
+        usage = {"input_tokens": 1_000_000, "output_tokens": 100_000, "cache_read_input_tokens": 1_000_000}
+        self.assertAlmostEqual(estimate_cost("claude-sonnet-5-5", usage), 2.0 + 1.0 + 0.2)
+        self.assertAlmostEqual(estimate_cost("claude-haiku-5-5", {"output_tokens": 1_000_000}), 0.5)
+        self.assertAlmostEqual(estimate_cost(None, {"input_tokens": 1_000_000}), 4.0, msg="unknown prices as opus")
 
 
 class MechanicalCheckTest(FakeBinCase):
@@ -262,6 +273,11 @@ class OrchestratorTest(FakeBinCase):
         self.assertIn("--json-schema", args)
         self.assertTrue((self.project / "runs/acme-1/plan/plan-001.json").exists())
         self.assertFalse(self.planner.finished())
+
+    def test_the_prompt_lets_work_stack_on_an_open_pr(self):
+        from springer_harness.scheduler.orchestrator import PROMPT
+        self.assertIn("depends_on its key", PROMPT)
+        self.assertIn("starts from the open PR's branch", PROMPT)
 
     def test_nothing_is_asked_while_work_can_move(self):
         self.assertIsNone(self.planner.next_batch(Snapshot(1, 1, 0, active=1)))
@@ -353,6 +369,39 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class ReviewPackageTest(unittest.TestCase):
+    """The daemon cuts the reviewer's package and checks its tag dispositions."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.project = git_project(Path(self.tmp.name) / "acme")
+        script = self.project / ".claude/skills/spgr-run-harness/scripts/review-package.py"
+        script.parent.mkdir(parents=True)
+        shutil.copy(REPO / "runtime/skills/spgr-run-harness/scripts/review-package.py", script)
+        env = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+        subprocess.run(["git", "-C", str(self.project), "checkout", "-qb", "unit/U-0001"], check=True)
+        (self.project / "eslint.config.js").write_text("export default [];\n")
+        subprocess.run(["git", "-C", str(self.project), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.project), *env, "commit", "-qm", "loosen lint"], check=True)
+
+    def test_the_package_is_cut_and_a_skipped_tag_is_refused(self):
+        from springer_harness.check import review
+        out = Path(self.tmp.name) / "U-0002" / "review" / "package.md"
+        self.assertIsNone(review.cut_package(self.project, "main", "unit/U-0001", out))
+        self.assertIn("eslint.config.js", out.read_text())
+        tags = Path(str(out) + ".tags.json")
+        self.assertTrue(tags.exists())
+        code_review = Path(self.tmp.name) / "code-review.json"
+        code_review.write_text(json.dumps({"content": {"gate_tags": []}}))
+        self.assertIsNotNone(review.dispositions(self.project, tags, code_review), "an unanswered tag fails")
+        self.assertIsNotNone(review.dispositions(self.project, tags, None), "no artifact cannot be checked")
+
+    def test_a_range_that_does_not_exist_is_reported(self):
+        from springer_harness.check import review
+        self.assertIsNotNone(review.cut_package(self.project, "main", "unit/U-9999", Path(self.tmp.name) / "p.md"))
+
+
 class IntegrateTest(unittest.TestCase):
     """An artifact unit's branch lands on the default branch in the main checkout."""
 
@@ -389,3 +438,32 @@ class IntegrateTest(unittest.TestCase):
 
     def test_nothing_committed_is_nothing_to_integrate(self):
         self.assertEqual(self.trees.integrate("U-0001"), "nothing to integrate")
+
+    def test_two_units_that_both_wrote_the_docs_index_merge_it(self):
+        index = "# Project documentation\n\nCopies of runs/.\n\n## {h}\n\n- [{a}]({a}.md)\n"
+        self.commit("docs/README.md", index.format(h="Product", a="brief"))
+        other, _ = self.trees.claim("U-0002", "main")
+        (other / "docs").mkdir()
+        (other / "docs/README.md").write_text(index.format(h="Design", a="directions"))
+        env = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+        subprocess.run(["git", "-C", str(other), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(other), *env, "commit", "-qm", "other"], check=True)
+        self.assertIsNone(self.trees.integrate("U-0001"))
+        self.assertIsNone(self.trees.integrate("U-0002"))
+        merged = (self.project / "docs/README.md").read_text()
+        self.assertEqual(merged, "# Project documentation\n\nCopies of runs/.\n\n## Product\n\n- [brief](brief.md)\n\n"
+                                 "## Design\n\n- [directions](directions.md)\n")
+        status = subprocess.run(["git", "-C", str(self.project), "status", "--porcelain"], capture_output=True, text=True)
+        self.assertEqual(status.stdout, "")
+
+    def test_a_conflict_beyond_the_docs_index_is_refused(self):
+        self.commit("docs/prd.md", "one")
+        other, _ = self.trees.claim("U-0002", "main")
+        (other / "docs").mkdir()
+        (other / "docs/prd.md").write_text("two")
+        env = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+        subprocess.run(["git", "-C", str(other), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(other), *env, "commit", "-qm", "other"], check=True)
+        self.assertIsNone(self.trees.integrate("U-0001"))
+        self.assertIn("CONFLICT", self.trees.integrate("U-0002"))
+        self.assertEqual((self.project / "docs/prd.md").read_text(), "one")

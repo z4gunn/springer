@@ -143,6 +143,22 @@
       ],
       "minLength": 1,
       "description": "The command that proves the outcome. Null only for a unit whose outcome is an artifact validated by schema."
+    },
+    "review_of": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^U-[0-9]{4,}$",
+      "description": "Set on a review unit the daemon opened: the unit whose PR it reviews. The review sits on that PR's head and its verdict decides whether the PR merges."
+    },
+    "review_session": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^S-[0-9]{4,}$",
+      "description": "Set on a review unit: the reviewed unit's session whose PR head it reviews. A retry starts a new session, which gets a new review."
     }
   },
   "additionalProperties": false

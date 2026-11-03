@@ -30,7 +30,8 @@ def read_result(session_dir):
     return CheckResult(status=data.get("status", "fail"), outcome=data.get("outcome", "artifact"), pr=data.get("pr"),
                        touched_paths=tuple(data.get("touched_paths", ())), failure_class=data.get("failure_class"),
                        detail=data.get("detail", ""), raised_level=data.get("raised_level"),
-                       findings=tuple(data.get("findings", ())))
+                       findings=tuple(data.get("findings", ())), verdict=data.get("verdict"),
+                       code_review=data.get("code_review"))
 
 
 def risk_for(result, baseline):

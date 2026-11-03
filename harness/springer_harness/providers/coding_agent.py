@@ -80,3 +80,5 @@ class CheckResult:
     detail: str = ""
     raised_level: str | None = None
     findings: tuple = field(default_factory=tuple)
+    verdict: str | None = None  # a review unit's approve or request_changes
+    code_review: str | None = None  # the code-review artifact a review unit wrote

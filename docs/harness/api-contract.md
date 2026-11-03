@@ -192,10 +192,10 @@ The gate view is the `content` of `hil-checkpoint-v2` plus a `context` object, a
 ```json
 {"context": {"task": "...", "findings": [{"vertical": "spgr-agent-auth", "rule": "...", "detail": "..."}],
              "builder_response": "...", "diff_path": "/v1/projects/acme/runs/acme-1/units/U-0412/diff",
-             "design_session": false, "age_seconds": 3600}}
+             "review": "approve", "design_session": false, "age_seconds": 3600}}
 ```
 
-`design_session` is true when the gate needs a browser (e.g. direction review), and the client then requests a design session.
+`review` on a pr-merge gate is the Code Reviewer's last verdict (approve or request_changes), and its findings are in `findings`. `design_session` is true when the gate needs a browser (e.g. direction review), and the client then requests a design session.
 
 ### Session stream
 

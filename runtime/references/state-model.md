@@ -72,13 +72,15 @@ States, in the order a healthy unit passes through them, with the side exits.
 | running | A session is alive for it | Worktree allocated, session spawned, dispatch event written | Session exits with a result or a handoff, or is found dead |
 | returned | A result, a handoff, or receipts exist on disk | Session exited | Check begins |
 | checking | Validation, receipts, failure classification, review package, risk scoring | Returned | A verdict is reached |
-| gated | Its PR is open and a gate decides the merge | Check passed and the unit produced a PR | Auto-merge (L0, L1) or the human answers (L2) |
+| gated | Its PR is open and a gate decides the merge | Check passed and the unit produced a PR | Auto-merge (L0, L1) or the human answers (L2), in either case only after the Code Reviewer's verdict |
 | done | Merged, or the artifact it produced is confirmed | Merge or confirmation recorded | Terminal |
 | retry | Check found a defect, one bounded retry is spent | Classify returned defect | A fresh session at the unit's tier, second retry one tier up |
 | redispatch | Check found a transient, environment, or context failure, no retry spent | Classify returned one of those, or the session was abandoned | A fresh session, narrower brief on context |
 | blocked | An escalation or a missing provisioned input holds it | Classify returned blocked, or a dependency is L3 | The escalation is resolved |
 | abandoned | The session died without a return | Heartbeat lost and process gone | Redispatch |
 | cancelled | A human cancelled it | API call | Terminal |
+
+Every PR gets a review unit before it can merge. When a unit reaches gated with a PR, the daemon cuts the review package with `review-package.py` and opens a unit for spgr-agent-code-reviewer on the PR head, with `review_of` naming the reviewed unit. The PR waits while that review unit is not terminal. Its result.json carries `verdict` (approve or request_changes), `findings`, and `code_review`, the artifact whose gate-tag dispositions Check verifies. Approve lets the merge go on with the findings attached to the gate. request_changes sends the reviewed unit to retry with the findings in its notes, once. A second request_changes raises the PR to L2, so a person decides. A review unit never integrates or merges anything.
 
 retry, redispatch, and blocked return to ready when their condition clears. A unit that reaches done, cancelled, or exhausts its retries is terminal. A cycle closes when every unit it routed is terminal, and its Act record lists the terminal state of each.
 
@@ -101,13 +103,13 @@ runs/<run_id>/units/U-0412/
       handoff.md     written by the session on a context-threshold exit
       gate-request.json  written by the session when it needs a person, see Gate requests
   receipts/          as today
-  review/            the review package and each reviewer's verdict JSON
+  review/            the review package (on a review unit) and each review verdict JSON (on the reviewed unit)
   risk.json          baseline level from the rules file, raised by reviewers, never lowered
 ```
 
-spec.json holds: unit_id, cycle_id, agent, role prompt reference, model tier, brief (the compact context brief), input artifact refs, expected outcome, workstream, declared paths (the files the unit may touch, used for disjointness), allowlist, mcp config reference, budget (tokens and wall clock), risk baseline, dependencies (unit ids), and the executable check.
+spec.json holds: unit_id, cycle_id, agent, role prompt reference, model tier, brief (the compact context brief), input artifact refs, expected outcome, workstream, declared paths (the files the unit may touch, used for disjointness), allowlist, mcp config reference, budget (tokens and wall clock), risk baseline, dependencies (unit ids), the executable check, and on a review unit review_of and review_session (the reviewed unit and the session whose PR head it grades).
 
-state.json holds: state, entered_at, history (state, at, reason), retries_spent, sessions (ids), pr (number, branch, base), merge (sha, at), cancelled_by.
+state.json holds: state, entered_at, history (state, at, reason), retries_spent, sessions (ids), pr (number, branch, base), merge (sha, at), cancelled_by, and reviews (the review unit ids opened for its PR).
 
 ## Session lifecycle
 
