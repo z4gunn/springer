@@ -25,10 +25,9 @@ class ShimTest(unittest.TestCase):
         for loop_step in ("## Inputs", "Rehydrate", "Dispatch each routed unit", "fork-join"):
             self.assertNotIn(loop_step, SKILL)
 
-    def test_the_old_procedure_is_kept_as_the_spec_for_the_provider(self):
-        kept = (REPO / "docs" / "harness" / "in-session-loop.md").read_text()
-        for needle in ("Rehydrate", "scripts/receipt.py verify", "classify-failure.py"):
-            self.assertIn(needle, kept)
+    def test_the_old_loop_is_gone(self):
+        self.assertFalse((REPO / "docs" / "harness" / "in-session-loop.md").exists())
+        self.assertFalse((REPO / "runtime" / "skills" / "spgr-run-harness" / "scripts" / "run-unattended.py").exists())
 
     def test_every_script_the_daemon_still_needs_is_still_there(self):
         scripts = REPO / "runtime" / "skills" / "spgr-run-harness" / "scripts"

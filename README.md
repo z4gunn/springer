@@ -222,7 +222,7 @@ The loop rules, the rehydration algorithm, the scheduling rules, and the advisor
 
 ### Leave a run going unattended
 
-Quit the TUI while a run is in progress and the daemon keeps it going. Run `springer` to come back. `run-unattended.py` drove the old in-session loop and no longer has anything to drive. It is removed once the daemon has done a real run.
+Quit the TUI while a run is in progress and the daemon keeps it going. Run `springer` to come back.
 
 The backlog is an epic, feature, then story, task, or bug hierarchy, and the orchestrator finishes a whole feature, product check included, before it starts the next.
 

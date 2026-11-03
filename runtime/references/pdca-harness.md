@@ -19,7 +19,7 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 - Parallel Do: disjoint scheduling
 - Token economy and dispatch efficiency
 - Dispatch contract
-- Main-session budget and unattended runs
+- Main-session budget
 - Fold-in policy
 - Docs rendering policy
 - Vertical budget
@@ -520,40 +520,21 @@ Those counts stay. The loop inside them has a fixed shape.
    from diff`) is the harness's to resolve by running the named check, never
    the implementer's to argue away and never silently dropped.
 
-## Main-session budget and unattended runs
+## Main-session budget
 
-The main session runs the harness on sonnet by default. It writes run state and
-the cycle record, dispatches, and reads script output. The cycle record is
-capped at roughly 2k tokens: the batch, the verdicts, the transition, and the
-pending batch. A human ruling is recorded as the human's own words plus a
-one-line list of the artifacts it changes. In the reference case the main
-session issued 771 shell commands and 2.26M output tokens on opus, more than
-all 71 subagents combined.
-
-The `session-usage.py` hook is the sensor. It writes the main session's
-context and tokens to `runs/_dashboard/sessions/<session-id>.json` for the
-dashboard, and at 60 percent of the window it tells the harness to end at the
-next clean Act, at 80 percent to finish the current Act, release the lock, and
-stop. It never blocks. Every dispatch event records the model it ran on, so
-cost is priced per tier.
-
-A stopped session no longer waits for a human. `scripts/run-unattended.py
-<run-id>` runs the harness in a loop of headless sessions, each with a fresh
-context that rehydrates from the store. Under it the 60 percent warning is the
-stop, AskUserQuestion is disallowed, and edits are accepted while every other
-tool is allowed only by the instance allowlist, so an unlisted command is
-refused, never prompted. A usage limit sleeps until its reset. A dispatch the
-exited session left un-joined is marked abandoned. The loop stops and
-notifies through the Slack webhook in `SPRINGER_SLACK_WEBHOOK_URL` (macOS
-notification as fallback, `unattended-status.md` always) when the run
-completes, when a gate holds all remaining work, after three failed sessions,
-or after two sessions that add no cycle.
+The harness daemon drives every run, so a main session in an instance does not
+dispatch or write run state. It answers the person, edits by hand when asked,
+and stays small. The `session-usage.py` hook is the sensor. It writes the main
+session's context and tokens to `runs/_dashboard/sessions/<session-id>.json`,
+and at 60 percent of the window it advises ending at the next clean point, at
+80 percent finishing the current task and stopping. It never blocks.
 
 The instance settings from `templates/project-settings.json` carry the
-allowlist for the commands the harness runs (validate, the harness scripts,
-the project verification scripts, git, and the gh pr commands) and a denylist
-for the destructive git forms. Without it a run stalls at a permission prompt
-on every commit.
+allowlist for the commands a session runs (validate, the harness scripts by
+name, the project verification scripts, git, and the gh pr commands) and a
+denylist for the destructive git forms. The daemon passes the same lists to
+each headless session as flags, so an unlisted command is refused, never
+prompted.
 
 ## Fold-in policy
 
@@ -954,7 +935,7 @@ These scripts keep the deterministic work out of the model.
 - `scripts/classify-failure.py <unit-dir>` names a failed unit's class and
   whether a retry is spent.
 - `scripts/pr-risk.py <base> <head>` scores a PR low, medium, or high and
-  exits 1 on high. `scripts/run-unattended.py <run-id>` is the session loop.
+  exits 1 on high.
 - `scripts/product-check.py <run-dir> --touches <paths>` runs the project's
   product checks from `runs/_product-check.json` against the real product
   and records each result as a `product_check` event, plus a `product`

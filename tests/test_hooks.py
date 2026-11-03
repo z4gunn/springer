@@ -160,14 +160,6 @@ class SessionUsageTest(unittest.TestCase):
         self.assertIsNone(self.call())
         self.assertEqual(self.state()["warned"], ["advisory", "critical"])
 
-    def test_unattended_session_stops_at_sixty_percent(self):
-        self.append(10, 640_000, 12_000, 2_200)
-        out = self.call(env={"SPRINGER_UNATTENDED": "1"})
-        text = out["hookSpecificOutput"]["additionalContext"]
-        self.assertIn("60 percent", text)
-        self.assertIn("unattended driver", text)
-        self.assertEqual(self.state()["warned"], ["critical"])
-
     def test_stop_event_records_but_never_warns(self):
         self.append(10, 900_000, 0, 10)
         self.assertIsNone(self.call(event="Stop"))

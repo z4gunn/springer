@@ -15,7 +15,6 @@
       "Bash(python3 .claude/skills/spgr-run-harness/scripts/receipt.py:*)",
       "Bash(python3 .claude/skills/spgr-run-harness/scripts/review-package.py:*)",
       "Bash(python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py:*)",
-      "Bash(python3 .claude/skills/spgr-run-harness/scripts/run-unattended.py:*)",
       "Bash(python3 .claude/skills/spgr-render-design-comps/scripts/capture-comps.py:*)",
       "Bash(python3 .claude/skills/spgr-check-quality-floor/scripts/floor_guard.py:*)",
       "Bash(playwright-cli:*)",
