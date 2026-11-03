@@ -19,6 +19,7 @@ from .theme import C, STONES, THEME, join, mark, paint, stones_laid
 
 REFRESH_SECONDS = 0.25
 IDLE_REFRESH_SECONDS = 5
+BUSY_AFTER_SECONDS = 1.0
 RETRY_SECONDS = 1
 LOST = "Lost the daemon. What you see may be stale. Retrying."
 QUIET_EVENTS = {"heartbeat"}
@@ -223,19 +224,21 @@ class SpringerApp(App):
 
     # --- writes: one path, with the confirmation flow ---
 
-    async def apply(self, kind, args=None, project=None, run_id=None, reraise=False, reviewed=False):
+    async def apply(self, kind, args=None, project=None, run_id=None, reraise=False, reviewed=False, busy=None):
         """Send an operation. A change that needs confirming shows the API's preview,
         and on yes is sent again with its token. reviewed means the person already
         confirmed a fuller review of this exact change (e.g. the adopt screen), so the
-        generic preview is not shown a second time. Returns the outcome, or None."""
+        generic preview is not shown a second time. busy is said when the daemon takes
+        longer than a moment, so a slow change never looks like nothing happened.
+        Returns the outcome, or None."""
         op_id = str(uuid.uuid4())
         try:
-            outcome = await self.client.op(kind, args, project, run_id, op_id=op_id)
+            outcome = await self._slow(busy, self.client.op(kind, args, project, run_id, op_id=op_id))
             if outcome["status"] == "needs_confirmation":
                 if not reviewed and not await self.push_screen_wait(ConfirmDialog(outcome["preview"])):
                     return None
-                outcome = await self.client.op(kind, args, project, run_id, confirm_token=outcome["confirm_token"],
-                                               op_id=op_id)
+                outcome = await self._slow(busy, self.client.op(kind, args, project, run_id,
+                                                                confirm_token=outcome["confirm_token"], op_id=op_id))
         except ApiError as exc:
             if reraise:
                 raise
@@ -247,6 +250,13 @@ class SpringerApp(App):
             return None
         self.mark_dirty()
         return outcome
+
+    async def _slow(self, busy, request):
+        timer = self.set_timer(BUSY_AFTER_SECONDS, lambda: self.notify(busy or "Working on it.", timeout=8))
+        try:
+            return await request
+        finally:
+            timer.stop()
 
     def _explain(self, exc):
         if exc.code == "critique_errors":

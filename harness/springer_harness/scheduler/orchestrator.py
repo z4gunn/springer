@@ -94,6 +94,9 @@ Rules for the schema:
   run_brief.pinned_rulings binds.
 - A unit in blocked, gated, or planned behind a gate is waiting on a person, and the
   answer resumes that same unit. Never route its work again under a new key.
+- A unit whose PR is open (state gated) is not a reason to wait. Work that builds on it
+  depends_on its key: that unit's worktree starts from the open PR's branch, its own PR
+  stacks on that branch, and it merges after the first one. Route that work now.
 - done: true only when the profile's work is finished and nothing remains to route.
   Return an empty units list with done false when everything left is held.
 

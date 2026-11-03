@@ -222,6 +222,21 @@ class ProjectsScreenTest(TuiCase):
             await self.see(pilot, "Fresh")
         self.assertTrue((self.root / "apps" / "fresh" / ".claude").is_dir())
 
+    async def test_a_slow_change_says_it_is_working(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.see(pilot, "Acme")
+            real = self.app.client.op
+
+            async def slow(*args, **kwargs):
+                await asyncio.sleep(1.5)
+                return await real(*args, **kwargs)
+            self.app.client.op = slow
+            task = asyncio.ensure_future(self.app.apply("project.configure", {"ci_signal": "both"}, project="acme",
+                                                        busy="Saving the settings.", reviewed=True))
+            await self.see(pilot, "Saving the settings.")
+            await task
+            self.assertEqual(task.result()["status"], "applied")
+
     async def test_settings_set_the_ci_signal(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.see(pilot, "Acme", "receipts")
@@ -747,6 +762,20 @@ class RunScreenTest(TuiCase):
                                     "auth  Sessions expire. (R1)", "1 approve    It merges.   recommended",
                                     "2 send back  A fresh session fixes it.")
             self.assertLess(screen.index("needs you"), screen.index("in flight"), "gates come first")
+
+    async def test_a_long_question_keeps_its_options_on_a_small_terminal(self):
+        async with self.app.run_test(size=(80, 28)) as pilot:
+            run_id = await self.run_screen(pilot)
+            long = "Why it blocked. " * 120 + "The last sentence."
+            self.engine(run_id).gates.open("scope-change", "L3", [], long, [
+                {"option": "retry", "consequence": "A fresh session tries again."},
+                {"option": "cancel", "consequence": "The unit is cancelled."}])
+            self.app.mark_dirty()
+            screen = await self.see(pilot, "1 retry", "2 cancel", "full question")
+            self.assertNotIn("The last sentence.", screen)
+            await pilot.press("f")
+            await self.dialog(pilot, TextDialog)
+            self.assertTrue(self.app.screen.text.endswith("The last sentence."))
 
     async def test_no_open_gate_collapses_the_card_area(self):
         async with self.app.run_test(size=self.SIZE) as pilot:

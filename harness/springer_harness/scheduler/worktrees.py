@@ -3,6 +3,8 @@
 A removal git refuses is logged and left for the human, never forced.
 """
 
+DOCS_INDEX = "docs/README.md"
+
 import subprocess
 import sys
 from pathlib import Path
@@ -81,10 +83,26 @@ class Worktrees:
         done = _git(self.project, *merge)
         if done.returncode and self._clear_identical_copies(branch, done.stderr):
             done = _git(self.project, *merge)
+        if done.returncode and self._resolve_docs_index():
+            done = _git(self.project, "-c", "user.name=Springer", "-c", "user.email=springer@local",
+                        "commit", "--no-edit", "--quiet")
         if done.returncode:
             _git(self.project, "merge", "--abort")
             return done.stderr.strip() or done.stdout.strip() or "git merge failed"
         return None
+
+    def _resolve_docs_index(self):
+        """Parallel units each rebuild the docs index from what their branch has, so two
+        of them collide on it. The index only ever gains links, so the two sides merge
+        by heading. True when that was the only conflict and it is now resolved."""
+        conflicted = _git(self.project, "diff", "--name-only", "--diff-filter=U").stdout.split()
+        if conflicted != [DOCS_INDEX]:
+            return False
+        ours, theirs = (_git(self.project, "show", f":{stage}:{DOCS_INDEX}") for stage in (2, 3))
+        if ours.returncode or theirs.returncode:
+            return False
+        (self.project / DOCS_INDEX).write_text(merge_index(ours.stdout, theirs.stdout))
+        return _git(self.project, "add", DOCS_INDEX).returncode == 0
 
     def _clear_identical_copies(self, branch, error):
         """git refuses a merge that would overwrite untracked files. A session that
@@ -115,3 +133,33 @@ class Worktrees:
 
     def claimed(self):
         return sorted(p.name for p in self.root.iterdir() if p.is_dir()) if self.root.is_dir() else []
+
+
+def merge_index(ours, theirs):
+    """Both versions of a Markdown index, merged: every section either side has, in
+    the order first seen, each with the union of its lines and no line twice."""
+    order, sections = [], {}
+    for text in (ours, theirs):
+        heading = ""
+        for line in text.splitlines():
+            if line.startswith("#"):
+                heading = line
+            if heading not in sections:
+                order.append(heading)
+                sections[heading] = []
+            if line == heading or (line.strip() and line in sections[heading]):
+                continue
+            sections[heading].append(line)
+    out = []
+    for heading in order:
+        body = sections[heading]
+        while body and not body[-1].strip():
+            body.pop()
+        while body and not body[0].strip():
+            body.pop(0)
+        if out:
+            out.append("")
+        if heading:
+            out.extend([heading, ""] if body else [heading])
+        out.extend(body)
+    return "\n".join(out) + "\n"

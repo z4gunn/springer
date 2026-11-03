@@ -595,7 +595,8 @@ class BriefPane(Pane):
                 self.query_one("#rail", OptionList).focus()
                 return
             args.update({k: v for k, v in choice.items() if v})
-        outcome = await self.app.apply("run.start", args, project=self.app.project)
+        outcome = await self.app.apply("run.start", args, project=self.app.project,
+                                       busy="Starting the run: committing the brief and pushing it. This takes a few seconds.")
         if outcome and outcome.get("result", {}).get("run_id"):
             self.app.select_run(outcome["result"]["run_id"])
             self.app.show("run")
@@ -834,6 +835,9 @@ class BacklogPane(Pane):
             self.app.notify("This item has no PR link.")
 
 
+PROMPT_LINES = 3
+
+
 class RunPane(Pane):
     focus_id = "#units"
     BINDINGS = [*(Binding(str(n), f"answer({n})", show=False) for n in range(1, 10)),
@@ -841,7 +845,8 @@ class RunPane(Pane):
                 Binding("o", "design", "design"), Binding("n", "notes", "answer with notes"),
                 Binding("P", "pause", "pause"), Binding("c", "cancel_unit", "cancel"),
                 Binding("R", "redispatch", "re-dispatch"), Binding("X", "cancel_run", "cancel run"),
-                Binding("v", "viewed", "clear routine"), Binding("l", "runs", "runs")]
+                Binding("v", "viewed", "clear routine"), Binding("l", "runs", "runs"),
+                Binding("f", "full_prompt", "full question")]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -911,7 +916,8 @@ class RunPane(Pane):
             if not selected:
                 continue
             context = gate["context"]
-            rows.append(paint(gate["decision_prompt"], "text", bold=True))
+            prompt, clipped = self._clip_prompt(gate["decision_prompt"])
+            rows.append(paint(prompt, "text", bold=True))
             rows += [paint(f"{f.get('vertical', '').removeprefix('spgr-agent-')}  {f.get('detail', '')} ({f.get('rule', '')})",
                            "error") for f in context.get("findings", [])]
             width = max(len(o["option"]) for o in gate["options"]) + 2
@@ -922,7 +928,8 @@ class RunPane(Pane):
                                  paint("   recommended" if option.get("recommended_because") else "", "success")))
             rows += [join(paint(f"decision {decision['decision_id']}  ", "dim"), decision["prompt"])
                      for decision in gate.get("decisions", [])]
-            hints = [("n", "answer with notes")]
+            hints = [("f", "full question")] if clipped else []
+            hints.append(("n", "answer with notes"))
             if context.get("diff_path"):
                 hints.append(("d", "diff"))
             if context.get("design_session"):
@@ -930,8 +937,20 @@ class RunPane(Pane):
             rows.append(keys(*hints))
         return lines(rows)
 
+    def _clip_prompt(self, prompt):
+        """A long question is cut to a few lines, so the options under it stay on a
+        small terminal. f shows the whole of it."""
+        limit = max(60, self.size.width - 8) * PROMPT_LINES
+        flat = " ".join(prompt.split())
+        return (flat, False) if len(flat) <= limit else (flat[:limit - 1].rstrip() + "…", True)
+
     def _gate(self):
         return self.open_gates[self.selected_gate] if self.open_gates else None
+
+    def action_full_prompt(self):
+        gate = self._gate()
+        if gate:
+            self.app.spawn(self.app.push_screen_wait(TextDialog(gate["checkpoint_id"], gate["decision_prompt"])))
 
     def action_next_gate(self):
         if self.open_gates:
