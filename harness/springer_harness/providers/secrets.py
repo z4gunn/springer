@@ -23,6 +23,16 @@ class KeyringSecrets:
     def has(self, project, name):
         return self._keyring().get_password(self.SERVICE, f"{project}/{name}") is not None
 
+    def get(self, project, name):
+        """For the harness's own credentials (e.g. the Slack tokens), never a project secret."""
+        return self._keyring().get_password(self.SERVICE, f"{project}/{name}")
+
+    def delete(self, project, name):
+        try:
+            self._keyring().delete_password(self.SERVICE, f"{project}/{name}")
+        except Exception:  # noqa: BLE001, nothing stored is already the goal
+            pass
+
 
 class MemorySecrets:
     def __init__(self):
@@ -33,3 +43,9 @@ class MemorySecrets:
 
     def has(self, project, name):
         return (project, name) in self.values
+
+    def get(self, project, name):
+        return self.values.get((project, name))
+
+    def delete(self, project, name):
+        self.values.pop((project, name), None)

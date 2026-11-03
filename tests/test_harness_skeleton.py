@@ -11,7 +11,7 @@ HARNESS = REPO / "harness"
 sys.path.insert(0, str(HARNESS))
 
 SUBPACKAGES = ("state", "scheduler", "dispatch", "providers", "check",
-               "gates", "retrieval", "api", "tui", "chat")
+               "gates", "retrieval", "api", "tui", "chat", "notify")
 
 
 class HarnessSkeletonTest(unittest.TestCase):

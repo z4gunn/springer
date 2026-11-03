@@ -153,13 +153,32 @@ def report(found):
     return "\n".join(lines)
 
 
+def check_notifications(home):
+    """Optional: Slack is set up and both tokens are in the keychain."""
+    from .notify.notifier import load_settings
+    from .notify.slack import APP_TOKEN, BOT_TOKEN, SECRET_SCOPE
+    from .providers.secrets import KeyringSecrets
+    if load_settings(home) is None:
+        return [Finding("slack", False, "not set up, so gates reach you only in the TUI", required=False,
+                        fix="Run: springer notifications setup")]
+    try:
+        secrets = KeyringSecrets()
+        stored = all(secrets.get(SECRET_SCOPE, name) for name in (BOT_TOKEN, APP_TOKEN))
+    except Exception:  # noqa: BLE001, a locked or missing keychain is the finding
+        stored = False
+    if not stored:
+        return [Finding("slack", False, "set up, but a token is missing from the keychain", required=False,
+                        fix="Run: springer notifications setup")]
+    return [Finding("slack", True, "gates go to your Slack direct messages", required=False)]
+
+
 def doctor(home):
     from .registry import Home
     config = load_config(home)
     print("springer doctor")
     if config is None:
         print("  warn  config         not onboarded, so runs use the mock provider. Run: springer onboard")
-    found = checks(config)
+    found = checks(config) + check_notifications(home)
     print(report(found))
     fixed = repair(home, Home(home).projects())
     for line in fixed:

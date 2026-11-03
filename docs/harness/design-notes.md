@@ -404,7 +404,7 @@ Gate notifications go to channels with numbered options. Replying with a number 
 | Coding agent | Claude Code (Agent SDK), plus a mock provider for tests | Codex, Gemini CLI, OpenCode as reviewers through an adapter, builder parity later | spawn(role, brief, allowlist, mcp) returns an event stream, result, cost, usage |
 | Source host | Local (the default) and GitHub | GitLab, Forgejo | open a change or PR, merge, retarget stacked branches, report mergeability |
 | Backlog | Files in the repo plus the TUI board (the default, not a fallback) | Linear, GitHub Projects, Jira as one-way projections | project stories and states one way |
-| Channel | Desktop notification, Slack | Telegram, Discord, email, iMessage | notify(event, payload), answer a gate by reply |
+| Channel | Slack over Socket Mode (built) | Desktop notification, Telegram, Discord, email | post a gate, close it when answered, reply in its thread, post a line; a button answers the gate |
 | Design tools | Playwright, impeccable, ui-ux-pro-max detected | Claude Design, Figma MCP | wired into the design skills when present |
 | Memory | FTS5 | Embeddings | index(records), query(scope) |
 
@@ -442,12 +442,13 @@ springer-harness/
     dispatch/     contract builder, tier selection, provider runner
     providers/    coding agent, source host, backlog, channel, memory
     check/        schema validate, receipts, classify-failure, review package, pr-risk
-    gates/        queue, merge, notifiers
+    gates/        queue, merge
     retrieval/    FTS5 index, corpus builders, brief assembly
     api/          FastAPI, runs, units, gates, events (SSE), interventions, static docs/design
     tui/          Textual app: projects, brief, backlog, run, chat line
     chat/         typed-operation agent over the API
-  cli: springer onboard | springer | configure | doctor
+    notify/       notifier loop, digest, Slack channel over Socket Mode, springer notifications
+  cli: springer onboard | springer | configure | doctor | notifications
 ```
 
 ### Migration path

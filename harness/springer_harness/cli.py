@@ -150,6 +150,9 @@ def serve(home, port):
     app = create_app(daemon)
     daemon.home.write_port(port)
     daemon.start()
+    if daemon.config is not None:
+        from .notify.notifier import start_notifications
+        start_notifications(daemon, app.state.operations)
     # A TUI's open event stream must not hold the daemon's shutdown.
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning", timeout_graceful_shutdown=1)
     return 0
@@ -208,6 +211,8 @@ def main(argv=None):
     onboard_cmd = sub.add_parser("onboard", help="set up the coding agent, the source host, and the daemon, once")
     onboard_cmd.add_argument("--yes", action="store_true", help="take every default without asking")
     sub.add_parser("doctor", help="check the setup and repair what is safe to repair")
+    notes = sub.add_parser("notifications", help="send gates to Slack and answer them from your phone")
+    notes.add_argument("action", nargs="?", default="setup", choices=("setup", "test", "manifest", "off"))
     run_daemon = sub.add_parser("daemon", help="run the daemon in the foreground")
     run_daemon.add_argument("--home", dest="daemon_home", default=None)
     run_daemon.add_argument("--port", type=int, default=DEFAULT_PORT)
@@ -221,6 +226,9 @@ def main(argv=None):
     if args.command == "doctor":
         from .setup import doctor
         return doctor(home)
+    if args.command == "notifications":
+        from .notify.setup import notifications
+        return notifications(home, args.action)
     if args.command == "stop":
         stopped = stop_daemon(home)
         print("springer: daemon stopped." if stopped else "springer: no daemon is running.")

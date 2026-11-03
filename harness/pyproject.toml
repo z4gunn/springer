@@ -14,6 +14,7 @@ dependencies = [
     "jsonschema>=4",
     "keyring>=25",
     "pyyaml>=6",
+    "slack_sdk>=3.33",
     "textual>=8",
     "uvicorn>=0.30",
 ]

@@ -69,6 +69,7 @@ def create_app(daemon):
     app.state.heartbeat_seconds = HEARTBEAT_SECONDS
     operations = Operations(daemon)
     app.state.operations = operations
+    daemon.operations = operations
     token = daemon.home.token()
     build = build_id()
     design_codes = {}
