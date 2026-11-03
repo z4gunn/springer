@@ -2,6 +2,8 @@
 meta-test fails when a catalog operation or a GET path has no test, so the contract
 cannot grow past its coverage. See Conformance in docs/harness/api-contract.md."""
 
+import contextlib
+import io
 import json
 import shutil
 import socket
@@ -989,6 +991,16 @@ class StreamTest(ApiCase):
         engine = fresh.engine("acme", run_id)
         self.assertIn(engine.units.state("U-0001")["state"], ("redispatch", "done", "checking", "returned"))
         self.assertTrue(fresh.tick_all())
+
+
+    def test_a_failing_tick_is_written_to_the_run_ledger_once(self):
+        run_id = self.start()
+        engine = self.daemon.engine("acme", run_id)
+        engine.tick = lambda: (_ for _ in ()).throw(RuntimeError("gh pr merge failed"))
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.tick(3)
+        failures = [e.line for e in engine.ledger.read() if e.line.get("event") == "tick_failed"]
+        self.assertEqual([f["detail"] for f in failures], ["RuntimeError: gh pr merge failed"])
 
 
 if __name__ == "__main__":

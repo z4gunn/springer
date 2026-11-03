@@ -513,7 +513,11 @@ class RunEngine:
         number = state["pr"]["number"]
         if not self._ci_green(unit_id, state, number):
             return
-        sha = self.source_host.merge(self.project_slug, number)
+        try:
+            sha = self.source_host.merge(self.project_slug, number)
+        except Exception as exc:  # noqa: BLE001, a refused merge must not stop the tick
+            self._merge_failed(unit_id, state, number, str(exc))
+            return
         self.ledger.append("merge", unit_id=unit_id, pr=number, sha=sha)
         self.units.transition(unit_id, "done", f"merged at {level}", merge={"sha": sha, "at": iso(self.now())})
         if level == "L1":
@@ -522,8 +526,49 @@ class RunEngine:
         for other in self.units.by_state("gated", "checking", "running", "retry", "redispatch"):
             if other.get("pr") and other["pr"].get("base") == state["pr"]["branch"]:
                 base = self.worktrees.default_branch()
+                if other["state"] == "gated":
+                    self._restack(other["unit_id"], other)
                 self.source_host.retarget(self.project_slug, other["pr"]["number"], base)
                 self.units.save({**other, "pr": {**other["pr"], "base": base}})
+
+    def _restack(self, unit_id, state):
+        """A squash merge leaves a stacked branch carrying its parent's original commits,
+        which conflict with the squash. Replay only the unit's own commits onto the base.
+        True when the branch moved."""
+        for dep in self._spec(unit_id)["dependencies"]:
+            parent = self.units.state(dep)
+            if parent["state"] != "done" or not parent.get("pr"):
+                continue
+            problem = self.worktrees.restack(state["pr"]["branch"], parent["pr"]["branch"],
+                                             self.worktrees.default_branch())
+            if problem is None:
+                self.ledger.append("restacked", unit_id=unit_id, pr=state["pr"]["number"], onto=dep)
+                return True
+            if problem not in ("nothing to restack", "a branch is missing"):
+                self.ledger.append("restack_failed", unit_id=unit_id, pr=state["pr"]["number"], detail=problem)
+        return False
+
+    def _merge_failed(self, unit_id, state, number, detail):
+        """A PR that conflicts with its base goes back to its builder. Any other refusal
+        goes to a person. While the host has not computed mergeability yet, the merge
+        is tried again on the next tick."""
+        mergeable = getattr(self.source_host, "mergeable", lambda *_: "unknown")(self.project_slug, number)
+        if mergeable == "unknown":
+            return
+        if mergeable == "conflicting" and self._restack(unit_id, state):
+            return
+        detail = detail[-300:]
+        self.ledger.append("merge_failed", unit_id=unit_id, pr=number, detail=detail)
+        self._retire_merge_gates(unit_id)
+        base = state["pr"]["base"]
+        if mergeable == "conflicting":
+            self._append_note(unit_id, f"PR {number} conflicts with {base} after other work merged. Merge {base} "
+                                       f"into your branch, resolve every conflict keeping the intent of both sides, "
+                                       f"run the tests, and push to the same branch. Do not open a new PR.")
+            self.units.transition(unit_id, "retry", f"defect: PR {number} conflicts with {base}",
+                                  retries_spent=state["retries_spent"] + 1)
+        else:
+            self._block(unit_id, state, f"merging PR {number} failed: {detail}")
 
     def _ci_green(self, unit_id, state, number):
         """The merge waits for the project's CI signal. Receipts were verified at Check.

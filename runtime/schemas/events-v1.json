@@ -53,6 +53,18 @@
       "$ref": "#/$defs/merge"
     },
     {
+      "$ref": "#/$defs/merge_failed"
+    },
+    {
+      "$ref": "#/$defs/restacked"
+    },
+    {
+      "$ref": "#/$defs/restack_failed"
+    },
+    {
+      "$ref": "#/$defs/tick_failed"
+    },
+    {
       "$ref": "#/$defs/retrieval"
     },
     {
@@ -993,6 +1005,164 @@
           "minLength": 1
         },
         "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "merge_failed": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "pr",
+        "detail"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "merge_failed"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "pr": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "restacked": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "pr",
+        "onto"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "restacked"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "pr": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "onto": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        }
+      }
+    },
+    "restack_failed": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "pr",
+        "detail"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "restack_failed"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "pattern": "^U-[0-9]{4,}$"
+        },
+        "pr": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "tick_failed": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "detail"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "tick_failed"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail": {
           "type": "string",
           "minLength": 1
         }

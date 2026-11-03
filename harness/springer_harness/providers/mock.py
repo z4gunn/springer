@@ -138,7 +138,14 @@ class MockSourceHost:
     def pr_state(self, project, number):
         return self.prs.get(number, "open")
 
+    def mergeable(self, project, number):
+        """Scripted per PR in mergeable_states, mergeable by default."""
+        return getattr(self, "mergeable_states", {}).get(number, "mergeable")
+
     def merge(self, project, number):
+        """A PR listed in merge_errors refuses to merge with that message."""
+        if number in getattr(self, "merge_errors", {}):
+            raise RuntimeError(self.merge_errors[number])
         self.prs[number] = "merged"
         self.merged.append(number)
         return f"sha{number:04d}"

@@ -123,6 +123,46 @@ class Worktrees:
             (self.project / rel).unlink()
         return True
 
+    def restack(self, branch, upstream, onto):
+        """Replay the commits a stacked branch added on top of upstream onto the base,
+        after upstream was squash-merged there and its own commits would otherwise
+        conflict with the squash. The rebase runs in a detached scratch worktree, so a
+        unit worktree is never touched, and the push is leased to the old head, so work
+        pushed since is never overwritten. Returns None, or why it did nothing."""
+        old = _git(self.project, "rev-parse", "--verify", f"refs/heads/{branch}").stdout.strip()
+        tip = _git(self.project, "rev-parse", "--verify", f"refs/heads/{upstream}").stdout.strip()
+        if not old or not tip:
+            return "a branch is missing"
+        if _git(self.project, "merge-base", "--is-ancestor", tip, old).returncode:
+            return "nothing to restack"
+        remote = _git(self.project, "remote", "get-url", "origin").returncode == 0
+        if remote:
+            _git(self.project, "fetch", "--quiet", "origin", onto)
+        target = f"origin/{onto}" if remote else onto
+        scratch = self.root / f"_restack-{branch.replace('/', '-')}"
+        _git(self.project, "worktree", "remove", "--force", str(scratch))
+        self.root.mkdir(parents=True, exist_ok=True)
+        if _git(self.project, "worktree", "add", "--detach", str(scratch), old).returncode:
+            return "could not make a scratch worktree"
+        try:
+            done = _git(scratch, "-c", "user.name=Springer", "-c", "user.email=springer@local",
+                        "rebase", "--onto", target, tip)
+            if done.returncode:
+                _git(scratch, "rebase", "--abort")
+                said = [line for line in (done.stdout + done.stderr).splitlines() if line and not line.startswith("hint:")]
+                return " ".join(said)[-300:] or "git rebase failed"
+            new = _git(scratch, "rev-parse", "HEAD").stdout.strip()
+            if _git(self.project, "update-ref", f"refs/heads/{branch}", new, old).returncode:
+                return "the branch moved during the restack"
+            if remote:
+                pushed = _git(self.project, "push", "--quiet", f"--force-with-lease={branch}:{old}", "origin", branch)
+                if pushed.returncode:
+                    _git(self.project, "update-ref", f"refs/heads/{branch}", old, new)
+                    return pushed.stderr.strip()[-300:] or "git push failed"
+            return None
+        finally:
+            _git(self.project, "worktree", "remove", "--force", str(scratch))
+
     def release(self, unit_id):
         """Returns None on success, or git's reason for refusing."""
         path = self.path(unit_id)

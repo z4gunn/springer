@@ -37,6 +37,14 @@ class GitHubSourceHost:
         self.sync(project)
         return sha
 
+    def mergeable(self, project, number):
+        """conflicting, mergeable, or unknown while GitHub is still computing it."""
+        try:
+            value = json.loads(self._gh(project, "pr", "view", str(number), "--json", "mergeable"))["mergeable"]
+        except (GitHubError, ValueError, KeyError):
+            return "unknown"
+        return {"CONFLICTING": "conflicting", "MERGEABLE": "mergeable"}.get(value, "unknown")
+
     def checks(self, project, number):
         """("pass" | "pending" | "fail", detail) over every check on the PR. A PR with
         no checks at all is pending, because a configured CI signal that never reports

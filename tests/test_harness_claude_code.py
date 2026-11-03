@@ -70,6 +70,8 @@ if args[:2] == ["auth", "status"]:
     print("github.com\n  Logged in to github.com account octo (keyring)"); sys.exit(0)
 if args[:2] == ["pr", "view"] and "state" in args:
     print(json.dumps({{"state": "MERGED"}})); sys.exit(0)
+if args[:2] == ["pr", "view"] and "mergeable" in args:
+    print(json.dumps({{"mergeable": "CONFLICTING"}})); sys.exit(0)
 if args[:2] == ["pr", "view"] and "mergeCommit" in args:
     print(json.dumps({{"mergeCommit": {{"oid": "abc123"}}}})); sys.exit(0)
 if args[:2] == ["pr", "diff"]:
@@ -318,12 +320,66 @@ class OrchestratorTest(FakeBinCase):
         self.assertTrue(self.planner.finished())
 
 
+class RestackTest(unittest.TestCase):
+    """A stacked branch keeps only its own commits after its parent is squash-merged."""
+
+    ENV = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.project = git_project(root / "acme")
+        from springer_harness.scheduler.worktrees import Worktrees
+        self.trees = Worktrees(root / "home", "acme", self.project)
+
+    def git(self, cwd, *args):
+        return subprocess.run(["git", "-C", str(cwd), *self.ENV, *args], capture_output=True, text=True)
+
+    def commit(self, cwd, files):
+        for rel, text in files.items():
+            (cwd / rel).write_text(text)
+        self.git(cwd, "add", "-A")
+        self.git(cwd, "commit", "-qm", "work")
+
+    def test_a_stacked_branch_merges_cleanly_after_its_parent_was_squashed(self):
+        self.commit(self.project, {"f.txt": "a\nb\n"})
+        parent, _ = self.trees.claim("U-0001", "main")
+        self.commit(parent, {"f.txt": "A\nb\n"})
+        child, _ = self.trees.claim("U-0002", "unit/U-0001")
+        self.commit(child, {"f.txt": "A\nB\n", "g.txt": "child"})
+        self.git(self.project, "merge", "--squash", "unit/U-0001")
+        self.git(self.project, "commit", "-qm", "squash of U-0001")
+        probe = self.git(self.project, "merge-tree", "--write-tree", "main", "unit/U-0002")
+        self.assertNotEqual(probe.returncode, 0, "without a restack the squash conflicts")
+        self.trees.release("U-0002")
+        self.assertIsNone(self.trees.restack("unit/U-0002", "unit/U-0001", "main"))
+        self.assertEqual(self.git(self.project, "merge", "--no-edit", "unit/U-0002").returncode, 0)
+        self.assertEqual(((self.project / "f.txt").read_text(), (self.project / "g.txt").read_text()),
+                         ("A\nB\n", "child"))
+        self.assertEqual(self.trees.restack("unit/U-0002", "unit/U-0001", "main"), "nothing to restack")
+
+    def test_a_restack_that_conflicts_leaves_the_branch_where_it_was(self):
+        self.commit(self.project, {"f.txt": "a\n"})
+        parent, _ = self.trees.claim("U-0001", "main")
+        self.commit(parent, {"f.txt": "parent\n"})
+        child, _ = self.trees.claim("U-0002", "unit/U-0001")
+        self.commit(child, {"f.txt": "child\n"})
+        self.commit(self.project, {"f.txt": "main moved\n"})
+        before = self.git(self.project, "rev-parse", "unit/U-0002").stdout
+        self.trees.release("U-0002")
+        self.assertIn("CONFLICT", self.trees.restack("unit/U-0002", "unit/U-0001", "main"))
+        self.assertEqual(self.git(self.project, "rev-parse", "unit/U-0002").stdout, before)
+        self.assertEqual([p.name for p in self.trees.root.iterdir() if p.name.startswith("_restack")], [])
+
+
 class GitHubTest(FakeBinCase):
     def test_merge_reads_the_sha_and_retarget_and_state_go_through_gh(self):
         project = git_project(self.root / "acme")
         host = GitHubSourceHost(lambda slug: project)
         self.assertEqual(host.merge("acme", 7), "abc123")
         self.assertEqual(host.pr_state("acme", 7), "merged")
+        self.assertEqual(host.mergeable("acme", 7), "conflicting")
         host.retarget("acme", 8, "main")
         calls = [c for c in self.calls() if isinstance(c, list)]
         self.assertIn(["pr", "merge", "7", "--squash"], calls)

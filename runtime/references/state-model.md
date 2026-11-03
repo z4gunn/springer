@@ -141,6 +141,9 @@ events.jsonl keeps its current line format and its existing event names (agent_d
 | gate_opened | gate_id, level, holds |
 | gate_answered | gate_id, response, by |
 | merge | unit_id, pr, sha |
+| merge_failed | unit_id, pr, detail. A conflict sends the unit back to its builder, any other refusal blocks it for a person |
+| restacked, restack_failed | unit_id, pr, and onto or detail. After a squash merge, a stacked branch keeps only its own commits |
+| tick_failed | detail, written once per distinct error so a stalled run is visible in its ledger |
 | retrieval | unit_id, record ids supplied |
 | window_sample | provider, used fraction, resets at |
 | operation_applied | op_id, type, actor, args. A secret value is never in args |

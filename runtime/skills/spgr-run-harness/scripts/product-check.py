@@ -31,7 +31,9 @@ PRODUCT_CHECK_ID and PRODUCT_CHECK_RUN_DIR in its environment.
 Writes `runs/<run-id>/product-checks/<timestamp>.json` with every result and
 the tail of each command's output, and appends one `product_check` event per
 check to `runs/<run-id>/events.jsonl`, which is where the dashboard's outcome
-figure comes from. Prints one line per check and a summary.
+figure comes from. With SPRINGER_PROJECT_DIR set, as it is in a harness session,
+both land in that project's run store and not in the worktree. Prints one line
+per check and a summary.
 
 With `--unit` it also writes a `product` receipt to <unit-dir>/receipts/
 through receipt.py, carrying the commit and tree fingerprint, so the
@@ -137,6 +139,18 @@ def run_check(check, project_root, run_dir, timeout):
         "duration_s": round(time.monotonic() - started, 1),
         "output_tail": output[-OUTPUT_TAIL:],
     }
+
+
+def store_dir(run_dir):
+    """Where the outcome is recorded. A session in a unit worktree runs the checks
+    against its own code but records into the project's run store, named by
+    SPRINGER_PROJECT_DIR, so the run ledger is never copied into a branch."""
+    project = os.environ.get("SPRINGER_PROJECT_DIR")
+    if not project:
+        return run_dir
+    target = os.path.join(os.path.abspath(project), "runs", os.path.basename(os.path.normpath(run_dir)))
+    os.makedirs(target, exist_ok=True)
+    return target
 
 
 def record(run_dir, cycle_id, results, selected_by):
@@ -247,7 +261,7 @@ def main(argv):
 
     results = [run_check(c, project_root, run_dir, timeout) for c in selected]
     selected_by = {"only": only} if only else {"touches": touches}
-    path = record(run_dir, cycle_id, results, selected_by)
+    path = record(store_dir(run_dir), cycle_id, results, selected_by)
     write_unit_receipt(unit_dir, project_root, results)
     for r in results:
         print(f"{r['result'].upper():5} {r['check_id']}  ({r['duration_s']}s)  expect: {r['expect']}")

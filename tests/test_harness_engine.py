@@ -321,6 +321,40 @@ class MergePolicyTest(EngineCase):
         notes = (engine.units.unit_dir("U-0001") / "redispatch-notes.txt").read_text()
         self.assertIn("CI failed on PR 1: failed: conformance", notes)
 
+    def events(self, engine, name):
+        return [e.line for e in engine.ledger.read() if e.line.get("event") == name]
+
+    def test_a_pr_that_conflicts_with_main_goes_back_to_its_builder(self):
+        self.host.merge_errors = {1: "gh pr merge failed: Pull request is not mergeable"}
+        self.host.mergeable_states = {1: "conflicting"}
+        self.provider.script["routine"].append(Attempt(result=pr_result(1, touched=("packages/ui/button.tsx",))))
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: len(self.provider.spawned) == 2)
+        self.assertEqual(engine.units.state("U-0001")["retries_spent"], 1)
+        self.assertIn("PR 1 conflicts with main", self.provider.spawned[-1].brief)
+        self.assertEqual(self.events(engine, "merge_failed")[0]["pr"], 1)
+        self.assertEqual(self.host.merged, [])
+
+    def test_a_merge_refused_for_another_reason_blocks_for_a_person(self):
+        self.host.merge_errors = {1: "gh pr merge failed: branch protection"}
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "blocked")
+        gate = engine.gates.open_gates()[0]["content"]
+        self.assertIn("branch protection", gate["decision_prompt"])
+        engine.tick()
+        self.assertEqual(len(self.events(engine, "merge_failed")), 1, "a refused merge is not retried every tick")
+
+    def test_a_merge_waits_while_the_host_has_not_computed_mergeability(self):
+        self.host.merge_errors = {1: "gh pr merge failed: not mergeable yet"}
+        self.host.mergeable_states = {1: "unknown"}
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "gated")
+        for _ in range(3):
+            engine.tick()
+        self.assertEqual((self.states(engine)["U-0001"], self.events(engine, "merge_failed")), ("gated", []))
+        del self.host.merge_errors[1]
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+
     def test_l1_merges_alone_and_leaves_a_digest_entry_that_holds_nothing(self):
         engine = self.engine([batch(unit("a", agent="notable"))])
         self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")

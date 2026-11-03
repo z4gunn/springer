@@ -10,6 +10,9 @@ class SourceHost(Protocol):
     def merge(self, project, number) -> str:
         """Merge and return the merge sha."""
 
+    def mergeable(self, project, number) -> str:
+        """conflicting, mergeable, or unknown."""
+
     def retarget(self, project, number, base) -> None:
         """Point a stacked PR at a new base after its parent merged."""
 

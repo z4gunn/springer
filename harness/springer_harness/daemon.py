@@ -58,6 +58,7 @@ class Daemon:
         self.owner = daemon_owner()
         self.lock = threading.RLock()
         self.engines = {}
+        self._tick_errors = {}
         self.window = UsageWindow(self.home.root, provider.name, now, maximum)
         self._stop = threading.Event()
         self.started_at = now()
@@ -252,10 +253,25 @@ class Daemon:
                         continue
                     try:
                         results[(slug, run_id)] = engine.tick()
-                    except Exception:  # noqa: BLE001, one run's defect must not stop the others
+                    except Exception as exc:  # noqa: BLE001, one run's defect must not stop the others
                         traceback.print_exc(file=sys.stderr)
+                        self._tick_failed(engine, (slug, run_id), exc)
                         results[(slug, run_id)] = "failed"
+                    else:
+                        self._tick_errors.pop((slug, run_id), None)
             return results
+
+    def _tick_failed(self, engine, key, exc):
+        """A failing tick is written to the run's ledger, where the TUI shows it, once
+        per distinct error, because the daemon's stderr is not where anyone looks."""
+        detail = f"{type(exc).__name__}: {exc}"[-400:]
+        if self._tick_errors.get(key) == detail:
+            return
+        self._tick_errors[key] = detail
+        try:
+            engine.ledger.append("tick_failed", detail=detail)
+        except OSError:
+            pass
 
     def loop(self, seconds=TICK_SECONDS):
         while not self._stop.wait(seconds):
