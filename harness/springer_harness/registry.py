@@ -56,7 +56,7 @@ class Home:
         write_json(self.projects_path, projects)
 
     def config(self):
-        return read_json(self.config_path, {"role_models": {}, "gate_channels": {}, "staging_hosts": []})
+        return read_json(self.config_path, {"role_models": {}, "gate_channels": {}})
 
     def save_config(self, config):
         write_json(self.config_path, config)

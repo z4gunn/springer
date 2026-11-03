@@ -22,7 +22,7 @@ This document records the design of an opinionated, near-autonomous software dev
 | CLI surface | Two commands a user must know: springer onboard and springer. Everything else is in the TUI or the chat line |
 | Harness | Springer-specific daemon, Python, Agent SDK, one daemon serving many projects, SDK sessions as subprocesses in a worktree |
 | Coding agent providers | Provider contract designed now. Claude Code is the only builder provider at v1. Other agents join as reviewers through an adapter, builder parity is a later milestone |
-| Bring your own | Source host, backlog projection, notification channels, staging targets, design tools, memory backend, all behind small provider contracts |
+| Bring your own | Source host, backlog projection, notification channels, design tools, memory backend, all behind small provider contracts |
 | Assumptions | Reversible decisions are taken by default and logged (L1). Irreversible decisions escalate before start (L3). Agents never stop mid-task to ask |
 | Merge policy | L0 and L1 auto-merge on green. L2 holds the merge only. L3 blocks before start. The harness is the only merger |
 | PR size | Small. One task, one PR, stacked branches for dependent work |
@@ -30,7 +30,7 @@ This document records the design of an opinionated, near-autonomous software dev
 | Stack | TypeScript monorepo, Next.js for web, Expo and Expo Router for mobile, shared packages/ui |
 | Deployment profiles | Cloud (Vercel, Supabase) or self-hosted (one VPS, Docker Compose, Coolify or Dokploy). No Kubernetes |
 | CI | Local, on the orchestrator machine, receipts as the evidence. GitHub free tier as remote, no Actions |
-| Staging | Local Linux farm, Compose per branch, a Mac for iOS simulators |
+| Staging | Owned by each project, not the harness. Projects stage differently (one runs across three machines), so the harness registers no host and runs no deploy. A project that wants a staging deploy wires it into its own CI or scripts |
 | Cost and auth | v1 runs on Claude Code subscription session auth, not an API key. The daemon budgets against the plan's usage windows, sleeps through a limit to the reset, and shows window usage and list-price equivalent spend in the TUI. An API-key path with a dollar cap is kept as a switch for later |
 | Build order | The orchestrator state model is designed first, because it is the one thing expensive to change later. Done, see springer-state-model.md. Then Phase 0, the harness walking skeleton. Task templates and the risk rules file are written the day they are needed |
 | State model | Approved as written in springer-state-model.md: the unit as a first-class entity, sessions tracked separately, gates with level and holds, the usage window as daemon state, mechanical crash recovery, and overlapping cycles with disjointness computed from declared paths |
@@ -88,7 +88,6 @@ payments: subscription       # none | one-time | subscription
 scale: team                  # personal | team | public
 autonomy: autopilot          # supervised | standard | autopilot (shown by what the user experiences)
 deploy: self-hosted          # cloud | self-hosted
-staging: staging-1           # a host registered in the harness
 reach: regional              # regional | global (global tags the i18n vertical)
 frameworks: [gdpr]           # compliance verticals to dispatch
 variants: 3                  # 0 | 2 | 3
@@ -169,7 +168,7 @@ The chat line's interview mode asks these in order, each unlocking the next, eac
 
 Errors block Start run. Warnings show inline. The existing buildability check runs as part of this.
 
-- Error: a flow without an outcome, a user referenced in a flow but absent from Users, no critical flow, an unknown pinned key, a staging host not registered in the harness, a surface that contradicts a flow (a mobile-only flow with no mobile surface).
+- Error: a flow without an outcome, a user referenced in a flow but absent from Users, no critical flow, an unknown pinned key, a surface that contradicts a flow (a mobile-only flow with no mobile surface).
 - Warning: non-goals empty, no success criteria, a pinned value that conflicts with the deploy profile (Supabase on self-hosted), variants set when the derived profile is brochure, a glossary term used inconsistently, a flow with more than about twelve steps.
 - Info: an input mentioned in prose but not present under docs/inputs, which becomes an intake question rather than an error.
 
@@ -382,7 +381,7 @@ springer onboard     once
 springer             opens the TUI
 ```
 
-springer onboard is one guided flow: coding agent provider and auth, source host, backlog projection, notification channels, staging hosts and optional tools, then the daemon is installed and started. springer configure <area> changes one section later. springer doctor validates and repairs.
+springer onboard is one guided flow: coding agent provider and auth, source host, backlog projection, notification channels and optional tools, then the daemon is installed and started. springer configure <area> changes one section later. springer doctor validates and repairs.
 
 The TUI has four screens and a chat line.
 
@@ -406,7 +405,6 @@ Gate notifications go to channels with numbered options. Replying with a number 
 | Source host | GitHub | GitLab, Forgejo | create repo, open PR, post status, merge, retarget stacked branches |
 | Backlog | Files in the repo plus the TUI board (the default, not a fallback) | Linear, GitHub Projects, Jira as one-way projections | project stories and states one way |
 | Channel | Desktop notification, Slack | Telegram, Discord, email, iMessage | notify(event, payload), answer a gate by reply |
-| Staging | Compose over SSH | Vercel preview, Coolify API | deploy(branch) returns a URL, teardown |
 | Design tools | Playwright, impeccable, ui-ux-pro-max detected | Claude Design, Figma MCP | wired into the design skills when present |
 | Memory | FTS5 | Embeddings | index(records), query(scope) |
 
@@ -422,7 +420,7 @@ One installed package and one daemon on an always-on box, with a project registr
 
 Scaffolding impact: project creation gains a register step and the manifest records the minimum harness version. Runtime updates stay as they are. Harness updates are a package upgrade with a compat check at run open. The spgr-run-harness skill becomes a shim calling the daemon. run-unattended.py is retired. Docs rendering, the tracker projection, and the dashboard move to harness features.
 
-Registry: projects (path, profile, deploy, staging host, runtime version), worktrees under ~/.springer/worktrees/<project>/<unit> with a shared pnpm store, secrets in the OS keyring per project (builders get .env.test only), staging mapping (project to host to Compose project name).
+Registry: projects (path, profile, deploy, CI signal, runtime version), worktrees under ~/.springer/worktrees/<project>/<unit> with a shared pnpm store, secrets in the OS keyring per project (builders get .env.test only).
 
 Daemon security: localhost bind, token auth, typed operations only from the chat agent, audit log of applied operations.
 
@@ -442,7 +440,7 @@ springer-harness/
     state/        cycle log reader, projection, SQLite index
     scheduler/    ready queue, barrier, WIP, worktrees
     dispatch/     contract builder, tier selection, provider runner
-    providers/    coding agent, source host, backlog, channel, staging, memory
+    providers/    coding agent, source host, backlog, channel, memory
     check/        schema validate, receipts, classify-failure, review package, pr-risk
     gates/        queue, merge, notifiers
     retrieval/    FTS5 index, corpus builders, brief assembly
@@ -456,7 +454,7 @@ springer-harness/
 
 1. Extract every harness script into an importable library with no session assumptions.
 2. Build the mock coding-agent provider and the harness test suite against it.
-3. Service tick loop calling those libraries, Claude Code provider, file backlog, desktop and Slack channels, Compose staging.
+3. Service tick loop calling those libraries, Claude Code provider, file backlog, desktop and Slack channels.
 4. Hooks POST events to the service. TUI run screen reads the service.
 5. spgr-notify-human posts to the gate queue. Channels become notifiers.
 6. First full run under the service on a small profile project.
@@ -464,9 +462,9 @@ springer-harness/
 
 Risks: loss of "open the repo and go" (mitigated by the shim), two sources of truth during migration (the cycle log stays the only durable state), prose-to-code behavior drift (evals catch some, the first real run catches the rest).
 
-### Local CI, staging, and cost
+### Local CI and cost
 
-GitHub free tier for PRs and branches through the gh API. Private repositories on the free tier have no branch protection, so the harness is the sole enforcer of merge policy and a direct push to main is logged, not prevented. The harness posts check results as commit statuses. Receipts are the CI signal. Staging is Compose per branch on local Linux boxes with DB per branch from a template database, names resolvable on the LAN. Android emulators run on the Linux boxes for Maestro. iOS simulators need macOS, so a Mac joins the farm or iOS E2E runs on the workstation on demand. A dedicated always-on machine hosts the daemon.
+GitHub free tier for PRs and branches through the gh API. Private repositories on the free tier have no branch protection, so the harness is the sole enforcer of merge policy and a direct push to main is logged, not prevented. The harness posts check results as commit statuses. Receipts are the default CI signal, and a project can pick self-hosted Actions or both. Staging belongs to the project. Android emulators run on the Linux boxes for Maestro. iOS simulators need macOS, so a Mac joins the farm or iOS E2E runs on the workstation on demand. A dedicated always-on machine hosts the daemon.
 
 Auth and budget at v1: the Claude Code provider uses the subscription session the CLI is logged into on the daemon machine, not an API key. The Agent SDK drives the CLI, so this is the same auth path run-unattended.py uses today. Consequences the scheduler must handle: the budget is a usage window, not dollars, so the scheduler tracks consumption per window from the provider's usage signal, slows dispatch as a window fills, and sleeps through a limit to the reset the way run-unattended.py already does. Parallel sessions draw from one window, so the WIP limit is also a usage-window decision. Per-session cost is still computed at list price for the TUI and the retrospective, as information rather than a cap. Cheaper tiers for mechanical roles, the strong model for builders and the security and compliance reviewers, which also stretches the window. The API-key path, with a real daily dollar cap, stays implemented behind a provider setting so a project can switch when predictability matters more than price.
 
@@ -555,7 +553,7 @@ Before Phase 0, the state model: done. springer-state-model.md is the reference 
 Phase 0, harness walking skeleton (weeks):
 
 1. Extract harness scripts into a library. Mock coding-agent provider. Test suite.
-2. Daemon tick loop, Claude Code provider on subscription session auth with usage-window budgeting, file backlog, GitHub source host, desktop and Slack channels, Compose staging over SSH, localhost static serving of docs/design.
+2. Daemon tick loop, Claude Code provider on subscription session auth with usage-window budgeting, file backlog, GitHub source host, desktop and Slack channels, localhost static serving of docs/design.
 3. TUI: projects, brief editor with the side panel, backlog board, run screen with gates and interventions. Chat line with typed operations.
 4. springer onboard and springer doctor.
 5. First full run on a small-profile project. Then retire run-unattended.py and shrink pdca-harness.md.
@@ -571,7 +569,7 @@ Phase 2, design as code (weeks):
 
 10. Tokens emitted into packages/ui/tokens, comps rendered from those files, react-native-web on mobile.
 11. Seed data skill from packages/types.
-12. Local-receipts CI platform, commit statuses through gh, staging target in the brief.
+12. Local-receipts CI platform, commit statuses through gh.
 13. High-fidelity variants, opt-in.
 
 Phase 3, memory and providers (ongoing):

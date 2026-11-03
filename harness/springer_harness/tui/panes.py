@@ -86,14 +86,6 @@ async def show_runs(app, slug):
         await app.push_screen_wait(TextDialog(f"{value['run_id']} (imported)", imported_text(value, history["learnings"])))
 
 
-def staging_of(project):
-    staging = (project.get("settings") or {}).get("staging")
-    if not staging:
-        return paint("-", "dim")
-    mark = "" if project["settings"].get("deploy_confirmed") else " (unconfirmed)"
-    return paint(f"{staging['name']} {staging['kind']}{mark}", "dim")
-
-
 def age(iso_text):
     seconds = max(0, int(time.time() - time.mktime(time.strptime(iso_text, "%Y-%m-%dT%H:%M:%SZ")) + time.timezone))
     return f"{seconds // 3600}h{seconds % 3600 // 60:02d}m" if seconds >= 3600 else f"{seconds // 60}m"
@@ -136,17 +128,17 @@ class Pane(Vertical):
 class ProjectsPane(Pane):
     focus_id = "#projects"
     BINDINGS = [Binding("n", "new", "new"), Binding("a", "adopt", "adopt"), Binding("x", "archive", "archive"),
-                Binding("e", "settings", "settings"), Binding("D", "deploy", "deploy"),
+                Binding("e", "settings", "settings"),
                 Binding("o", "design", "design"), Binding("l", "runs", "runs")]
 
     def compose(self) -> ComposeResult:
         yield DataTable(id="projects", cursor_type="row", zebra_stripes=False)
         yield Static("", id="project-notes", markup=False)
-        yield Static(keys(("n", "new"), ("a", "adopt"), ("enter", "open"), ("e", "settings"), ("D", "deploy"),
+        yield Static(keys(("n", "new"), ("a", "adopt"), ("enter", "open"), ("e", "settings"),
                           ("o", "design"), ("l", "runs"), ("x", "archive")), classes="hint")
 
     def on_mount(self):
-        self.query_one("#projects", DataTable).add_columns("NAME", "PROFILE", "PHASE", "GATES", "CI", "STAGING", "STATUS")
+        self.query_one("#projects", DataTable).add_columns("NAME", "PROFILE", "PHASE", "GATES", "CI", "STATUS")
 
     async def load(self):
         projects = await self.client.get("/v1/projects")
@@ -158,7 +150,7 @@ class ProjectsPane(Pane):
                                            paint(run["phase"] if run else "-", "stone"),
                                            str(run["open_gates"]) if run else "0",
                                            paint(project.get("settings", {}).get("ci_signal", "receipts"), "dim"),
-                                           staging_of(project), status_of(project))))
+                                           status_of(project))))
         self.fill(self.query_one("#projects", DataTable), rows)
         self._show_notes()
 
@@ -168,9 +160,6 @@ class ProjectsPane(Pane):
         project = getattr(self, "projects", {}).get(slug) or {}
         notes = [paint(f"Merge by hand: {path}, the new rendering beside your file.", "you")
                  for path in project.get("hand_merge") or []]
-        staging = (project.get("settings") or {}).get("staging")
-        if staging and not project["settings"].get("deploy_confirmed"):
-            notes.append(paint("Staging deploy is not confirmed yet. Press D for a dry run.", "stone"))
         self.query_one("#project-notes", Static).update(lines(notes) if notes else "")
 
     def on_data_table_row_highlighted(self):
@@ -185,30 +174,6 @@ class ProjectsPane(Pane):
         args = await self.app.push_screen_wait(SettingsDialog(slug, self.projects[slug].get("settings") or {}))
         if args:
             await self.app.apply("project.configure", args, project=slug)
-
-    def action_deploy(self):
-        slug = self.table_key(self.query_one("#projects", DataTable))
-        if slug:
-            self.app.spawn(self._deploy(slug))
-
-    async def _deploy(self, slug):
-        """A dry run first, always shown. Deploying from it is the one confirmation."""
-        dry = await self.app.apply("staging.deploy", {"dry_run": True}, project=slug)
-        if not dry:
-            return
-        commands = "\n".join(dry["result"]["commands"])
-        # The first real deploy is confirmed by the API, whose preview is these commands.
-        # After that a person pressing D is still asked, so D never deploys silently.
-        if self.projects[slug]["settings"].get("deploy_confirmed") and not await self.app.push_screen_wait(
-                ConfirmDialog({"summary": f"Deploy {slug} to staging? This runs:", "consequences": dry["result"]["commands"]})):
-            self.app.notify(f"Dry run only. Nothing was deployed:\n{commands}")
-            return
-        done = await self.app.apply("staging.deploy", {"dry_run": False}, project=slug)
-        if done and done.get("result"):
-            ok = done["result"]["ok"]
-            self.app.notify("Deployed." if ok else "The deploy failed. See the log.", severity="information" if ok else "error")
-            if not ok:
-                await self.app.push_screen_wait(TextDialog(f"Deploy log for {slug}", done["result"]["log"]))
 
     def on_data_table_row_selected(self, event):
         self.app.spawn(self.app.open_project(event.row_key.value))

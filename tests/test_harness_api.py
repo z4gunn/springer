@@ -328,40 +328,14 @@ class ReadsTest(ApiCase):
 
 
 class OperationCatalogTest(ApiCase):
-    def test_project_configure_sets_ci_and_staging(self):
-        out = self.confirmed("project.configure", {"ci_signal": "self-hosted-actions",
-                                                   "staging": {"name": "box", "kind": "static-dir", "source": "site",
-                                                               "path": str(self.root / "served")}})
-        self.assertEqual(out["result"]["settings"]["ci_signal"], "self-hosted-actions")
-        self.assertEqual(self.get("/v1/projects/acme")["settings"]["staging"]["kind"], "static-dir")
-        bad = self.op("project.configure", {"staging": {"name": "x", "kind": "ftp"}})
-        bad = self.op("project.configure", {"staging": {"name": "x", "kind": "ftp"}}, token=bad["confirm_token"], expect=400)
-        self.assertIn("kind", bad["error"]["message"])
-
-    def test_a_deploy_needs_a_dry_run_and_one_confirmation(self):
-        (self.project_path / "site").mkdir()
-        (self.project_path / "site/index.html").write_text("<h1>hi</h1>")
-        served = self.root / "served"
-        self.confirmed("project.configure", {"staging": {"name": "box", "kind": "static-dir", "source": "site",
-                                                         "path": str(served)}})
-        refused = self.op("staging.deploy", {"dry_run": False})
-        refused = self.op("staging.deploy", {"dry_run": False}, token=refused["confirm_token"], expect=409)
-        self.assertIn("dry run first", refused["error"]["message"])
-        dry = self.op("staging.deploy", {"dry_run": True})
-        self.assertEqual(dry["status"], "applied", "a dry run asks nothing")
-        self.assertTrue(dry["result"]["commands"][0].startswith("rsync -a --delete"))
-        self.assertFalse(served.exists(), "a dry run runs nothing")
-        first = self.op("staging.deploy", {"dry_run": False})
-        self.assertEqual(first["status"], "needs_confirmation")
-        self.assertEqual(first["preview"]["consequences"], dry["result"]["commands"], "the confirmation shows the commands")
-        done = self.op("staging.deploy", {"dry_run": False}, token=first["confirm_token"])
-        self.assertTrue(done["result"]["ok"], done)
-        self.assertEqual((served / "index.html").read_text(), "<h1>hi</h1>")
-        again = self.op("staging.deploy", {"dry_run": False})
-        self.assertEqual(again["status"], "applied", "confirmed once per project")
-
     """One test per catalog entry, named in COVERED. See the meta-test below."""
 
+    def test_project_configure_sets_the_ci_signal(self):
+        out = self.confirmed("project.configure", {"ci_signal": "self-hosted-actions"})
+        self.assertEqual(out["result"]["settings"], {"ci_signal": "self-hosted-actions"})
+        self.assertEqual(self.get("/v1/projects/acme")["settings"]["ci_signal"], "self-hosted-actions")
+        bad = self.op("project.configure", {"ci_signal": "jenkins"}, expect=400)
+        self.assertIn("ci_signal", json.dumps(bad))
 
     def run_started(self):
         run_id = self.start()
@@ -706,8 +680,7 @@ class OperationCatalogTest(ApiCase):
 
 COVERAGE = {
     "project.create": "test_project_create_and_archive", "project.archive": "test_project_create_and_archive",
-    "project.configure": "test_project_configure_sets_ci_and_staging",
-    "staging.deploy": "test_a_deploy_needs_a_dry_run_and_one_confirmation",
+    "project.configure": "test_project_configure_sets_the_ci_signal",
     "brief.update_section": "test_brief_update_section_before_start_needs_no_confirmation",
     "brief.update_facts": "test_brief_update_facts_recomputes_the_derived_profile",
     "brief.confirm_section": "test_brief_confirm_section_clears_proposed",

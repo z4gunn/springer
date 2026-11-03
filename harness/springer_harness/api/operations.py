@@ -29,12 +29,6 @@ class Args(BaseModel):
 
 class ProjectConfigure(Args):
     ci_signal: Literal["receipts", "self-hosted-actions", "both"] | None = None
-    staging: dict | None = None
-    clear_staging: bool = False
-
-
-class StagingDeploy(Args):
-    dry_run: bool = True
 
 
 class ProjectCreate(Args):
@@ -196,7 +190,6 @@ class Operation:
     chat: bool = True
     secret_fields: tuple = field(default_factory=tuple)
     status: str = "applied"
-    preview: object = None  # a function of the Context, the lines a confirmation shows
 
 
 # --- handlers ---
@@ -206,45 +199,8 @@ def project_create(c):
 
 
 def project_configure(c):
-    from ..providers.staging import StagingError, validate
-    changes = {}
-    if c.args.ci_signal:
-        changes["ci_signal"] = c.args.ci_signal
-    if c.args.clear_staging:
-        changes.update(staging=None, dry_run_seen=False, deploy_confirmed=False)
-    elif c.args.staging is not None:
-        try:
-            host = validate(c.args.staging)
-        except StagingError as exc:
-            raise InvalidArgs(str(exc))
-        # A changed host is a new deploy, so it is shown and confirmed again.
-        changes.update(staging=host, dry_run_seen=False, deploy_confirmed=False)
+    changes = {"ci_signal": c.args.ci_signal} if c.args.ci_signal else {}
     return {"settings": c.daemon.save_settings(c.project, **changes)}
-
-
-def _deploy_commands(c):
-    from ..providers.staging import describe, plan
-    settings = c.daemon.settings(c.project)
-    if not settings["staging"]:
-        raise IllegalTransition(f"{c.project} has no staging host. Register one first.")
-    return describe(plan(settings["staging"], c.daemon.project_path(c.project)))
-
-
-def staging_deploy(c):
-    settings = c.daemon.settings(c.project)
-    commands = _deploy_commands(c)
-    if c.args.dry_run:
-        c.daemon.save_settings(c.project, dry_run_seen=True)
-        return {"dry_run": True, "commands": commands}
-    if not settings["dry_run_seen"]:
-        raise IllegalTransition("Run a dry run first, so you have seen what the deploy does.")
-    c.daemon.save_settings(c.project, deploy_confirmed=True)
-    ok, log = c.daemon.deploy(c.project)
-    return {"dry_run": False, "ok": ok, "log": log[-4000:]}
-
-
-def _deploy_needs_confirming(c):
-    return not c.args.dry_run and not c.daemon.settings(c.project)["deploy_confirmed"]
 
 
 def project_archive(c):
@@ -287,9 +243,7 @@ def run_start(c):
         if not (c.args.issue or "").strip():
             raise InvalidArgs("A polish run needs the issue, in your own words.")
         return {"run_id": c.daemon.start_run(c.project, "build", lane="polish", issue=c.args.issue.strip())}
-    hosts = c.daemon.home.config().get("staging_hosts", []) + \
-        [h["name"] for h in [c.daemon.settings(c.project)["staging"]] if h]
-    result = critique(front, sections, hosts)
+    result = critique(front, sections)
     if result["errors"]:
         raise CritiqueErrors("The brief has blocking errors.", {"critique": result})
     return {"run_id": c.daemon.start_run(c.project, "build", lane=c.args.lane)}
@@ -408,12 +362,8 @@ CATALOG = {op.type: op for op in [
     Operation("project.create", ProjectCreate, project_create, "Scaffolds or adopts the repository and registers it.",
               scope="none", confirm=True, confirm_rule="yes"),
     Operation("project.configure", ProjectConfigure, project_configure,
-              "Sets the project's CI signal and staging host. A changed host is shown and confirmed again.",
+              "Sets the project's CI signal, the check a PR must pass before the harness merges it.",
               confirm=True, confirm_rule="yes"),
-    Operation("staging.deploy", StagingDeploy, staging_deploy,
-              "A dry run lists the deploy's commands and runs nothing. A real deploy needs a dry run first and is "
-              "confirmed once per project. After that, a merge deploys on its own.",
-              confirm=_deploy_needs_confirming, confirm_rule="the first real deploy", preview=_deploy_commands),
     Operation("project.archive", NoArgs, project_archive, "Hides the project and refuses a new run. Deletes nothing.",
               confirm=True, confirm_rule="yes"),
     Operation("brief.update_section", UpdateSection, update_section,
@@ -521,7 +471,7 @@ class Operations:
                     token = stdlib_secrets.token_urlsafe(24)
                     self.tokens[token] = {"bound": bound, "expires": self.daemon.now() + CONFIRM_SECONDS}
                     return {"op_id": op_id, "type": kind, "status": "needs_confirmation", "confirm_token": token,
-                            "preview": {"summary": op.effect, "consequences": op.preview(ctx) if op.preview else
+                            "preview": {"summary": op.effect, "consequences":
                                         [f"{k}: {v}" for k, v in self._redact(op, raw_args).items()]}}
                 self._spend_token(confirm_token, bound)
             result = op.handler(ctx)

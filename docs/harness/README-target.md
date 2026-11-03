@@ -2,7 +2,7 @@
 
 An AI software team that runs on contracts, not trust. Brief in, product out, five decisions in between.
 
-Springer is a harness and a runtime. The runtime is a library of Claude Code agents and skills that model a product and engineering organization: discovery, product management, architecture, design, development, QA, code review, DevOps, and the cross-cutting specialists for auth, security, compliance, accessibility, performance, and the rest. The harness is a daemon on a machine you own that drives those agents through one opinionated workflow, merges their work when it is safe, deploys it to your staging boxes, and asks you only for the decisions that need a person. You work in a terminal UI. Your main job is writing the brief.
+Springer is a harness and a runtime. The runtime is a library of Claude Code agents and skills that model a product and engineering organization: discovery, product management, architecture, design, development, QA, code review, DevOps, and the cross-cutting specialists for auth, security, compliance, accessibility, performance, and the rest. The harness is a daemon on a machine you own that drives those agents through one opinionated workflow, merges their work when it is safe, and asks you only for the decisions that need a person. You work in a terminal UI. Your main job is writing the brief.
 
 ## Who this is for
 
@@ -28,7 +28,7 @@ Process that fits the product. A landing page does not get the SaaS lifecycle. S
 
 A harness that improves under a budget. Every run ends with a retrospective that lists what it learned and which rules it never used. A repeated mistake adds a check a script can run, not a paragraph of instructions, and the harness is measured by one figure: product checks passed per hundred agent dispatches.
 
-Your tools, your machines. Your coding agent subscription, your source host, your notification channels, your staging boxes. Continuous integration runs on the machine Springer runs on. There is no cloud CI bill and no vendor between you and your code.
+Your tools, your machines. Your coding agent subscription, your source host, your notification channels. Staging stays yours: each project deploys to it the way it already does. Continuous integration runs on the machine Springer runs on. There is no cloud CI bill and no vendor between you and your code.
 
 ## What you do, in order
 
@@ -51,7 +51,7 @@ pipx install springer-harness
 springer onboard
 ```
 
-Onboarding is one guided flow. It asks for your coding agent provider and checks its login, your source host, whether you want a tracker projection, which notification channels to use, your staging hosts, and which optional tools it found. It installs the daemon as a service and opens the TUI.
+Onboarding is one guided flow. It asks for your coding agent provider and checks its login, your source host, whether you want a tracker projection, which notification channels to use, and which optional tools it found. It installs the daemon as a service and opens the TUI.
 
 Optional tools, each detected and used when present: the Playwright CLI for screenshots, the impeccable engine for the design detector, the ui-ux-pro-max catalog for design directions, Maestro for mobile end-to-end tests, Android emulators on a Linux staging box, a Mac on the farm for iOS simulators.
 
@@ -122,7 +122,6 @@ Springer's agents and skills are fixed. What they run on is yours.
 | Source host | GitHub (free tier works, no Actions needed), GitLab, Forgejo |
 | Backlog | Files plus the TUI board, or a one-way projection to Linear, GitHub Projects, or Jira |
 | Notifications | Desktop, Slack, Telegram, Discord, email. Reply with a number to answer a gate |
-| Staging | Docker Compose on your Linux boxes over SSH, Vercel previews, Coolify |
 | Deploy target | Cloud (Vercel, Supabase) or self-hosted (one VPS, Compose, Coolify or Dokploy) |
 | Design tools | Playwright, impeccable, ui-ux-pro-max, Claude Design, Figma |
 

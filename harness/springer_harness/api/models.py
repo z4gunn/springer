@@ -58,7 +58,7 @@ class ProjectSummary(BaseModel):
     adopted: bool = False
     hand_merge: list[str] = []  # renderings under .claude/springer-update/ awaiting a hand merge
     lane: str | None = None
-    settings: dict = {}  # ci_signal, staging, dry_run_seen, deploy_confirmed
+    settings: dict = {}  # ci_signal
     adopted_brief_version: int | None = None  # a build on an adopted project waits for a brief delta
     has_design: bool = False  # docs/design/index.html exists
 

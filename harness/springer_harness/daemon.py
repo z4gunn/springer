@@ -38,7 +38,7 @@ def slugify(name):
 
 
 CI_SIGNALS = ("receipts", "self-hosted-actions", "both")
-SETTINGS_DEFAULT = {"ci_signal": "receipts", "staging": None, "dry_run_seen": False, "deploy_confirmed": False}
+SETTINGS_DEFAULT = {"ci_signal": "receipts"}
 
 
 def _content_of(path):
@@ -107,8 +107,7 @@ class Daemon:
     def _new_engine(self, slug, path, run_id, kind):
         return RunEngine(slug, path, run_id, self.provider, self.planner_factory(slug, run_id, kind), self.source_host,
                          Worktrees(self.home.root, slug, path), self.window, self.owner, self.now,
-                         in_flight_total=self._in_flight_total, settings=lambda: self.settings(slug),
-                         deployer=lambda engine: self.deploy_after_merge(slug, engine))
+                         in_flight_total=self._in_flight_total, settings=lambda: self.settings(slug))
 
     # --- per-project settings ---
 
@@ -119,26 +118,6 @@ class Daemon:
         record = self.home.project(slug)
         self.home.save_project(slug, {**record, "settings": {**self.settings(slug), **changes}})
         return self.settings(slug)
-
-    def deploy(self, slug):
-        from .providers import staging
-        return staging.deploy(self.settings(slug)["staging"], self.project_path(slug))
-
-    def deploy_after_merge(self, slug, engine):
-        """A merge deploys on its own once a person confirmed this project's deploy.
-        Before that it records why it did not, and the TUI says so."""
-        settings = self.settings(slug)
-        if not settings["staging"]:
-            return
-        if not settings["deploy_confirmed"]:
-            engine.ledger.append("deploy_skipped", reason="staging deploy is not confirmed for this project yet")
-            return
-
-        def run():
-            engine.ledger.append("deploy_started", host=settings["staging"]["name"])
-            ok, log = self.deploy(slug)
-            engine.ledger.append("deploy_finished", host=settings["staging"]["name"], ok=ok, log=log[-2000:])
-        threading.Thread(target=run, daemon=True, name=f"deploy-{slug}").start()
 
     def _in_flight_total(self):
         return sum(len(e.units.by_state("running")) for e in self.engines.values())

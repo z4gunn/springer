@@ -189,7 +189,7 @@ def create_app(daemon):
     @app.get("/v1/projects/{slug}/brief/critique", response_model=m.Critique, dependencies=secured)
     def brief_critique(slug: str):
         front, sections = daemon.brief(slug).load()
-        return critique(front, sections, daemon.home.config().get("staging_hosts", []))
+        return critique(front, sections)
 
     @app.get("/v1/projects/{slug}/provisioning", response_model=list[m.ProvisioningItem], dependencies=secured)
     def provisioning(slug: str):

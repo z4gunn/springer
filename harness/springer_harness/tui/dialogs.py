@@ -315,8 +315,7 @@ class FactsDialog(Dialog):
                 with Horizontal(classes="form-row"):
                     yield Label("Live")
                     yield Toggle(bool(facts.get("live")), "yes, people already use it", "no, not yet", id="fact-live")
-                for key, label, hint in (("staging", "Staging host", "a host registered in the harness"),
-                                         ("frameworks", "Compliance", "e.g. gdpr, hipaa"),
+                for key, label, hint in (("frameworks", "Compliance", "e.g. gdpr, hipaa"),
                                          ("reference", "Reference", "a POC or earlier version to match")):
                     value = facts.get(key)
                     value = ", ".join(value) if isinstance(value, list) else (value or "")
@@ -349,8 +348,6 @@ class FactsDialog(Dialog):
             if value is not Select.NULL:
                 facts[key] = value
         facts["live"] = self.query_one("#fact-live", Toggle).value
-        staging = self.query_one("#fact-staging", Input).value.strip()
-        facts["staging"] = staging or None
         facts["frameworks"] = [f.strip() for f in self.query_one("#fact-frameworks", Input).value.split(",") if f.strip()]
         facts["reference"] = self.query_one("#fact-reference", Input).value.strip() or None
         cap = self.query_one("#fact-cap", Input).value.strip()
@@ -374,18 +371,10 @@ class FactsDialog(Dialog):
 
 
 CI_SIGNALS = ("receipts", "self-hosted-actions", "both")
-STAGING_KINDS = ("none", "static-dir", "compose")
-STAGING_FIELDS = (("name", "Host name", "a name for this host"),
-                  ("source", "Built dir", "static-dir: the folder in the repo to copy, e.g. site"),
-                  ("path", "Target path", "static-dir: where it goes on the host"),
-                  ("ssh", "SSH", "user@host, blank for this machine (static-dir)"),
-                  ("dir", "Host dir", "compose: the directory on the host"),
-                  ("compose_file", "Compose file", "compose: default compose.yml"),
-                  ("health_url", "Health URL", "checked after a deploy, optional"))
 
 
 class SettingsDialog(Dialog):
-    """A project's CI signal and staging host. Returns project.configure args."""
+    """A project's CI signal. Returns project.configure args."""
 
     BINDINGS = [Binding("ctrl+s", "save", "Save", priority=True)]
 
@@ -394,7 +383,6 @@ class SettingsDialog(Dialog):
         self.project, self.settings = project, settings
 
     def compose(self) -> ComposeResult:
-        staging = self.settings.get("staging") or {}
         with Vertical(classes="dialog form"):
             yield Static(f"Settings for {self.project}", classes="dialog-title", markup=False)
             with Fields(classes="form-fields"):
@@ -402,14 +390,6 @@ class SettingsDialog(Dialog):
                     yield Label("CI signal")
                     yield Select([(c, c) for c in CI_SIGNALS], id="set-ci", value=self.settings.get("ci_signal", "receipts"),
                                  allow_blank=False, compact=True)
-                with Horizontal(classes="form-row"):
-                    yield Label("Staging")
-                    yield Select([(k, k) for k in STAGING_KINDS], id="set-kind", value=staging.get("kind", "none"),
-                                 allow_blank=False, compact=True)
-                for key, label, hint in STAGING_FIELDS:
-                    with Horizontal(classes="form-row"):
-                        yield Label(label)
-                        yield Input(str(staging.get(key, "")), id=f"set-{key}", placeholder=hint, compact=True)
             yield Static("", id="form-error", markup=False)
             yield Static(keys(("tab", "next"), ("ctrl+s", "save"), ("esc", "cancel")), classes="hint")
 
@@ -419,15 +399,6 @@ class SettingsDialog(Dialog):
 
     def action_save(self):
         args = {"ci_signal": self.query_one("#set-ci", Select).value}
-        kind = self.query_one("#set-kind", Select).value
-        if kind == "none":
-            args["clear_staging"] = True
-        else:
-            host = {"kind": kind, **{key: self.query_one(f"#set-{key}", Input).value.strip()
-                                    for key, _, _ in STAGING_FIELDS}}
-            host = {k: v for k, v in host.items() if v}
-            if host != {**{k: v for k, v in (self.settings.get("staging") or {}).items() if v}}:
-                args["staging"] = host
         self.dismiss(args)
 
 

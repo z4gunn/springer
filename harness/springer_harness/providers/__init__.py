@@ -1,1 +1,1 @@
-"""Coding agent, source host, backlog, channel, staging, and memory contracts."""
+"""Coding agent, source host, backlog, channel, and memory contracts."""

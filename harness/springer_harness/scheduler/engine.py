@@ -56,7 +56,7 @@ def overlaps(paths_a, paths_b):
 
 class RunEngine:
     def __init__(self, project_slug, project_path, run_id, provider, planner, source_host, worktrees, window, owner,
-                 now, in_flight_total=None, settings=None, deployer=None):
+                 now, in_flight_total=None, settings=None):
         self.project_slug = project_slug
         self.project_path = Path(project_path)
         self.run_id = run_id
@@ -77,8 +77,7 @@ class RunEngine:
         self.lock = RunLock(self.run_dir, owner, now)
         self.handles = {}
         self.keys = self._load_keys()
-        self.settings = settings or (lambda: {"ci_signal": "receipts", "staging": None})
-        self.deployer = deployer
+        self.settings = settings or (lambda: {"ci_signal": "receipts"})
 
     # --- helpers ---
 
@@ -412,8 +411,6 @@ class RunEngine:
         sha = self.source_host.merge(self.project_slug, number)
         self.ledger.append("merge", unit_id=unit_id, pr=number, sha=sha)
         self.units.transition(unit_id, "done", f"merged at {level}", merge={"sha": sha, "at": iso(self.now())})
-        if self.deployer:
-            self.deployer(self)
         if level == "L1":
             self.gates.open("routine-decision", "L1", [], f"{unit_id} merged at L1", [
                 {"option": "viewed", "consequence": "Closes this entry."}], artifact_ref=f"PR-{number}", digest=True)

@@ -222,30 +222,16 @@ class ProjectsScreenTest(TuiCase):
             await self.see(pilot, "Fresh")
         self.assertTrue((self.root / "apps" / "fresh" / ".claude").is_dir())
 
-    async def test_settings_and_a_dry_run_before_the_first_deploy(self):
-        (self.project / "site").mkdir()
-        (self.project / "site/index.html").write_text("hi")
-        served = self.root / "served"
+    async def test_settings_set_the_ci_signal(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.see(pilot, "Acme", "receipts")
             await pilot.press("e")
             await self.dialog(pilot, SettingsDialog)
             self.app.screen.query_one("#set-ci", Select).value = "both"
-            self.app.screen.query_one("#set-kind", Select).value = "static-dir"
-            for key, value in (("name", "box"), ("source", "site"), ("path", str(served))):
-                self.app.screen.query_one(f"#set-{key}", Input).value = value
             await pilot.press("ctrl+s")
             await self.dialog(pilot, ConfirmDialog)
             await pilot.press("y")
-            await self.see(pilot, "both", "box static-dir (unconfirmed)", "Press D for a dry run")
-            await pilot.press("D")
-            await self.dialog(pilot, ConfirmDialog)
-            await self.see(pilot, "rsync -a --delete")
-            self.assertFalse(served.exists(), "nothing runs before the confirmation")
-            await pilot.press("y")
-            await self.until(pilot, lambda: (served / "index.html").exists())
-            await self.see(pilot, "box static-dir")
-            self.assertNotIn("(unconfirmed)", self.text())
+            await self.see(pilot, "both")
 
     async def test_new_open_archive(self):
         target = self.root / "fresh"
@@ -1091,8 +1077,8 @@ COVERAGE = {
     ("Projects", "Design page serves an existing docs/design/index.html"):
         (AdoptedProjectTest, "test_the_design_page_serves_the_existing_mockups"),
     ("Projects", "Runs list with imported history"): (AdoptedProjectTest, "test_the_runs_list_shows_imported_history"),
-    ("Projects", "CI signal and staging, a dry run before the one deploy confirmation"):
-        (ProjectsScreenTest, "test_settings_and_a_dry_run_before_the_first_deploy"),
+    ("Projects", "CI signal per project"):
+        (ProjectsScreenTest, "test_settings_set_the_ci_signal"),
     ("Brief", "Editor, facts panel, derived profile"): (BriefScreenTest, "test_editor_facts_panel_and_derived_profile"),
     ("Brief", "Critique"): (BriefScreenTest, "test_critique"),
     ("Brief", "Every section as fields"): (BriefScreenTest, "test_core_flows_and_users_as_fields"),

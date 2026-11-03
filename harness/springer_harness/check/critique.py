@@ -27,7 +27,7 @@ def parse_users(text):
     return {n.strip().lower() for n in names}
 
 
-def critique(front, sections, staging_hosts=()):
+def critique(front, sections):
     errors, warnings, info = [], [], []
 
     def add(bucket, rule, section, message):
@@ -65,8 +65,6 @@ def critique(front, sections, staging_hosts=()):
     pinned = front.get("pinned") or {}
     for key in sorted(set(pinned) - PINNED_IDS):
         add(errors, "unknown-pinned-key", "Facts", f"{key} is not a pinned decision id.")
-    if front.get("staging") and front["staging"] not in staging_hosts:
-        add(errors, "unregistered-staging-host", "Facts", f"{front['staging']} is not registered in the harness.")
     if not sections.get("Non-goals"):
         add(warnings, "no-non-goals", "Non-goals", "Name what the first version will not build.")
     if not sections.get("Success criteria"):
