@@ -355,6 +355,18 @@ class MergePolicyTest(EngineCase):
         del self.host.merge_errors[1]
         self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
 
+    def test_on_the_local_host_the_harness_opens_the_change(self):
+        opened = []
+        self.host.name, self.host.noun = "local", "change"
+        self.host.open = lambda project, branch, base, title="": opened.append((branch, base)) or 7
+        self.provider.script["risky"][0] = Attempt(result=pr_result(None, touched=("packages/auth/session.ts",)))
+        engine = self.engine([batch(unit("a", agent="risky"))])
+        self.tick_until(engine, lambda: engine.gates.open_gates())
+        self.assertEqual(opened, [("unit/U-0001", "main")])
+        self.assertEqual(engine.units.state("U-0001")["pr"]["number"], 7)
+        self.assertEqual(engine.gates.open_gates()[0]["content"]["decision_prompt"], "Merge change 7 for U-0001?")
+        self.assertEqual(self.provider.spawned[0].env["SPRINGER_SOURCE_HOST"], "local")
+
     def test_l1_merges_alone_and_leaves_a_digest_entry_that_holds_nothing(self):
         engine = self.engine([batch(unit("a", agent="notable"))])
         self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")

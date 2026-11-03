@@ -371,10 +371,11 @@ class FactsDialog(Dialog):
 
 
 CI_SIGNALS = ("receipts", "self-hosted-actions", "both")
+SOURCE_HOSTS = (("local", "local merges"), ("github", "GitHub pull requests"))
 
 
 class SettingsDialog(Dialog):
-    """A project's CI signal. Returns project.configure args."""
+    """A project's source host and CI signal. Returns project.configure args."""
 
     BINDINGS = [Binding("ctrl+s", "save", "Save", priority=True)]
 
@@ -387,6 +388,10 @@ class SettingsDialog(Dialog):
             yield Static(f"Settings for {self.project}", classes="dialog-title", markup=False)
             with Fields(classes="form-fields"):
                 with Horizontal(classes="form-row"):
+                    yield Label("Source host")
+                    yield Select([(label, value) for value, label in SOURCE_HOSTS], id="set-host",
+                                 value=self.settings.get("source_host", "local"), allow_blank=False, compact=True)
+                with Horizontal(classes="form-row"):
                     yield Label("CI signal")
                     yield Select([(c, c) for c in CI_SIGNALS], id="set-ci", value=self.settings.get("ci_signal", "receipts"),
                                  allow_blank=False, compact=True)
@@ -398,8 +403,11 @@ class SettingsDialog(Dialog):
         self.focus_next()
 
     def action_save(self):
-        args = {"ci_signal": self.query_one("#set-ci", Select).value}
-        self.dismiss(args)
+        host, ci = self.query_one("#set-host", Select).value, self.query_one("#set-ci", Select).value
+        if host == "local" and ci != "receipts":
+            self.query_one("#form-error", Static).update("GitHub Actions as the CI signal needs the github source host.")
+            return
+        self.dismiss({"source_host": host, "ci_signal": ci})
 
 
 def _clip(text, width):

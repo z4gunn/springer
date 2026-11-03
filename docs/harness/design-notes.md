@@ -29,7 +29,7 @@ This document records the design of an opinionated, near-autonomous software dev
 | Target surfaces | Web only, mobile only (Expo), or both |
 | Stack | TypeScript monorepo, Next.js for web, Expo and Expo Router for mobile, shared packages/ui |
 | Deployment profiles | Cloud (Vercel, Supabase) or self-hosted (one VPS, Docker Compose, Coolify or Dokploy). No Kubernetes |
-| CI | Local, on the orchestrator machine, receipts as the evidence. GitHub free tier as remote, no Actions |
+| CI | Local, on the orchestrator machine, receipts as the evidence. Merges are local by default. GitHub pull requests and Actions are a per-project opt-in |
 | Staging | Owned by each project, not the harness. Projects stage differently (one runs across three machines), so the harness registers no host and runs no deploy. A project that wants a staging deploy wires it into its own CI or scripts |
 | Cost and auth | v1 runs on Claude Code subscription session auth, not an API key. The daemon budgets against the plan's usage windows, sleeps through a limit to the reset, and shows window usage and list-price equivalent spend in the TUI. An API-key path with a dollar cap is kept as a switch for later |
 | Build order | The orchestrator state model is designed first, because it is the one thing expensive to change later. Done, see springer-state-model.md. Then Phase 0, the harness walking skeleton. Task templates and the risk rules file are written the day they are needed |
@@ -402,7 +402,7 @@ Gate notifications go to channels with numbered options. Replying with a number 
 | Slot | v1 implementation | Later | Contract |
 |------|-------------------|-------|----------|
 | Coding agent | Claude Code (Agent SDK), plus a mock provider for tests | Codex, Gemini CLI, OpenCode as reviewers through an adapter, builder parity later | spawn(role, brief, allowlist, mcp) returns an event stream, result, cost, usage |
-| Source host | GitHub | GitLab, Forgejo | create repo, open PR, post status, merge, retarget stacked branches |
+| Source host | Local (the default) and GitHub | GitLab, Forgejo | open a change or PR, merge, retarget stacked branches, report mergeability |
 | Backlog | Files in the repo plus the TUI board (the default, not a fallback) | Linear, GitHub Projects, Jira as one-way projections | project stories and states one way |
 | Channel | Desktop notification, Slack | Telegram, Discord, email, iMessage | notify(event, payload), answer a gate by reply |
 | Design tools | Playwright, impeccable, ui-ux-pro-max detected | Claude Design, Figma MCP | wired into the design skills when present |

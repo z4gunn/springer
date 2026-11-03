@@ -266,7 +266,7 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 | Type | Args | Confirm | Effect |
 |------|------|---------|--------|
 | project.create | `name`, `path` (absolute or starting with `~`), `mode` (new, adopt) | Yes | Scaffolds or adopts the repository and registers it. A client resolves a relative path against its own directory before sending it |
-| project.configure | `ci_signal` (receipts, self-hosted-actions, both) | Yes | Sets the project's CI signal. Check requires receipts only when the signal includes them, and a merge waits for green Actions checks only when it includes them. Staging is the project's own, so the harness registers no host and runs no deploy |
+| project.configure | `source_host` (local, github), `ci_signal` (receipts, self-hosted-actions, both) | Yes | Sets the project's source host and CI signal. A project is local until it opts in: the harness opens a numbered change for each unit, merges it into the project checkout with a merge commit, and pushes the default branch when the project has an origin. The github host opens a pull request per unit and squash-merges it through gh. An Actions signal requires the github host, and the host cannot change while a run is in progress. Check requires receipts only when the signal includes them, and a merge waits for green Actions checks only when it includes them. Staging is the project's own, so the harness registers no host and runs no deploy |
 | project.archive | none | Yes | Hides the project and refuses a new run. Deletes nothing |
 | brief.update_section | `section`, `body`, `base_version` | After start | Writes the section and marks it confirmed. After `run.start` it opens a scope-change gate |
 | brief.update_facts | `facts`, `base_version` | After start | Writes the frontmatter and recomputes `derived`. After `run.start` it opens a scope-change gate |
@@ -309,7 +309,7 @@ This section is used to check the contract against what the target README promis
 |--------|---------|-----------|
 | Projects | List with status | GET /v1/projects, daemon stream |
 | Projects | New, open, archive | project.create, project.archive |
-| Projects | CI signal per project | project.configure |
+| Projects | Source host and CI signal per project | project.configure |
 | Projects | Adopt an existing instance: derived facts, proposed sections, edited files, the CLAUDE.md merge | GET /v1/adopt/preview, project.create |
 | Projects | Start on an adopted project: polish with an issue, or build a delta | run.start with lane and issue |
 | Projects | Design page serves an existing docs/design/index.html | GET design-session |

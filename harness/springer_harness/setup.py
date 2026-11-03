@@ -80,11 +80,14 @@ def check_claude(binary="claude"):
 
 
 def check_github():
+    """Optional: only a project switched to the github source host needs gh."""
     if not shutil.which("gh"):
-        return [Finding("gh", False, "The GitHub CLI is not on PATH.", fix="Install it: brew install gh")]
+        return [Finding("gh", False, "The GitHub CLI is not on PATH. Only a project using GitHub pull requests "
+                        "needs it.", fix="Install it: brew install gh", required=False)]
     status = _run(["gh", "auth", "status"])
     if status.returncode:
-        return [Finding("gh login", False, "gh is not logged in.", fix="Run: gh auth login")]
+        return [Finding("gh login", False, "gh is not logged in. Only a project using GitHub pull requests needs it.",
+                        fix="Run: gh auth login", required=False)]
     account = next((line.split("account", 1)[1].split()[0] for line in (status.stdout + status.stderr).splitlines()
                     if "Logged in to" in line and "account" in line), "an account")
     return [Finding("gh login", True, f"logged in as {account}")]

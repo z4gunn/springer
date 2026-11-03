@@ -265,7 +265,7 @@ def create_app(daemon):
         state = daemon.engine(slug, run_id).units.state(unit_id)
         if not state["pr"]:
             raise NotFound(f"{unit_id} has no PR")
-        return PlainTextResponse(daemon.source_host.diff(slug, state["pr"]["number"]), media_type="text/x-diff")
+        return PlainTextResponse(daemon.host_for(slug).diff(slug, state["pr"]["number"]), media_type="text/x-diff")
 
     @app.get(run_path + "/gates", response_model=m.Page, dependencies=secured)
     def gates(slug: str, run_id: str, state: str | None = Query(None, pattern="^(open|answered)$"),

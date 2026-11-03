@@ -48,6 +48,14 @@ READ_ONLY = ("Bash(ls:*)", "Bash(cat:*)", "Bash(head:*)", "Bash(tail:*)", "Bash(
              "Bash(git ls-files:*)", "Bash(git branch --show-current:*)")
 TIERS = {"haiku": "haiku", "sonnet": "sonnet", "opus": "opus"}
 PREAMBLE = Path(".claude/skills/spgr-run-harness/assets/dispatch-preamble.md")
+# How a pull request outcome is opened, by the project's source host.
+PR_STEPS = {
+    "github": "When the outcome is a pull request, push this branch and open the PR against {base} with "
+              "spgr-create-pr, then put its number in result.json.",
+    "local": "When the outcome is a pull request, leave your commits on this branch. Do not push and do not "
+             "open a PR: the harness opens a local change against {base}, reviews it, and merges it. Put the "
+             "branch and base in result.json with no number.",
+}
 # What every session leaves for Check, in the session directory the brief names.
 OUTPUT_CONTRACT = """
 ## Where your result goes
@@ -57,7 +65,8 @@ session directory {session_dir}:
 
 - result.json, one object:
   {{"status": "pass" or "fail", "outcome": "artifact", "pr", or "review",
-    "pr": {{"number": <int>, "branch": "<branch>", "base": "<base>"}} (only when outcome is pr),
+    "pr": {{"number": <int>, "branch": "<branch>", "base": "<base>"}} (only when outcome is pr,
+    and number only when you opened a GitHub PR),
     "touched_paths": ["<repo-relative path>", ...],
     "failure_class": "defect" | "blocked" | "environment" | "context" | "question" (only on fail),
     "detail": "<one line>"}}
@@ -75,9 +84,7 @@ Use {session_dir} as the unit directory for receipt.py. Write run artifacts to
 runs/ in your worktree. Write and amend your artifacts there, including a decision-log
 line on an ADR. Never edit a cycle (CYCLE-), gate (G-), or escalation (E-) record, which
 only the harness writes. Commit everything else
-(docs/, source, tests) on the branch you are on ({branch}). When the
-outcome is a pull request, push this branch and open the PR against {base} with
-spgr-create-pr, then put its number in result.json.
+(docs/, source, tests) on the branch you are on ({branch}). {pr_step}
 
 If you need a person to decide something, do not ask in text: write gate-request.json
 to the session directory as spgr-notify-human describes, set status "pass" with
@@ -289,7 +296,9 @@ class ClaudeCodeProvider:
                                           run_dir=Path(env.get("SPRINGER_PROJECT_DIR", ".")) / "runs" /
                                           env.get("SPRINGER_RUN_ID", ""),
                                           branch=env.get("SPRINGER_BRANCH", f"unit/{request.unit_id}"),
-                                          base=env.get("SPRINGER_BASE", "main"))
+                                          base=env.get("SPRINGER_BASE", "main"),
+                                          pr_step=PR_STEPS.get(env.get("SPRINGER_SOURCE_HOST"), PR_STEPS["github"])
+                                          .format(base=env.get("SPRINGER_BASE", "main")))
         brief_path.write_text(request.brief.rstrip() + "\n" + contract)
         preamble_file = Path(request.cwd) / PREAMBLE
         preamble = preamble_file.read_text() if preamble_file.exists() else "Your brief:\n"

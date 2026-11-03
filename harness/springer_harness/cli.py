@@ -120,8 +120,9 @@ def build_daemon(home):
         from .providers.mock import MockProvider, MockSourceHost
         from .providers.mock_scenario import demo_planner_factory, demo_script
 
-        return Daemon(home, MockProvider(demo_script()), MockSourceHost(), demo_planner_factory(), KeyringSecrets(),
-                      time.time)
+        host = MockSourceHost()
+        return Daemon(home, MockProvider(demo_script()), host, demo_planner_factory(), KeyringSecrets(),
+                      time.time, local_host=host)
     from .providers.claude_code import ClaudeCodeProvider
     from .providers.github import GitHubSourceHost
     from .scheduler.orchestrator import orchestrator_factory

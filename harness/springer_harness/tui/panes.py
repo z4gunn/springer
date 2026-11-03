@@ -51,6 +51,14 @@ def status_of(project):
     return paint("● running", "success")
 
 
+def host_of(settings):
+    """local, github, or github with the Actions signal it waits on."""
+    host, ci = settings.get("source_host", "local"), settings.get("ci_signal", "receipts")
+    if host != "github" or ci == "receipts":
+        return host
+    return "github+actions" if ci == "self-hosted-actions" else "github+both"
+
+
 def _clip(text, width):
     flat = " ".join(text.split())
     return flat if len(flat) <= width else flat[:width - 1] + "…"
@@ -138,7 +146,7 @@ class ProjectsPane(Pane):
                           ("o", "design"), ("l", "runs"), ("x", "archive")), classes="hint")
 
     def on_mount(self):
-        self.query_one("#projects", DataTable).add_columns("NAME", "PROFILE", "PHASE", "GATES", "CI", "STATUS")
+        self.query_one("#projects", DataTable).add_columns("NAME", "PROFILE", "PHASE", "GATES", "HOST", "STATUS")
 
     async def load(self):
         projects = await self.client.get("/v1/projects")
@@ -149,7 +157,7 @@ class ProjectsPane(Pane):
             rows.append((project["slug"], (paint(project["name"], bold=True), paint(project["profile"] or "-", "dim"),
                                            paint(run["phase"] if run else "-", "stone"),
                                            str(run["open_gates"]) if run else "0",
-                                           paint(project.get("settings", {}).get("ci_signal", "receipts"), "dim"),
+                                           paint(host_of(project.get("settings", {})), "dim"),
                                            status_of(project))))
         self.fill(self.query_one("#projects", DataTable), rows)
         self._show_notes()
@@ -715,7 +723,7 @@ class BacklogPane(Pane):
                 for story in feature["stories"]:
                     pr = story.get("pr") or {}
                     deps = ", ".join(story.get("depends_on", []))
-                    note = " ".join(x for x in (f"PR #{pr['number']}" if pr else "", f"needs {deps}" if deps else "") if x)
+                    note = " ".join(x for x in (f"change #{pr['number']}" if pr else "", f"needs {deps}" if deps else "") if x)
                     column, risk = story.get("column") or "", story.get("risk") or ""
                     rows.append((f"story:{story['story_id']}",
                                  (join(paint(f"      {story['story_id']} ", "dim"), story["title"]),

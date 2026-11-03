@@ -373,6 +373,80 @@ class RestackTest(unittest.TestCase):
         self.assertEqual([p.name for p in self.trees.root.iterdir() if p.name.startswith("_restack")], [])
 
 
+class LocalHostTest(unittest.TestCase):
+    """The default source host: changes merge in the project checkout, then main is pushed."""
+
+    ENV = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.project = git_project(self.root / "acme")
+        from springer_harness.providers.local import LocalSourceHost
+        from springer_harness.scheduler.worktrees import Worktrees
+        self.host = LocalSourceHost(lambda slug: self.project, self.root / "home" / "changes")
+        self.trees = Worktrees(self.root / "home", "acme", self.project)
+
+    def git(self, cwd, *args):
+        return subprocess.run(["git", "-C", str(cwd), *self.ENV, *args], capture_output=True, text=True)
+
+    def unit(self, unit_id, files, base="main"):
+        path, branch = self.trees.claim(unit_id, base)
+        for rel, text in files.items():
+            (path / rel).write_text(text)
+        self.git(path, "add", "-A")
+        self.git(path, "commit", "-qm", f"{unit_id} work")
+        return branch
+
+    def test_a_change_merges_with_a_merge_commit_and_main_is_pushed(self):
+        remote = self.root / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+        self.git(self.project, "remote", "add", "origin", str(remote))
+        branch = self.unit("U-0001", {"app.ts": "one"})
+        number = self.host.open("acme", branch, "main", "the counter")
+        self.assertEqual(self.host.open("acme", branch, "main"), number, "a retry reuses its change")
+        self.assertIn("app.ts", self.host.diff("acme", number))
+        self.assertEqual(self.host.mergeable("acme", number), "mergeable")
+        sha = self.host.merge("acme", number)
+        self.assertEqual(self.host.pr_state("acme", number), "merged")
+        parents = self.git(self.project, "rev-list", "--parents", "-n", "1", sha).stdout.split()
+        self.assertEqual(len(parents), 3, "a merge commit has two parents")
+        self.assertEqual(self.git(remote, "rev-parse", "main").stdout.strip(), sha)
+
+    def test_a_stacked_change_merges_after_its_parent_with_no_restack(self):
+        parent = self.unit("U-0001", {"f.txt": "A\nb\n"})
+        child = self.unit("U-0002", {"f.txt": "A\nB\n"}, base=parent)
+        first, second = self.host.open("acme", parent, "main"), self.host.open("acme", child, parent)
+        self.host.merge("acme", first)
+        self.host.retarget("acme", second, "main")
+        self.assertEqual(self.host.mergeable("acme", second), "mergeable")
+        self.host.merge("acme", second)
+        self.assertEqual((self.project / "f.txt").read_text(), "A\nB\n")
+
+    def test_a_conflict_or_a_dirty_checkout_is_refused_and_leaves_main_alone(self):
+        from springer_harness.providers.local import LocalMergeError
+        branch = self.unit("U-0001", {"f.txt": "unit"})
+        (self.project / "f.txt").write_text("main")
+        self.git(self.project, "add", "-A")
+        self.git(self.project, "commit", "-qm", "main moved")
+        number = self.host.open("acme", branch, "main")
+        self.assertEqual(self.host.mergeable("acme", number), "conflicting")
+        before = self.git(self.project, "rev-parse", "HEAD").stdout
+        with self.assertRaises(LocalMergeError):
+            self.host.merge("acme", number)
+        self.assertEqual(self.git(self.project, "rev-parse", "HEAD").stdout, before)
+        self.assertEqual(self.git(self.project, "status", "--porcelain").stdout, "")
+        (self.project / "notes.md").write_text("a person's edit")
+        with self.assertRaisesRegex(LocalMergeError, "uncommitted"):
+            self.host.merge("acme", number)
+
+    def test_the_session_contract_follows_the_source_host(self):
+        from springer_harness.providers.claude_code import PR_STEPS
+        self.assertIn("Do not push", PR_STEPS["local"])
+        self.assertIn("spgr-create-pr", PR_STEPS["github"])
+
+
 class GitHubTest(FakeBinCase):
     def test_merge_reads_the_sha_and_retarget_and_state_go_through_gh(self):
         project = git_project(self.root / "acme")

@@ -44,7 +44,7 @@ Everything between those points is observation. The run screen shows what is in 
 
 ## Install
 
-Springer runs on an always-on machine: a Mac mini, a NUC, or one of your Linux boxes. It needs Python 3.12, Node 22, pnpm, git, Docker, the GitHub CLI logged in, and Claude Code logged in with your subscription.
+Springer runs on an always-on machine: a Mac mini, a NUC, or one of your Linux boxes. It needs Python 3.12, Node 22, pnpm, git, Docker, and Claude Code logged in with your subscription. The GitHub CLI, logged in, is needed only for a project you switch to GitHub pull requests.
 
 ```bash
 pipx install springer-harness
@@ -119,7 +119,7 @@ Springer's agents and skills are fixed. What they run on is yours.
 | Slot | Choices |
 |------|---------|
 | Coding agent | Claude Code on your subscription. Other agents can be added as reviewers |
-| Source host | GitHub (free tier works, no Actions needed), GitLab, Forgejo |
+| Source host | Local merges (the default), GitHub (free tier works, Actions optional), GitLab, Forgejo |
 | Backlog | Files plus the TUI board, or a one-way projection to Linear, GitHub Projects, or Jira |
 | Notifications | Desktop, Slack, Telegram, Discord, email. Reply with a number to answer a gate |
 | Deploy target | Cloud (Vercel, Supabase) or self-hosted (one VPS, Compose, Coolify or Dokploy) |

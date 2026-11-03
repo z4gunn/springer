@@ -271,11 +271,22 @@ class RunEngine:
         write_json(self.units.unit_dir(unit_id) / "risk.json",
                    {"level": level, "triggers": triggers(result.touched_paths), "findings": list(result.findings)})
         if result.outcome == "pr" and result.pr:
-            self.units.transition(unit_id, "gated", f"PR open, risk {level}", pr=result.pr)
+            pr = self._opened(unit_id, result.pr)
+            self.units.transition(unit_id, "gated", f"PR open, risk {level}", pr=pr)
         else:
             self._integrate(unit_id)
             self.units.transition(unit_id, "done", "artifact confirmed")
         self._release(unit_id)
+
+    def _opened(self, unit_id, pr):
+        """On GitHub the session opened the PR and reports its number. On the local host
+        the harness opens the change, and a retry reuses the change its branch has."""
+        if pr.get("number") is not None or not hasattr(self.source_host, "open"):
+            return pr
+        base = pr.get("base") or self._base_for(unit_id)
+        number = self.source_host.open(self.project_slug, pr.get("branch") or f"unit/{unit_id}", base,
+                                       self._spec(unit_id)["expected_outcome"][:120])
+        return {"number": number, "branch": pr.get("branch") or f"unit/{unit_id}", "base": base}
 
     def _result(self, unit_id, state, session_dir):
         """A real provider's session gets the mechanical Check. The mock writes the
@@ -502,7 +513,8 @@ class RunEngine:
                    "triggers": risk.get("triggers", []),
                    "builder_response": response.read_text() if response.exists() else "",
                    "unit_id": unit_id, "design_session": False, "review": risk.get("review")}
-        self.gates.open("pr-merge", level, [unit_id], f"Merge PR {state['pr']['number']} for {unit_id}?",
+        noun = getattr(self.source_host, "noun", "PR")
+        self.gates.open("pr-merge", level, [unit_id], f"Merge {noun} {state['pr']['number']} for {unit_id}?",
                         MERGE_OPTIONS, artifact_ref=f"PR-{state['pr']['number']}", context=context)
 
     def _merge(self, unit_id, state, level):
@@ -526,7 +538,7 @@ class RunEngine:
         for other in self.units.by_state("gated", "checking", "running", "retry", "redispatch"):
             if other.get("pr") and other["pr"].get("base") == state["pr"]["branch"]:
                 base = self.worktrees.default_branch()
-                if other["state"] == "gated":
+                if other["state"] == "gated" and getattr(self.source_host, "squashes", True):
                     self._restack(other["unit_id"], other)
                 self.source_host.retarget(self.project_slug, other["pr"]["number"], base)
                 self.units.save({**other, "pr": {**other["pr"], "base": base}})
@@ -555,7 +567,7 @@ class RunEngine:
         mergeable = getattr(self.source_host, "mergeable", lambda *_: "unknown")(self.project_slug, number)
         if mergeable == "unknown":
             return
-        if mergeable == "conflicting" and self._restack(unit_id, state):
+        if mergeable == "conflicting" and getattr(self.source_host, "squashes", True) and self._restack(unit_id, state):
             return
         detail = detail[-300:]
         self.ledger.append("merge_failed", unit_id=unit_id, pr=number, detail=detail)
@@ -762,7 +774,8 @@ class RunEngine:
                                cwd=self.worktrees.path(unit_id), session_dir=store.dir(session_id),
                                env={"SPRINGER_PROJECT_DIR": str(self.project_path), "SPRINGER_RUN_ID": self.run_id,
                                     "SPRINGER_SESSION_DIR": str(store.dir(session_id)),
-                                    "SPRINGER_BRANCH": f"unit/{unit_id}", "SPRINGER_BASE": self._base_for(unit_id)})
+                                    "SPRINGER_BRANCH": f"unit/{unit_id}", "SPRINGER_BASE": self._base_for(unit_id),
+                                    "SPRINGER_SOURCE_HOST": getattr(self.source_host, "name", "github")})
         handle = self.provider.spawn(request)
         self.handles[(unit_id, session_id)] = handle
         store.create(self.provider.name, handle.model, tier, handle.pid, handle.provider_session_id, session_id)

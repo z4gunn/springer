@@ -70,7 +70,7 @@ class TuiCase(unittest.IsolatedAsyncioTestCase):
         self.host = MockSourceHost()
         self.secrets = MemorySecrets()
         self.daemon = Daemon(self.root / "home", MockProvider(demo_script()), self.host, demo_planner_factory(),
-                             self.secrets, time.time)
+                             self.secrets, time.time, local_host=self.host)
         self.api = create_app(self.daemon)
         self.api.state.heartbeat_seconds = 0.5
         self.port = free_port()
@@ -231,7 +231,7 @@ class ProjectsScreenTest(TuiCase):
                 await asyncio.sleep(1.5)
                 return await real(*args, **kwargs)
             self.app.client.op = slow
-            task = asyncio.ensure_future(self.app.apply("project.configure", {"ci_signal": "both"}, project="acme",
+            task = asyncio.ensure_future(self.app.apply("project.configure", {"ci_signal": "receipts"}, project="acme",
                                                         busy="Saving the settings.", reviewed=True))
             await self.see(pilot, "Saving the settings.")
             await task
@@ -239,14 +239,17 @@ class ProjectsScreenTest(TuiCase):
 
     async def test_settings_set_the_ci_signal(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
-            await self.see(pilot, "Acme", "receipts")
+            await self.see(pilot, "Acme", "local")
             await pilot.press("e")
             await self.dialog(pilot, SettingsDialog)
             self.app.screen.query_one("#set-ci", Select).value = "both"
             await pilot.press("ctrl+s")
+            await self.see(pilot, "needs the github source host")
+            self.app.screen.query_one("#set-host", Select).value = "github"
+            await pilot.press("ctrl+s")
             await self.dialog(pilot, ConfirmDialog)
             await pilot.press("y")
-            await self.see(pilot, "both")
+            await self.see(pilot, "github+both")
 
     async def test_new_open_archive(self):
         target = self.root / "fresh"
@@ -656,7 +659,7 @@ class BacklogScreenTest(TuiCase):
     async def test_tree_board_graph_mvp_line_and_risk(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.backlog_screen(pilot)
-            screen = await self.see(pilot, "E-1 Invoice  critical", "S-1 Draft [wip]", "PR #7", "needs S-1", "unknowns: 1")
+            screen = await self.see(pilot, "E-1 Invoice  critical", "S-1 Draft [wip]", "change #7", "needs S-1", "unknowns: 1")
             story = next(line for line in screen.splitlines() if "S-2 Send" in line)
             feature = next(line for line in screen.splitlines() if "F-1 Editor" in line)
             self.assertGreater(story.index("S-2"), feature.index("F-1"), "the tree shows its hierarchy")
@@ -1106,7 +1109,7 @@ COVERAGE = {
     ("Projects", "Design page serves an existing docs/design/index.html"):
         (AdoptedProjectTest, "test_the_design_page_serves_the_existing_mockups"),
     ("Projects", "Runs list with imported history"): (AdoptedProjectTest, "test_the_runs_list_shows_imported_history"),
-    ("Projects", "CI signal per project"):
+    ("Projects", "Source host and CI signal per project"):
         (ProjectsScreenTest, "test_settings_set_the_ci_signal"),
     ("Brief", "Editor, facts panel, derived profile"): (BriefScreenTest, "test_editor_facts_panel_and_derived_profile"),
     ("Brief", "Critique"): (BriefScreenTest, "test_critique"),

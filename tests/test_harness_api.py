@@ -64,7 +64,7 @@ class ApiCase(unittest.TestCase):
         self.host = MockSourceHost()
         self.secrets = MemorySecrets()
         self.daemon = Daemon(self.root / "home", MockProvider(demo_script()), self.host, demo_planner_factory(),
-                             self.secrets, self.clock)
+                             self.secrets, self.clock, local_host=self.host)
         self.app = create_app(self.daemon)
         self.token = self.daemon.home.token()
         self.client = TestClient(self.app, base_url="http://127.0.0.1", raise_server_exceptions=False,
@@ -333,11 +333,30 @@ class OperationCatalogTest(ApiCase):
     """One test per catalog entry, named in COVERED. See the meta-test below."""
 
     def test_project_configure_sets_the_ci_signal(self):
-        out = self.confirmed("project.configure", {"ci_signal": "self-hosted-actions"})
-        self.assertEqual(out["result"]["settings"], {"ci_signal": "self-hosted-actions"})
+        out = self.confirmed("project.configure", {"source_host": "github", "ci_signal": "self-hosted-actions"})
+        self.assertEqual(out["result"]["settings"], {"ci_signal": "self-hosted-actions", "source_host": "github"})
         self.assertEqual(self.get("/v1/projects/acme")["settings"]["ci_signal"], "self-hosted-actions")
         bad = self.op("project.configure", {"ci_signal": "jenkins"}, expect=400)
         self.assertIn("ci_signal", json.dumps(bad))
+
+    def configure_refused(self, args, status, code):
+        first = self.op("project.configure", args)
+        response = self.client.post("/v1/operations", json={
+            "op_id": op_id(), "type": "project.configure", "project": "acme", "run_id": None, "args": args,
+            "confirm_token": first.get("confirm_token")})
+        self.error(response, status, code)
+
+    def test_a_project_is_local_until_it_opts_into_github(self):
+        self.assertEqual(self.daemon.settings("acme"), {"ci_signal": "receipts", "source_host": "local"})
+        self.assertIs(self.daemon.host_for("acme"), self.daemon.local_host)
+        self.configure_refused({"ci_signal": "both"}, 400, "invalid_args")
+        self.confirmed("project.configure", {"source_host": "github"})
+        self.assertIs(self.daemon.host_for("acme"), self.daemon.source_host)
+
+    def test_the_source_host_does_not_change_under_a_run(self):
+        self.start()
+        self.configure_refused({"source_host": "github"}, 409, "illegal_transition")
+        self.confirmed("project.configure", {"ci_signal": "receipts"})
 
     def run_started(self):
         run_id = self.start()
@@ -728,7 +747,8 @@ class OperationRulesTest(ApiCase):
         identifier = op_id()
         args = {"section": "Glossary", "body": "One.", "base_version": self.version}
         first = self.op("brief.update_section", args, identifier=identifier)
-        fresh = Daemon(self.root / "home", MockProvider(), self.host, demo_planner_factory(), self.secrets, self.clock)
+        fresh = Daemon(self.root / "home", MockProvider(), self.host, demo_planner_factory(), self.secrets, self.clock,
+                       local_host=self.host)
         client = TestClient(create_app(fresh), base_url="http://127.0.0.1",
                             headers={"Authorization": f"Bearer {self.token}"})
         second = client.post("/v1/operations", json={"op_id": identifier, "type": "brief.update_section",
@@ -986,7 +1006,7 @@ class StreamTest(ApiCase):
         run_id = self.start()
         self.tick_to_unit(run_id)
         fresh = Daemon(self.root / "home", MockProvider(demo_script()), self.host, demo_planner_factory(), self.secrets,
-                       self.clock)
+                       self.clock, local_host=self.host)
         fresh.recover()
         engine = fresh.engine("acme", run_id)
         self.assertIn(engine.units.state("U-0001")["state"], ("redispatch", "done", "checking", "returned"))

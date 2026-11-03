@@ -29,6 +29,7 @@ class Args(BaseModel):
 
 class ProjectConfigure(Args):
     ci_signal: Literal["receipts", "self-hosted-actions", "both"] | None = None
+    source_host: Literal["local", "github"] | None = None
 
 
 class ProjectCreate(Args):
@@ -199,7 +200,16 @@ def project_create(c):
 
 
 def project_configure(c):
-    changes = {"ci_signal": c.args.ci_signal} if c.args.ci_signal else {}
+    """GitHub Actions can only report on a GitHub pull request, so a hosted CI signal
+    needs the github source host. The host does not change under a run in progress,
+    whose open changes belong to the host they were opened on."""
+    changes = {k: v for k, v in (("ci_signal", c.args.ci_signal), ("source_host", c.args.source_host)) if v}
+    merged = {**c.daemon.settings(c.project), **changes}
+    if merged["ci_signal"] in ("self-hosted-actions", "both") and merged["source_host"] != "github":
+        raise InvalidArgs("GitHub Actions as the CI signal needs the github source host")
+    if "source_host" in changes and changes["source_host"] != c.daemon.settings(c.project)["source_host"] \
+            and c.daemon.active_run(c.project):
+        raise IllegalTransition(f"{c.project} has a run in progress, so its source host cannot change")
     return {"settings": c.daemon.save_settings(c.project, **changes)}
 
 
@@ -362,7 +372,8 @@ CATALOG = {op.type: op for op in [
     Operation("project.create", ProjectCreate, project_create, "Scaffolds or adopts the repository and registers it.",
               scope="none", confirm=True, confirm_rule="yes"),
     Operation("project.configure", ProjectConfigure, project_configure,
-              "Sets the project's CI signal, the check a PR must pass before the harness merges it.",
+              "Sets the project's source host (local merges, or GitHub pull requests) and its CI signal, "
+              "the check a change must pass before the harness merges it.",
               confirm=True, confirm_rule="yes"),
     Operation("project.archive", NoArgs, project_archive, "Hides the project and refuses a new run. Deletes nothing.",
               confirm=True, confirm_rule="yes"),

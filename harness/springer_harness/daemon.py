@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .common import artifact_header, read_json, write_json
 from .errors import InvalidArgs, NotFound
+from .providers.local import LocalSourceHost
 from .registry import Home
 from .scheduler.engine import RunEngine
 from .scheduler.worktrees import Worktrees
@@ -38,7 +39,22 @@ def slugify(name):
 
 
 CI_SIGNALS = ("receipts", "self-hosted-actions", "both")
-SETTINGS_DEFAULT = {"ci_signal": "receipts"}
+SOURCE_HOSTS = ("local", "github")
+# Local first: a project merges in its own checkout and runs its checks on this
+# machine until a person opts it into GitHub pull requests and Actions.
+SETTINGS_DEFAULT = {"ci_signal": "receipts", "source_host": "local"}
+HOSTED_SIGNALS = ("self-hosted-actions", "both")
+
+
+class ProjectHost:
+    """The source host a project's settings name, looked up on every call, so a
+    change in Settings takes effect on the next tick."""
+
+    def __init__(self, daemon, slug):
+        self._daemon, self._slug = daemon, slug
+
+    def __getattr__(self, name):
+        return getattr(self._daemon.host_for(self._slug), name)
 
 
 def _content_of(path):
@@ -47,10 +63,13 @@ def _content_of(path):
 
 
 class Daemon:
-    def __init__(self, home, provider, source_host, planner_factory, secrets, now, maximum=2):
+    def __init__(self, home, provider, source_host, planner_factory, secrets, now, maximum=2, local_host=None):
+        """source_host is the hosted one (GitHub) a project opts into. local_host is the
+        default, built here when not given."""
         self.home = Home(home)
         self.provider = provider
         self.source_host = source_host
+        self.local_host = local_host or LocalSourceHost(self.project_path, self.home.root / "changes")
         self.planner_factory = planner_factory
         self.secrets = secrets
         self.now = now
@@ -106,7 +125,7 @@ class Daemon:
         return self.engines[key]
 
     def _new_engine(self, slug, path, run_id, kind):
-        return RunEngine(slug, path, run_id, self.provider, self.planner_factory(slug, run_id, kind), self.source_host,
+        return RunEngine(slug, path, run_id, self.provider, self.planner_factory(slug, run_id, kind), ProjectHost(self, slug),
                          Worktrees(self.home.root, slug, path), self.window, self.owner, self.now,
                          in_flight_total=self._in_flight_total, settings=lambda: self.settings(slug))
 
@@ -114,6 +133,9 @@ class Daemon:
 
     def settings(self, slug):
         return {**SETTINGS_DEFAULT, **(self.home.project(slug).get("settings") or {})}
+
+    def host_for(self, slug):
+        return self.source_host if self.settings(slug)["source_host"] == "github" else self.local_host
 
     def save_settings(self, slug, **changes):
         record = self.home.project(slug)
@@ -185,10 +207,11 @@ class Daemon:
         if kind == "build":
             self._stamp_profile(path, derived["profile"])
             self.commit_brief(slug, path, run_id)
-            if hasattr(self.source_host, "ensure_remote"):
+            host = self.host_for(slug)
+            if hasattr(host, "ensure_remote"):
                 private = (self.config or {}).get("private_repos", True)
                 try:
-                    self.source_host.ensure_remote(slug, private=private)
+                    host.ensure_remote(slug, private=private)
                 except RuntimeError as exc:
                     raise InvalidArgs(f"the project has no GitHub repository and one could not be made: {exc}")
         self.engines[(slug, run_id)] = self._new_engine(slug, path, run_id, kind)
@@ -208,8 +231,8 @@ class Daemon:
                               capture_output=True, text=True)
         if done.returncode:
             sys.stderr.write(f"could not commit the brief in {path}: {done.stderr.strip()}\n")
-        elif hasattr(self.source_host, "publish"):
-            self.source_host.publish(slug, "HEAD")
+        elif hasattr(self.host_for(slug), "publish"):
+            self.host_for(slug).publish(slug, "HEAD")
 
     def _stamp_profile(self, path, profile):
         """Scaffolding happens before the brief exists, so the ruleset learns its profile
