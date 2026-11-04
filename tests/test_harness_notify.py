@@ -12,7 +12,7 @@ from test_harness_api import ApiCase, op_id
 from springer_harness.notify import setup as notify_setup
 from springer_harness.notify.notifier import Notifier, load_settings, quiet, save_settings
 from springer_harness.notify.slack import (APP_TOKEN, BOT_TOKEN, MANIFEST, SECRET_SCOPE, closed_blocks, gate_blocks,
-                                           handle_action, handle_command)
+                                           handle_action, handle_command, route)
 from springer_harness.providers.secrets import MemorySecrets
 
 ME, SOMEONE = "U0ME", "U0OTHER"
@@ -173,6 +173,30 @@ class SlackHandlerTest(NotifyCase):
         self.assertIn("paused", handle_command("status", self.daemon, ops, ME, ME))
         self.assertEqual(handle_command("resume acme", self.daemon, ops, ME, ME), f"{self.run_id} resumed.")
         self.assertIn("No project", handle_command("pause nope", self.daemon, ops, ME, ME))
+
+    def test_the_ack_goes_before_the_daemon_lock_is_taken(self):
+        order = []
+        lock = self.daemon.lock
+
+        class Watched:
+            def __enter__(self):
+                order.append("lock")
+                return lock.__enter__()
+
+            def __exit__(self, *exc):
+                return lock.__exit__(*exc)
+
+        self.daemon.lock = Watched()
+        try:
+            route("slash_commands", {"text": "status", "user_id": ME, "response_url": "https://hooks.example/r"},
+                  lambda: order.append("ack"), lambda url, text: order.append(("reply", url, text)), None,
+                  self.daemon, self.app.state.operations, ME)
+        finally:
+            self.daemon.lock = lock
+        self.assertEqual(order[0], "ack")
+        self.assertIn("lock", order)
+        self.assertEqual(order[-1][:2], ("reply", "https://hooks.example/r"))
+        self.assertIn(self.run_id, order[-1][2])
 
     def test_the_message_shows_review_counts_and_no_file_paths(self):
         findings = [{"severity": "P2", "file": "src/secret/path.ts", "detail": "log fields missing"},

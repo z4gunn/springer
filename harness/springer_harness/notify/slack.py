@@ -224,24 +224,36 @@ class SlackService(SlackChannel):
 
     def _on_request(self, client, request):
         from slack_sdk.socket_mode.response import SocketModeResponse
+        from slack_sdk.webhook import WebhookClient
 
-        payload = request.payload or {}
-        if request.type == "slash_commands":
-            text = handle_command(payload.get("text", ""), self.daemon, self.operations, payload.get("user_id"),
-                                  self.user)
-            client.send_socket_mode_response(SocketModeResponse(envelope_id=request.envelope_id,
-                                                                payload={"text": text}))
-            return
-        client.send_socket_mode_response(SocketModeResponse(envelope_id=request.envelope_id))
-        if request.type == "interactive" and payload.get("type") == "block_actions":
-            note = handle_action(payload, self.operations, self.user)
-            message = payload.get("container", {})
-            if note and message.get("channel_id"):
-                self.web.chat_postMessage(channel=message["channel_id"], thread_ts=message.get("message_ts"),
-                                          text=note)
-            notifier = getattr(self.daemon, "notifier", None)
-            if notifier is not None:
-                notifier.kick.set()
+        def ack():
+            client.send_socket_mode_response(SocketModeResponse(envelope_id=request.envelope_id))
+
+        def respond(url, text):
+            WebhookClient(url).send(text=text, response_type="ephemeral")
+
+        route(request.type, request.payload or {}, ack, respond, self.web.chat_postMessage, self.daemon,
+              self.operations, self.user)
+
+
+def route(kind, payload, ack, respond, post, daemon, operations, allowed_user):
+    """One Socket Mode request. Slack wants the ack within 3 seconds and a tick holds the
+    daemon lock through git and merge work, so the ack goes first and the answer after:
+    a command's reply through its response_url, a button's note in the gate's thread."""
+    ack()
+    if kind == "slash_commands":
+        text = handle_command(payload.get("text", ""), daemon, operations, payload.get("user_id"), allowed_user)
+        if payload.get("response_url"):
+            respond(payload["response_url"], text)
+        return
+    if kind == "interactive" and payload.get("type") == "block_actions":
+        note = handle_action(payload, operations, allowed_user)
+        message = payload.get("container", {})
+        if note and message.get("channel_id"):
+            post(channel=message["channel_id"], thread_ts=message.get("message_ts"), text=note)
+        notifier = getattr(daemon, "notifier", None)
+        if notifier is not None:
+            notifier.kick.set()
 
 
 def tokens(secrets):
