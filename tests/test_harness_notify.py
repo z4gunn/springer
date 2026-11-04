@@ -13,7 +13,9 @@ from springer_harness.notify import setup as notify_setup
 from springer_harness.notify.notifier import Notifier, load_settings, quiet, save_settings
 from springer_harness.notify.slack import (APP_TOKEN, BOT_TOKEN, MANIFEST, SECRET_SCOPE, closed_blocks, gate_blocks,
                                            handle_action, handle_command, route)
+from springer_harness.notify.slack import slack_channel_factory
 from springer_harness.providers.secrets import MemorySecrets
+from slack_fake import FakeSlack
 
 ME, SOMEONE = "U0ME", "U0OTHER"
 OPTIONS = [{"option": "approve", "consequence": "Merges the change."},
@@ -221,6 +223,58 @@ class SlackHandlerTest(NotifyCase):
         view = next(v for k, v in self.channel.sent if k == "gate")
         self.assertFalse(view["answerable"])
         self.assertNotIn("actions", [b["type"] for b in gate_blocks(view)])
+
+
+class SocketModeTest(NotifyCase):
+    """The real slack_sdk client over a real websocket to a local fake Slack: a gate is
+    posted with buttons, a tap is acked and answers the gate, the message closes, and
+    /springer replies through its response_url."""
+
+    def setUp(self):
+        super().setUp()
+        self.slack = FakeSlack()
+        self.addCleanup(self.slack.close)
+        self.secrets.set(SECRET_SCOPE, BOT_TOKEN, "xoxb-fake")
+        self.secrets.set(SECRET_SCOPE, APP_TOKEN, "xapp-fake")
+        self.set_up_slack()
+        factory = slack_channel_factory(self.daemon, self.app.state.operations, self.slack.base_url)
+        self.notifier = Notifier(self.daemon, factory, clock=self.clock)
+        self.addCleanup(lambda: self.notifier.channel and self.notifier.channel.close())
+
+    def test_a_tap_and_a_command_round_trip_through_socket_mode(self):
+        gate_id = self.merge_gate()
+        self.notifier.poll()
+        posted = self.slack.wait(lambda: self.slack.methods("chat.postMessage"))[0]
+        self.assertEqual(posted["channel"], "D0SPRINGER")
+        actions = next(block for block in posted["blocks"] if block["type"] == "actions")
+        approve = next(e for e in actions["elements"] if e["action_id"] == "gate:approve")
+        self.slack.wait(lambda: self.slack.client)
+
+        self.slack.push("e-other", "interactive", {
+            "type": "block_actions", "user": {"id": SOMEONE},
+            "actions": [{"action_id": approve["action_id"], "value": approve["value"], "action_ts": "2.1"}],
+            "container": {"channel_id": "D0SPRINGER", "message_ts": "1700000000.000001"}})
+        self.slack.wait(lambda: any("Only the person" in m.get("text", "")
+                                    for m in self.slack.methods("chat.postMessage")))
+        self.assertIsNone(self.engine.gates.get(gate_id)["content"]["response"])
+
+        self.slack.push("e-tap", "interactive", {
+            "type": "block_actions", "user": {"id": ME},
+            "actions": [{"action_id": approve["action_id"], "value": approve["value"], "action_ts": "2.2"}],
+            "container": {"channel_id": "D0SPRINGER", "message_ts": "1700000000.000001"}})
+        self.slack.wait(lambda: any(a.get("envelope_id") == "e-tap" for a in self.slack.acks))
+        self.slack.wait(lambda: self.engine.gates.get(gate_id)["content"]["response"])
+        self.assertEqual(self.engine.gates.get(gate_id)["content"]["response"]["by"], "channel:slack")
+        self.notifier.poll()
+        updated = self.slack.wait(lambda: self.slack.methods("chat.update"))[0]
+        self.assertIn("Answered approve from Slack", json.dumps(updated["blocks"]))
+
+        self.slack.push("e-cmd", "slash_commands", {"command": "/springer", "text": "status", "user_id": ME,
+                                                    "response_url": self.slack.response_url})
+        self.slack.wait(lambda: any(a.get("envelope_id") == "e-cmd" for a in self.slack.acks))
+        reply = self.slack.wait(lambda: self.slack.responses)[0]
+        self.assertEqual(reply["response_type"], "ephemeral")
+        self.assertIn(self.run_id, reply["text"])
 
 
 class SetupTest(unittest.TestCase):

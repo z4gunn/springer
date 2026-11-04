@@ -209,11 +209,11 @@ class SlackChannel:
 class SlackService(SlackChannel):
     """The channel plus the Socket Mode listener for buttons and /springer."""
 
-    def __init__(self, bot_token, app_token, user, daemon, operations):
+    def __init__(self, bot_token, app_token, user, daemon, operations, base_url=None):
         from slack_sdk import WebClient
         from slack_sdk.socket_mode import SocketModeClient
 
-        super().__init__(WebClient(token=bot_token), user)
+        super().__init__(WebClient(token=bot_token, base_url=base_url or WebClient.BASE_URL), user)
         self.daemon, self.operations = daemon, operations
         self.socket = SocketModeClient(app_token=app_token, web_client=self.web)
         self.socket.socket_mode_request_listeners.append(self._on_request)
@@ -260,11 +260,11 @@ def tokens(secrets):
     return secrets.get(SECRET_SCOPE, BOT_TOKEN), secrets.get(SECRET_SCOPE, APP_TOKEN)
 
 
-def slack_channel_factory(daemon, operations):
+def slack_channel_factory(daemon, operations, base_url=None):
     def build(settings):
         bot, app = tokens(daemon.secrets)
         if not bot or not app:
             raise RuntimeError("Slack is set up but its tokens are not in the keychain. "
                                "Run: springer notifications setup")
-        return SlackService(bot, app, settings["slack"]["user"], daemon, operations)
+        return SlackService(bot, app, settings["slack"]["user"], daemon, operations, base_url)
     return build
