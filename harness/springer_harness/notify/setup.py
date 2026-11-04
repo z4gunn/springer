@@ -61,6 +61,14 @@ def setup(home, secrets=None, ask=input, ask_secret=_ask_secret, client=_client)
     except Exception as exc:  # noqa: BLE001, any Slack refusal means nothing is saved
         print(f"Not saved: Slack refused the token or the member ID ({exc}).")
         return 1
+    try:
+        # Opens nothing: the socket URL it returns expires unused. A token without
+        # connections:write passes the prefix check and fails only here.
+        web.apps_connections_open(app_token=app)
+    except Exception as exc:  # noqa: BLE001
+        print("Not saved: Slack refused the app-level token. Generate one under Basic Information, "
+              f"App-Level Tokens, with the connections:write scope ({exc}).")
+        return 1
     secrets.set(SECRET_SCOPE, BOT_TOKEN, bot)
     secrets.set(SECRET_SCOPE, APP_TOKEN, app)
     current = load_settings(home) or dict(DEFAULTS)

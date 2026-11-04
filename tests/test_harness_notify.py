@@ -300,6 +300,11 @@ class SetupTest(unittest.TestCase):
         def chat_postMessage(self, **kwargs):
             self.sent.append(kwargs)
 
+        def apps_connections_open(self, app_token):
+            if app_token == "xapp-config-only":
+                raise RuntimeError("missing_scope: needed connections:write")
+            return {"url": "wss://example/link"}
+
     def run_setup(self, answers, refuse=False):
         secrets = iter(answers[:2])
         import contextlib
@@ -321,6 +326,11 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(self.run_setup(["xoxb-1", "xapp-2", "U0ME"], refuse=True), 1)
         self.assertIsNone(load_settings(self.home))
         self.assertIsNone(self.secrets.get(SECRET_SCOPE, BOT_TOKEN))
+
+    def test_an_app_token_without_connections_write_saves_nothing(self):
+        self.assertEqual(self.run_setup(["xoxb-1", "xapp-config-only", "U0ME"]), 1)
+        self.assertIsNone(load_settings(self.home))
+        self.assertIsNone(self.secrets.get(SECRET_SCOPE, APP_TOKEN))
 
     def test_off_removes_the_settings_and_the_tokens(self):
         self.run_setup(["xoxb-1", "xapp-2", "U0ME"])
