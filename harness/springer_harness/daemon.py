@@ -8,10 +8,11 @@ import subprocess
 import sys
 import threading
 import traceback
+import uuid
 from pathlib import Path
 
-from .common import artifact_header, read_json, write_json
-from .errors import InvalidArgs, NotFound
+from .common import artifact_header, iso, read_json, write_json
+from .errors import IllegalTransition, InvalidArgs, NotFound
 from .providers.local import LocalSourceHost
 from .registry import Home
 from .scheduler.engine import RunEngine
@@ -22,6 +23,9 @@ from .state.usage import UsageWindow
 
 SOURCE = Path(__file__).resolve().parents[2]
 TICK_SECONDS = 5
+HEARTBEAT_FILE = "heartbeat.json"
+RESTART_FILE = "restart.json"
+STALL_AFTER = 3  # failed ticks in a row before a person is told at once
 
 
 def expand_path(raw):
@@ -78,6 +82,11 @@ class Daemon:
         self.lock = threading.RLock()
         self.engines = {}
         self._tick_errors = {}
+        self._tick_failures = {}
+        self.unclean_start = None  # the last heartbeat, when the daemon before did not stop cleanly
+        self.restart_process = None  # set by serve, so a drained restart can replace the process
+        self.operations = None  # set by the API app
+        self._restarting = False
         self.window = UsageWindow(self.home.root, provider.name, now, maximum)
         self._stop = threading.Event()
         self.started_at = now()
@@ -283,12 +292,22 @@ class Daemon:
                         results[(slug, run_id)] = "failed"
                     else:
                         self._tick_errors.pop((slug, run_id), None)
+                        self._tick_failures.pop((slug, run_id), None)
             return results
 
     def _tick_failed(self, engine, key, exc):
         """A failing tick is written to the run's ledger, where the TUI shows it, once
         per distinct error, because the daemon's stderr is not where anyone looks."""
         detail = f"{type(exc).__name__}: {exc}"[-400:]
+        count = self._tick_failures.get(key, 0) + 1
+        self._tick_failures[key] = count
+        if count == STALL_AFTER:
+            # One failed tick can be a passing hiccup. Three in a row is a stalled run,
+            # and a person hears of it at once.
+            try:
+                engine.ledger.append("tick_stalled", count=count, detail=detail)
+            except OSError:
+                pass
         if self._tick_errors.get(key) == detail:
             return
         self._tick_errors[key] = detail
@@ -300,8 +319,84 @@ class Daemon:
     def loop(self, seconds=TICK_SECONDS):
         while not self._stop.wait(seconds):
             self.tick_all()
+            self.beat()
+
+    # --- health and restarts ---
+
+    def beat(self, clean=False):
+        """The heartbeat. A start that finds one not marked clean follows a crash, a kill,
+        or a reboot, and the notifier says so once."""
+        write_json(self.home.root / HEARTBEAT_FILE, {"pid": os.getpid(), "at": iso(self.now()), "clean": clean})
+
+    def note_start(self):
+        previous = read_json(self.home.root / HEARTBEAT_FILE)
+        if isinstance(previous, dict) and not previous.get("clean"):
+            self.unclean_start = {"at": previous.get("at"), "pid": previous.get("pid")}
+        self.beat()
+
+    def mark_clean_stop(self):
+        self.beat(clean=True)
+
+    def _active_runs(self):
+        found = []
+        for slug, record in self.home.projects().items():
+            if record.get("archived"):
+                continue
+            run_id = self.active_run(slug)
+            if run_id:
+                found.append((slug, run_id))
+        return found
+
+    def sessions_running(self):
+        with self.lock:
+            return sum(len(self.engine(slug, run_id).units.by_state("running"))
+                       for slug, run_id in self._active_runs())
+
+    def request_restart(self, actor, poll=TICK_SECONDS):
+        """Drain, then restart: every run is paused so nothing new starts, the running
+        sessions finish, the process is replaced, and the next start resumes the runs.
+        A restart that kills a session costs the work in it."""
+        if self._restarting:
+            raise IllegalTransition("A restart is already draining.")
+        if self.operations is None or self.restart_process is None:
+            raise IllegalTransition("This daemon cannot restart itself. Run springer stop and start it again.")
+        self._restarting = True
+        threading.Thread(target=self._drain_and_restart, args=(actor, poll), daemon=True,
+                         name="springer-restart").start()
+
+    def _drain_and_restart(self, actor, poll):
+        paused = []
+        with self.lock:
+            runs = [(slug, run_id) for slug, run_id in self._active_runs()
+                    if not self.engine(slug, run_id).paused()]
+        for slug, run_id in runs:
+            self.operations.apply(f"restart-pause-{uuid.uuid4().hex}", "run.pause", slug, run_id,
+                                  {"reason": "draining for a daemon restart"}, None, actor)
+            paused.append([slug, run_id])
+        write_json(self.home.root / RESTART_FILE, {"resume": paused, "by": actor})
+        while self.sessions_running() and not self._stop.is_set():
+            self._stop.wait(poll)
+        self.restart_process()
+
+    def resume_after_restart(self):
+        """The runs a drained restart paused, resumed in the name of the person who asked."""
+        path = self.home.root / RESTART_FILE
+        record = read_json(path)
+        if not isinstance(record, dict) or self.operations is None:
+            return []
+        resumed = []
+        for slug, run_id in record.get("resume", []):
+            try:
+                self.operations.apply(f"restart-resume-{uuid.uuid4().hex}", "run.resume", slug, run_id, {}, None,
+                                      record.get("by", "tui"))
+                resumed.append(run_id)
+            except Exception as exc:  # noqa: BLE001, one run that cannot resume must not stop the rest
+                sys.stderr.write(f"could not resume {run_id} after the restart: {exc}\n")
+        path.unlink(missing_ok=True)
+        return resumed
 
     def start(self, seconds=TICK_SECONDS):
+        self.note_start()
         self.recover()
         if self.config is not None:
             threading.Thread(target=self._find_degradations, daemon=True, name="springer-doctor").start()

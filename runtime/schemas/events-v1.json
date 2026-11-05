@@ -65,6 +65,9 @@
       "$ref": "#/$defs/tick_failed"
     },
     {
+      "$ref": "#/$defs/tick_stalled"
+    },
+    {
       "$ref": "#/$defs/retrieval"
     },
     {
@@ -1165,6 +1168,44 @@
         "detail": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "tick_stalled": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "count",
+        "detail"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "tick_stalled"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Failed ticks in a row when the run was marked stalled."
         }
       }
     }

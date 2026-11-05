@@ -103,6 +103,7 @@ DAEMON_EVENTS = {
     "restacked": {"unit_id": "U-0412", "pr": 7, "onto": "U-0411"},
     "restack_failed": {"unit_id": "U-0412", "pr": 7, "detail": "CONFLICT"},
     "tick_failed": {"detail": "RuntimeError: boom"},
+    "tick_stalled": {"count": 3, "detail": "RuntimeError: boom"},
     "gate_answered": {"gate_id": "G-0001", "response": "approve", "by": "human"},
     "merge": {"unit_id": "U-0412", "pr": 7, "sha": "abc"},
     "retrieval": {"unit_id": "U-0412", "record_ids": ["adr-1"]},

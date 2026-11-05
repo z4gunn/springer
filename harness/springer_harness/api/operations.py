@@ -14,7 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..check.critique import critique
-from ..common import read_json
+from ..common import read_json, write_json
 from ..errors import (ConfirmationInvalid, CritiqueErrors, IllegalTransition, InvalidArgs, NotAllowedForActor,
                       UnknownOperation)
 from ..state.backlog import BacklogStore
@@ -88,6 +88,15 @@ class GateAnswer(Args):
     decisions: list[DecisionAnswer] = []
     free_text: str | None = None
     rule_change: str | None = None
+
+
+class RunNote(Args):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class UnlockConfig(Args):
+    path: str = Field(min_length=1, max_length=300)
+    reason: str = Field(min_length=1, max_length=1000)
 
 
 class MarkViewed(Args):
@@ -297,6 +306,34 @@ def gate_answer(c):
     return {}
 
 
+def run_note(c):
+    return {"units": c.engine.add_note(c.args.text.strip(), c.actor)}
+
+
+UNLOCK_FILE = "runs/_config-unlock.json"
+
+
+def unlock_config(c):
+    """A ruling that lets a session edit one protected check file. The protection hook
+    reads this file, and the harness copies it into every unit worktree."""
+    rel = c.args.path.strip()
+    rel = rel[2:] if rel.startswith("./") else rel
+    parts = rel.split("/")
+    if rel.startswith("/") or ".." in parts or rel == UNLOCK_FILE or not rel:
+        raise InvalidArgs(f"{c.args.path} is not a path inside the project that can be unlocked")
+    path = c.daemon.project_path(c.project) / UNLOCK_FILE
+    record = read_json(path) or {}
+    entries = [e for e in record.get("paths", []) if isinstance(e, dict) and e.get("path") != rel]
+    entries.append({"path": rel, "reason": f"{c.args.reason.strip()} Ruled by {c.actor}."})
+    write_json(path, {**record, "paths": entries})
+    return {"path": rel, "unlocked": len(entries)}
+
+
+def daemon_restart(c):
+    c.daemon.request_restart(c.actor)
+    return {}
+
+
 def mark_viewed(c):
     for gate_id in c.args.gate_ids:
         c.engine.gates.close_digest(gate_id, c.actor)
@@ -404,6 +441,15 @@ CATALOG = {op.type: op for op in [
               scope="run", confirm=True, confirm_rule="yes"),
     Operation("gate.answer", GateAnswer, gate_answer, "Records the response and releases what the gate holds.",
               scope="run", confirm=_rule_change, confirm_rule="with rule_change"),
+    Operation("run.note", RunNote, run_note,
+              "Adds a person's note to the next session brief of every open unit in the run.",
+              scope="run", chat=False),
+    Operation("project.unlock_config", UnlockConfig, unlock_config,
+              "Records a ruling in runs/_config-unlock.json that lets a session edit one protected check file.",
+              confirm=True, confirm_rule="yes", chat=False),
+    Operation("daemon.restart", NoArgs, daemon_restart,
+              "Pauses every run, waits until no session is running, restarts the daemon, and resumes the runs.",
+              scope="none", confirm=True, confirm_rule="yes", chat=False),
     Operation("digest.mark_viewed", MarkViewed, mark_viewed, "Closes digest entries.", scope="run"),
     Operation("backlog.move_mvp_line", MoveLine, move_line, "Moves the MVP line.", scope="run",
               confirm=_outside_scope_review, confirm_rule="outside scope review"),
