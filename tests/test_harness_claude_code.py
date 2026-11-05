@@ -342,6 +342,22 @@ class RestackTest(unittest.TestCase):
         self.git(cwd, "add", "-A")
         self.git(cwd, "commit", "-qm", "work")
 
+    def test_a_ruling_reaches_every_worktree_and_a_withdrawn_one_leaves(self):
+        """The hook reads runs/_config-unlock.json from the session's own tree, and git
+        does not carry the run store, so a ruling the human made once reached no unit."""
+        self.commit(self.project, {"f.txt": "a\n"})
+        rulings = self.project / "runs" / "_config-unlock.json"
+        rulings.parent.mkdir(parents=True)
+        rulings.write_text('{"paths": [{"path": "tsconfig.json", "reason": "ruled at G-0002"}]}')
+        tree, _ = self.trees.claim("U-0001", "main")
+        self.assertEqual((tree / "runs" / "_config-unlock.json").read_text(), rulings.read_text())
+        rulings.write_text('{"paths": []}')
+        tree, _ = self.trees.claim("U-0001", "main")
+        self.assertEqual((tree / "runs" / "_config-unlock.json").read_text(), '{"paths": []}', "a retry reads the latest")
+        rulings.unlink()
+        tree, _ = self.trees.claim("U-0001", "main")
+        self.assertFalse((tree / "runs" / "_config-unlock.json").exists())
+
     def test_a_stacked_branch_merges_cleanly_after_its_parent_was_squashed(self):
         self.commit(self.project, {"f.txt": "a\nb\n"})
         parent, _ = self.trees.claim("U-0001", "main")

@@ -4,7 +4,9 @@ A removal git refuses is logged and left for the human, never forced.
 """
 
 DOCS_INDEX = "docs/README.md"
+RULINGS = "runs/_config-unlock.json"
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -52,6 +54,7 @@ class Worktrees:
             # moves up to the base, so it reads what landed since (e.g. the brief).
             # Fast-forward only, so no work is ever lost.
             _git(path, "merge", "--ff-only", "--quiet", base)
+            self._carry_rulings(path)
             return path, branch
         _git(self.project, "worktree", "prune")
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,7 +64,19 @@ class Worktrees:
             done = _git(self.project, "worktree", "add", "-b", branch, str(path), base)
         if done.returncode:
             raise OSError(f"git worktree add failed for {unit_id}: {done.stderr.strip()}")
+        self._carry_rulings(path)
         return path, branch
+
+    def _carry_rulings(self, path):
+        """The config-unlock rulings live in the project's run store, which git does not
+        carry, and the protection hook reads them from the session's own tree. Without
+        this copy a ruling the human made reaches no unit. A withdrawn ruling is removed."""
+        source, target = self.project / RULINGS, Path(path) / RULINGS
+        if source.is_file():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+        elif target.exists():
+            target.unlink()
 
     def integrate(self, unit_id):
         """Merge the unit's branch into the default branch in the main checkout.

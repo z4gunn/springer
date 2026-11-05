@@ -130,9 +130,19 @@ class GateRequestTest(EngineCase):
             with self.subTest(bad):
                 shutil.rmtree(self.project / "runs", ignore_errors=True)
                 engine = self.run_until_blocked(bad)
-                self.tick_until(engine, lambda: len(engine.units.state("U-0001")["sessions"]) > 1
-                                or self.states(engine)["U-0001"] == "done")
+                self.tick_until(engine, lambda: len(engine.units.state("U-0001")["sessions"]) > 1)
                 self.assertEqual(engine.gates.all(), [])
+                self.assertEqual(engine.units.state("U-0001")["retries_spent"], 1, "refused is a defect, not a pass")
+                self.assertIn("gate-request.json was refused", self.provider.spawned[-1].brief)
+
+    def test_an_option_written_as_a_label_opens_the_gate(self):
+        """The first real request a session wrote used {id, label}, and the question was lost."""
+        request = {**self.REQUEST, "options": [{"id": "unlock", "label": "Record the ruling", "consequence": "It edits."},
+                                               {"id": "defer", "label": "Defer", "consequence": "It waits."}]}
+        engine = self.run_until_blocked(request)
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")
+        gate = engine.gates.open_gates()[0]["content"]
+        self.assertEqual([o["option"] for o in gate["options"]], ["Record the ruling", "Defer"])
 
     @unittest.skipUnless(HAVE_JSONSCHEMA, "jsonschema not installed in this interpreter")
     def test_the_gate_it_opens_validates(self):
@@ -182,6 +192,14 @@ class FailureTest(EngineCase):
         brief = self.provider.spawned[3].brief
         self.assertIn("Add a test runner", brief)
         self.assertIn("no passing test receipt", brief)
+
+    def test_a_retry_reads_why_check_sent_the_last_session_back(self):
+        self.provider.script["spgr-agent-backend-developer"] = [
+            Attempt(result=fail_result("defect", "receipt parity: unknown-count")), Attempt()]
+        engine = self.engine([batch(unit("a"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertNotIn("unknown-count", self.provider.spawned[0].brief)
+        self.assertIn("Check sent the last session back: receipt parity: unknown-count", self.provider.spawned[1].brief)
 
     def test_transient_and_environment_spend_no_retry(self):
         for cause in ("transient", "environment", "context"):
@@ -406,6 +424,21 @@ class MergePolicyTest(EngineCase):
         self.tick_until(engine, lambda: self.states(engine)["U-0002"] == "done")
         self.assertEqual(self.host.merged, [3, 4])
         self.assertEqual(self.host.retargeted, [(4, "main")])
+
+    def test_a_child_whose_pr_opens_after_its_parent_merged_lands_on_main(self):
+        """The first real stacked change reported its parent's branch as its base after
+        the parent had merged, so its merge looked for a checkout on that branch."""
+        self.provider.script["stacked"][0] = Attempt(ticks=8, result=pr_result(
+            4, branch="unit/U-0002", base="unit/U-0001", touched=("x/y.ts",)))
+        engine = self.engine([batch(unit("a", agent="risky"), unit("b", agent="stacked", depends_on=("a",)))])
+        self.tick_until(engine, lambda: engine.gates.open_gates())
+        engine.gates.answer(engine.gates.open_gates()[0]["content"]["checkpoint_id"], "approve", "human")
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+        self.assertEqual(self.states(engine)["U-0002"], "running", "the child opens its PR after the parent merged")
+        self.tick_until(engine, lambda: self.states(engine)["U-0002"] == "done")
+        self.assertEqual(self.host.merged, [3, 4])
+        self.assertEqual(self.host.retargeted, [(4, "main")])
+        self.assertEqual(engine.units.state("U-0002")["pr"]["base"], "main")
 
     def test_sending_a_merge_back_spends_a_retry_and_opens_a_fresh_gate(self):
         self.provider.script["risky"].append(self.provider.script["risky"][0])

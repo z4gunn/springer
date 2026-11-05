@@ -15,7 +15,7 @@ from ..check.risk import LEVELS, triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
 from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
 from ..errors import IllegalTransition, RunExternallyHeld
-from ..providers.coding_agent import SpawnRequest
+from ..providers.coding_agent import CheckResult, SpawnRequest
 from ..state.cycles import CycleStore
 from ..state.gates import GateStore
 from ..state.ledger import Ledger
@@ -24,6 +24,8 @@ from ..state.projection import is_paused, rebuild
 from ..state.sessions import SessionStore
 from ..state.units import MAX_RETRIES, TIERS, UnitStore, is_terminal
 from .plan import Snapshot
+
+RETRY_NOTE_CHARS = 1500
 
 GATE_TYPES = ("direction-review", "architecture-options-selection", "architecture-confirmation", "prd-approval",
               "design-direction-selection", "pr-merge", "security-compliance-flag", "scope-change", "discovery-go-no-go",
@@ -258,7 +260,13 @@ class RunEngine:
     def _check_one(self, state):
         unit_id = state["unit_id"]
         session_dir = self.sessions(unit_id).dir(state["sessions"][-1])
-        if self._raise_requested_gate(unit_id, state["sessions"][-1], session_dir):
+        requested = self._raise_requested_gate(unit_id, state["sessions"][-1], session_dir)
+        if requested is True:
+            return
+        if requested:
+            # A session that asked for a person and was refused must not pass silently:
+            # its question would be lost and the work would go on as if answered.
+            self._on_failure(unit_id, state, CheckResult(status="fail", failure_class="defect", detail=requested))
             return
         result = self._result(unit_id, state, session_dir)
         if result.status != "pass":
@@ -283,10 +291,14 @@ class RunEngine:
         the harness opens the change, and a retry reuses the change its branch has."""
         if pr.get("number") is not None or not hasattr(self.source_host, "open"):
             return pr
-        base = pr.get("base") or self._base_for(unit_id)
-        number = self.source_host.open(self.project_slug, pr.get("branch") or f"unit/{unit_id}", base,
-                                       self._spec(unit_id)["expected_outcome"][:120])
-        return {"number": number, "branch": pr.get("branch") or f"unit/{unit_id}", "base": base}
+        # The harness picks the base. A session reports the branch it started on, which is
+        # stale once the parent it stacked on has merged, and a reused change keeps the base
+        # it was opened with unless it is moved.
+        base, branch = self._base_for(unit_id), pr.get("branch") or f"unit/{unit_id}"
+        number = self.source_host.open(self.project_slug, branch, base, self._spec(unit_id)["expected_outcome"][:120])
+        if hasattr(self.source_host, "retarget"):
+            self.source_host.retarget(self.project_slug, number, base)
+        return {"number": number, "branch": branch, "base": base}
 
     def _result(self, unit_id, state, session_dir):
         """A real provider's session gets the mechanical Check. The mock writes the
@@ -404,18 +416,35 @@ class RunEngine:
                                reason=f"not integrated: {reason}")
 
     def _raise_requested_gate(self, unit_id, session_id, session_dir):
-        """A headless session asks for a person by leaving gate-request.json. A request
-        the schema would refuse is a defect in the session and falls through to Check."""
-        request = read_json(session_dir / "gate-request.json")
+        """A headless session asks for a person by leaving gate-request.json. Returns True
+        when a gate is open, None when there is no request, and the reason when the
+        schema would refuse it, which Check treats as a defect. An option written as
+        {label} rather than {option} is read as the same thing, because sessions do."""
+        path = session_dir / "gate-request.json"
+        if not path.exists():
+            return None
+        request = read_json(path)
         if not isinstance(request, dict):
-            return False
+            return "gate-request.json is not one JSON object"
         options = request.get("options")
+        if isinstance(options, list):
+            options = [{**o, "option": o.get("option") or o.get("label")} if isinstance(o, dict) else o for o in options]
+            options = [{k: v for k, v in o.items() if k in ("option", "consequence", "recommended_because")}
+                       if isinstance(o, dict) else o for o in options]
         decisions = request.get("decisions") or []
-        if request.get("checkpoint_type") not in GATE_TYPES or not request.get("decision_prompt") \
-                or not options or not all(isinstance(o, dict) and o.get("option") and o.get("consequence") for o in options) \
-                or not all(isinstance(d, dict) and d.get("decision_id") and d.get("kind") in DECISION_KINDS and d.get("prompt")
-                           for d in decisions):
-            return False
+        problem = None
+        if request.get("checkpoint_type") not in GATE_TYPES:
+            problem = f"checkpoint_type {request.get('checkpoint_type')!r} is not one of {sorted(GATE_TYPES)}"
+        elif not request.get("decision_prompt"):
+            problem = "it has no decision_prompt"
+        elif not options or not all(isinstance(o, dict) and o.get("option") and o.get("consequence") for o in options):
+            problem = "every option needs an option name and a consequence"
+        elif not all(isinstance(d, dict) and d.get("decision_id") and d.get("kind") in DECISION_KINDS and d.get("prompt")
+                     for d in decisions):
+            problem = f"every decision needs decision_id, prompt, and a kind from {sorted(DECISION_KINDS)}"
+        if problem:
+            return (f"gate-request.json was refused: {problem}. Write it again as the spgr-notify-human "
+                    "skill's step 0 describes, and return.")
         key = f"{unit_id}/{session_id}"
         # Check runs again after a crash, so the same request must not open two gates.
         if not any(g["content"]["context"].get("gate_request") == key for g in self.gates.all()):
@@ -442,6 +471,9 @@ class RunEngine:
             self._block(unit_id, {**state, "retries_spent": state["retries_spent"] + 1},
                         f"retries exhausted: {result.detail}", retries_spent=state["retries_spent"] + 1)
         else:
+            # The retry is a fresh session that knows nothing of the last one, so it reads
+            # why Check sent it back. Without this a session repeated the same mistake.
+            self._append_note(unit_id, f"Check sent the last session back: {result.detail[:RETRY_NOTE_CHARS]}")
             self.units.transition(unit_id, "retry", f"defect: {result.detail}",
                                   retries_spent=state["retries_spent"] + 1)
 
@@ -522,7 +554,12 @@ class RunEngine:
         deps = self._spec(unit_id)["dependencies"]
         if any(self.units.state(d)["state"] != "done" for d in deps):
             return
+        state = self.units.state(unit_id)  # a parent merged earlier in this tick may have moved it
         number = state["pr"]["number"]
+        if any((self.units.state(d).get("pr") or {}).get("branch") == state["pr"].get("base") for d in deps):
+            # The parent merged before this PR existed, so the retarget after that merge
+            # missed it. Its base branch is merged work, never where it lands.
+            state = self._retarget_to_default(unit_id, state)
         if not self._ci_green(unit_id, state, number):
             return
         try:
@@ -537,11 +574,16 @@ class RunEngine:
                 {"option": "viewed", "consequence": "Closes this entry."}], artifact_ref=f"PR-{number}", digest=True)
         for other in self.units.by_state("gated", "checking", "running", "retry", "redispatch"):
             if other.get("pr") and other["pr"].get("base") == state["pr"]["branch"]:
-                base = self.worktrees.default_branch()
-                if other["state"] == "gated" and getattr(self.source_host, "squashes", True):
-                    self._restack(other["unit_id"], other)
-                self.source_host.retarget(self.project_slug, other["pr"]["number"], base)
-                self.units.save({**other, "pr": {**other["pr"], "base": base}})
+                self._retarget_to_default(other["unit_id"], other)
+
+    def _retarget_to_default(self, unit_id, state):
+        base = self.worktrees.default_branch()
+        if state["state"] == "gated" and getattr(self.source_host, "squashes", True):
+            self._restack(unit_id, state)
+        self.source_host.retarget(self.project_slug, state["pr"]["number"], base)
+        state = {**state, "pr": {**state["pr"], "base": base}}
+        self.units.save(state)
+        return state
 
     def _restack(self, unit_id, state):
         """A squash merge leaves a stacked branch carrying its parent's original commits,
