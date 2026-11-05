@@ -10,7 +10,8 @@ import signal
 from pathlib import Path
 
 from ..check import review
-from ..check.mechanical import mechanical_check
+from ..check.gating import GatingRuns
+from ..check.mechanical import mechanical_check, needs_gating
 from ..check.risk import LEVELS, triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
 from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
@@ -25,8 +26,21 @@ from ..state.projection import is_paused, rebuild
 from ..state.sessions import SessionStore
 from ..state.units import MAX_RETRIES, TIERS, UnitStore, is_terminal
 from .plan import Snapshot
+from .worktrees import RULINGS
 
 RETRY_NOTE_CHARS = 1500
+UNLOCK = "unlock"  # the gate option that records a config-unlock ruling
+
+
+def gating_note(commands):
+    """What the session is told about the commands the harness runs after it returns."""
+    if not commands:
+        return ""
+    lines = "\n".join(f"- {c['name']} ({c['kind']}): {c['command']}" for c in commands)
+    return ("\n\nGating commands. The harness runs these itself at your branch head after you return, and "
+            "their result is the evidence the merge reads. Commit all your work before you return. Run them "
+            "yourself while you work so you return green. A test command must print a count of tests run.\n"
+            + lines)
 
 GATE_TYPES = ("direction-review", "architecture-options-selection", "architecture-confirmation", "prd-approval",
               "design-direction-selection", "pr-merge", "security-compliance-flag", "scope-change", "discovery-go-no-go",
@@ -82,6 +96,7 @@ class RunEngine:
         self.handles = {}
         self.keys = self._load_keys()
         self.settings = settings or (lambda: {"ci_signal": "receipts"})
+        self.gating_runs = GatingRuns()
 
     # --- helpers ---
 
@@ -280,6 +295,8 @@ class RunEngine:
             self._on_failure(unit_id, state, CheckResult(status="fail", failure_class="defect", detail=requested))
             return
         result = self._result(unit_id, state, session_dir)
+        if result is None:
+            return  # the gating commands are still running, and a later tick reads the verdict
         if result.status != "pass":
             self._on_failure(unit_id, state, result)
             return
@@ -326,9 +343,21 @@ class RunEngine:
         if not getattr(self.provider, "mechanical", False):
             return read_result(session_dir)
         record = self.sessions(unit_id).get(state["sessions"][-1])
+        gating = self._spec(unit_id).get("gating_commands")
+        if gating:
+            # The commands run on a thread, because the tick holds the daemon lock and a
+            # product check can take minutes. None leaves the unit in checking.
+            said = read_result(session_dir)
+            if said.status == "pass" and needs_gating(said):
+                verdict = self.gating_runs.poll((unit_id, state["sessions"][-1]), gating, session_dir,
+                                                self.worktrees.path(unit_id))
+                if verdict is None:
+                    return None
+                if verdict:
+                    return CheckResult(status="fail", failure_class="defect", detail=verdict)
         return mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path, unit_id,
                                 parse_iso(record["started_at"]),
-                                require_receipts=self.settings()["ci_signal"] in ("receipts", "both"))
+                                require_receipts=not gating and self.settings()["ci_signal"] in ("receipts", "both"))
 
     # --- review ---
 
@@ -463,15 +492,30 @@ class RunEngine:
         elif not all(isinstance(d, dict) and d.get("decision_id") and d.get("kind") in DECISION_KINDS and d.get("prompt")
                      for d in decisions):
             problem = f"every decision needs decision_id, prompt, and a kind from {sorted(DECISION_KINDS)}"
+        unlock = request.get("unlock_paths") or []
+        if not problem and (not isinstance(unlock, list) or not all(
+                isinstance(u, dict) and isinstance(u.get("path"), str) and u["path"].strip()
+                and str(u.get("reason") or "").strip() for u in unlock)):
+            problem = "every unlock_paths entry needs a path and a reason"
         if problem:
             return (f"gate-request.json was refused: {problem}. Write it again as the spgr-notify-human "
                     "skill's step 0 describes, and return.")
         key = f"{unit_id}/{session_id}"
+        context = {"gate_request": key}
+        if unlock:
+            # A config edit the story needs is a ruling the person makes with one answer.
+            # The harness, not the session, writes it, because the hook refuses the file
+            # to every agent.
+            context["unlock_paths"] = [{"path": u["path"].strip(), "reason": str(u["reason"]).strip()} for u in unlock]
+            if not any(o["option"] == UNLOCK for o in options):
+                named = ", ".join(u["path"] for u in context["unlock_paths"])
+                options = [{"option": UNLOCK, "consequence": f"The harness records the ruling for {named}, and the "
+                                                             "unit continues with those files editable."}] + options
         # Check runs again after a crash, so the same request must not open two gates.
         if not any(g["content"]["context"].get("gate_request") == key for g in self.gates.all()):
             self.gates.open(request["checkpoint_type"], "L3", [unit_id], request["decision_prompt"], options,
                             artifact_ref=request.get("artifact_ref") or "none", decisions=decisions or None,
-                            context={"gate_request": key})
+                            context=context)
         self.units.transition(unit_id, "blocked", f"waiting on a gate: {request['decision_prompt']}")
         return True
 
@@ -690,9 +734,23 @@ class RunEngine:
                     # The next session reads why the unit stopped and what the human said, and
                     # a human retry is a fresh budget: left spent, the first defect would block
                     # again before the session could act on the answer.
+                    if option == UNLOCK and content["context"].get("unlock_paths"):
+                        self._record_unlock(content["checkpoint_id"], content["context"]["unlock_paths"])
                     self._append_note(unit_id, self._answer_note(content, response))
                     self.units.transition(unit_id, "ready", f"gate {content['checkpoint_id']} answered {option}",
                                           retries_spent=0)
+
+    def _record_unlock(self, gate_id, entries):
+        """Add the approved paths to the project's rulings. The unit's worktree gets a
+        copy when it is claimed for the next session."""
+        path = self.project_path / RULINGS
+        rulings = read_json(path) or {}
+        kept = [e for e in rulings.get("paths", []) if isinstance(e, dict)]
+        named = {e["path"] for e in entries}
+        kept = [e for e in kept if e.get("path") not in named]
+        kept += [{"path": e["path"], "reason": f"{e['reason']} Ruled by the human at {gate_id}."} for e in entries]
+        write_json(path, {**rulings, "paths": kept})
+        self.ledger.append("config_unlocked", gate_id=gate_id, paths=sorted(named))
 
     def _answer_note(self, content, response):
         """What the next session's brief says about the gate this unit asked for."""
@@ -794,7 +852,8 @@ class RunEngine:
                     "workstream": draft.workstream, "declared_paths": list(draft.declared_paths), "allowlist": [],
                     "mcp_config_ref": None, "budget": {"tokens": 200000, "wall_clock_seconds": draft.wall_clock_seconds},
                     "risk_baseline": draft.risk_baseline, "dependencies": [self.keys[k] for k in draft.depends_on],
-                    "executable_check": draft.executable_check}
+                    "executable_check": draft.executable_check,
+                    "gating_commands": [dict(g) for g in draft.gating_commands]}
             self.units.create(spec)
             routed.append({"agent": draft.agent, "unit_id": unit_id, "expected_outcome": draft.expected_outcome,
                            "workstream": draft.workstream, "input_artifact_refs": []})
@@ -836,7 +895,7 @@ class RunEngine:
         store = self.sessions(unit_id)
         tier = self._tier(unit_id, state)
         session_id = next_id("S", store.ids())
-        brief = spec["brief"]
+        brief = spec["brief"] + gating_note(spec.get("gating_commands"))
         notes = self._notes(unit_id)
         if notes:
             brief += "\n\n" + notes

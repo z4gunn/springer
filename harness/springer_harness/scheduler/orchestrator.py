@@ -10,6 +10,7 @@ answer is kept under runs/<run-id>/plan/ for the retrospective and for debugging
 
 import hashlib
 import json
+import re
 import threading
 import time
 from pathlib import Path
@@ -23,6 +24,14 @@ TIERS = ("haiku", "sonnet", "opus")
 LEVELS = ("L0", "L1", "L2", "L3")
 BACKOFF_SECONDS = 120
 
+GATING_KINDS = ("test", "check", "product")
+# Agents whose unit writes code and so proves it with a test the harness runs. QA is not
+# here: its acceptance tests are written to fail until the code exists.
+BUILD_AGENTS = ("spgr-agent-backend-developer", "spgr-agent-frontend-developer", "spgr-agent-mobile-developer")
+GATING_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+GATING = {"type": "object", "required": ["name", "command", "kind"], "additionalProperties": False,
+          "properties": {"name": {"type": "string"}, "command": {"type": "string"},
+                         "kind": {"enum": list(GATING_KINDS)}, "count_regex": {"type": "string"}}}
 OPTION = {"type": "object", "required": ["option", "consequence"], "additionalProperties": False,
           "properties": {"option": {"type": "string"}, "consequence": {"type": "string"},
                          "recommended_because": {"type": "string"}}}
@@ -37,14 +46,15 @@ SCHEMA = {
         "units": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
             "required": ["key", "agent", "expected_outcome", "brief", "declared_paths", "depends_on",
-                         "risk_baseline", "model_tier"],
+                         "risk_baseline", "model_tier", "gating_commands"],
             "properties": {
                 "key": {"type": "string"}, "agent": {"type": "string"},
                 "expected_outcome": {"type": "string"}, "brief": {"type": "string"},
                 "declared_paths": {"type": "array", "items": {"type": "string"}},
                 "depends_on": {"type": "array", "items": {"type": "string"}},
                 "risk_baseline": {"enum": list(LEVELS)}, "model_tier": {"enum": list(TIERS)},
-                "executable_check": {"type": ["string", "null"]}}}},
+                "executable_check": {"type": ["string", "null"]},
+                "gating_commands": {"type": "array", "items": GATING}}}},
         "gates": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
             "required": ["checkpoint_type", "prompt", "holds", "options"],
@@ -70,9 +80,11 @@ The harness then creates each unit, runs it as a fresh headless session of its a
 its own git worktree off the default branch, checks it mechanically, and asks you again
 once nothing is in flight. A session sees only its brief, so each unit's brief must name
 the files to read in order (docs/brief.md, the artifacts under runs/{run_id}/artifacts/,
-docs/), the skills to follow, the gating commands, and whether the outcome is run
-artifacts and docs (committed to its branch, which the harness merges itself) or a pull
-request (pushed and opened with spgr-create-pr, then gated by risk).
+docs/), the skills to follow, and whether the outcome is run artifacts and docs
+(committed to its branch, which the harness merges itself) or a pull request (pushed and
+opened with spgr-create-pr, then gated by risk). The gating commands go in the unit's
+gating_commands, not only in the brief: the harness runs them itself at the branch head
+after the session returns, and their result is the evidence the merge reads.
 
 Read first, in order: docs/brief.md, .claude/references/pdca-harness.md (the profile
 table, the phase set for this profile, autonomy, walking skeleton), and the run state
@@ -83,6 +95,13 @@ Rules for the schema:
 - depends_on: keys from "keys used" or from this batch.
 - agent: one of {agents}.
 - declared_paths: the repo paths the unit may write. Units in one batch must not overlap.
+- gating_commands: what proves the unit's code, each {{name, command, kind}}. name is
+  lowercase-kebab and unique in the unit. kind is test for a test runner (it must print
+  a count of tests run, e.g. node --test, vitest, pytest, or add count_regex), check for
+  lint, typecheck, build, or a verification script judged by its exit code, and product
+  for the product check. A unit of {build_agents} names at least one test command. The
+  walking-skeleton or scaffold story sets up the test runner and names its test command,
+  so every later story has one to extend. A docs or artifact unit names none.
 - risk_baseline: L0 for docs and artifacts, L2 for code that touches auth, data model,
   billing, infra, or CI, L3 for a unit that must not start before a person decides.
 - gates: only the gates the autonomy level fires (under standard, one direction-review
@@ -100,7 +119,7 @@ Rules for the schema:
 - done: true only when the profile's work is finished and nothing remains to route.
   Return an empty units list with done false when everything left is held.
 
-Run state:
+{refused}Run state:
 {state}
 """
 
@@ -115,7 +134,8 @@ def normalize(output, text=None):
     if not output["rationale"] and text:
         output["rationale"] = _summary(text.rsplit("```", 1)[-1], 400)
     output["units"] = [{"expected_outcome": u.get("brief", "")[:200], "declared_paths": [], "depends_on": [],
-                        "risk_baseline": "L0", "model_tier": "sonnet", **u} for u in output["units"]]
+                        "risk_baseline": "L0", "model_tier": "sonnet", "gating_commands": [], **u}
+                       for u in output["units"]]
     output["gates"] = [{"holds": [], "options": [{"option": "proceed", "consequence": "The held units start."}], **g}
                        for g in output["gates"]]
     return output
@@ -139,6 +159,7 @@ class OrchestratorPlanner:
         self._answer = None
         self._error_at = 0
         self._asked_for = None  # the state the last answer was for
+        self._refused = None  # why the last answer was refused, read by the next ask
         self._lock = threading.Lock()
 
     # --- the Planner protocol ---
@@ -210,8 +231,10 @@ class OrchestratorPlanner:
         n = len(list(self.folder.glob("plan-*.json"))) + 1
         state = self.state()
         self._asked_for = self._fingerprint()
-        prompt = PROMPT.format(run_id=self.run_id, agents=", ".join(self._agents()),
-                               state=json.dumps(state, indent=1))
+        refused = (f"Your last answer was refused: {self._refused}. Return a batch without that problem.\n\n"
+                   if self._refused else "")
+        prompt = PROMPT.format(run_id=self.run_id, agents=", ".join(self._agents()), refused=refused,
+                               build_agents=", ".join(BUILD_AGENTS), state=json.dumps(state, indent=1))
         record = {"n": n, "asked_at": time.time(), "prompt": prompt}
         try:
             found = run_once(self.binary, self.project, prompt, agent="spgr-agent-orchestrator", model=self.model,
@@ -220,12 +243,14 @@ class OrchestratorPlanner:
             problems = self.problems(found["output"], state)
             if problems:
                 raise ValueError("; ".join(problems))
+            self._refused = None
             record.update(output=found["output"], cost=found["cost"], seconds=found["seconds"])
             write_json(self.folder / f"plan-{n:03d}.json", record)
             with self._lock:
                 self._answer = found["output"]
         except Exception as exc:  # a failed Plan is retried after a backoff, never a crash
             record["error"] = str(exc)[:2000]
+            self._refused = str(exc)[:1000]
             write_json(self.folder / f"error-{n:03d}.json", record)
             self._error_at = time.time()
             self._asked_for = None
@@ -246,6 +271,16 @@ class OrchestratorPlanner:
             for dep in unit["depends_on"]:
                 if dep not in used and dep not in keys:
                     found.append(f"{unit['key']} depends on unknown key {dep}")
+            gating = unit.get("gating_commands") or []
+            names = [g.get("name") for g in gating if isinstance(g, dict)]
+            if len(names) != len(gating) or any(not isinstance(n, str) or not GATING_NAME.match(n) for n in names) \
+                    or len(set(names)) != len(names) \
+                    or any(g.get("kind") not in GATING_KINDS or not str(g.get("command") or "").strip() for g in gating):
+                found.append(f"{unit['key']} has a gating command without a unique lowercase-kebab name, a "
+                             f"command, and a kind from {', '.join(GATING_KINDS)}")
+            elif unit["agent"] in BUILD_AGENTS and not any(g["kind"] == "test" for g in gating):
+                found.append(f"{unit['key']} writes code but names no test gating command. The walking-skeleton "
+                             "or scaffold story sets up the test runner")
         for gate in output.get("gates", []):
             if gate["checkpoint_type"] not in GATE_TYPES:
                 found.append(f"{gate['checkpoint_type']} is not a gate type ({', '.join(GATE_TYPES)})")
@@ -255,7 +290,9 @@ class OrchestratorPlanner:
         units = [UnitDraft(key=u["key"], agent=u["agent"], expected_outcome=u["expected_outcome"], brief=u["brief"],
                            declared_paths=tuple(u["declared_paths"]), depends_on=tuple(u["depends_on"]),
                            risk_baseline=u["risk_baseline"], model_tier=u["model_tier"],
-                           executable_check=u.get("executable_check")) for u in output["units"]]
+                           executable_check=u.get("executable_check"),
+                           gating_commands=tuple(dict(g) for g in u.get("gating_commands") or ()))
+                 for u in output["units"]]
         # A gate may name work not planned yet (the direction review comes before the
         # units that need its answer). It holds what exists, and nothing new is
         # planned until it is answered, because the run state does not change.

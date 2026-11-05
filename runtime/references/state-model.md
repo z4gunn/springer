@@ -54,7 +54,7 @@ This reference defines the durable state the Springer harness daemon reads and w
 | Session | S-nnnn | runs/<run_id>/units/U-nnnn/sessions/S-nnnn/, including gate-request.json when the session needs a person | daemon and the session |
 | Gate | G-nnnn | runs/<run_id>/artifacts/ as hil-checkpoint-v2 | daemon, answered through the API |
 | Escalation | E-nnnn | runs/<run_id>/artifacts/ as today | daemon |
-| Receipt | per gating command | runs/<run_id>/units/U-nnnn/receipts/ as today | receipt.py inside the session |
+| Receipt | per gating command | runs/<run_id>/units/U-nnnn/sessions/S-nnnn/check/receipts/ for the commands the harness runs at Check, which are the evidence. A session may write its own while it works | receipt.py, run by the daemon at Check |
 | Event | monotonic seq | runs/<run_id>/events.jsonl | daemon and the session hooks |
 | Worktree | unit id | ~/.springer/worktrees/<project>/U-nnnn/ | daemon |
 | Usage window | provider account | ~/.springer/usage/<provider>.json | daemon |
@@ -71,7 +71,7 @@ States, in the order a healthy unit passes through them, with the side exits.
 | ready | Dispatchable now | Dependencies merged or open as a stackable PR, WIP room in its workstream, usage window has room, no file overlap with an in-flight unit | The scheduler claims it |
 | running | A session is alive for it | Worktree allocated, session spawned, dispatch event written | Session exits with a result or a handoff, or is found dead |
 | returned | A result, a handoff, or receipts exist on disk | Session exited | Check begins |
-| checking | Validation, receipts, failure classification, review package, risk scoring | Returned | A verdict is reached |
+| checking | The unit's gating commands run at the branch head, validation, failure classification, review package, risk scoring | Returned | A verdict is reached |
 | gated | Its PR is open and a gate decides the merge | Check passed and the unit produced a PR | Auto-merge (L0, L1) or the human answers (L2), in either case only after the Code Reviewer's verdict |
 | done | Merged, or the artifact it produced is confirmed | Merge or confirmation recorded | Terminal |
 | retry | Check found a defect, one bounded retry is spent | Classify returned defect | A fresh session at the unit's tier, second retry one tier up |
@@ -168,8 +168,9 @@ The session writes gate-request.json in its own session directory, sets result.j
 | options | Yes | One or more `{option, consequence, recommended_because}`, recommended first. recommended_because is optional |
 | decisions | No | `{decision_id, kind, prompt}` items, kind being question, prd-approval, architecture-options-selection, design-direction-selection, or default-review |
 | artifact_ref | No | The artifact the person should read, or none |
+| unlock_paths | No | `{path, reason}` items naming protected config files the work must change. The gate gets an `unlock` option, and picking it writes each path with its reason to runs/_config-unlock.json |
 
-Check reads gate-request.json before result.json, so a request is never treated as a pass. A valid request opens a gate at L3 holding the requesting unit, and the unit moves to blocked. The gate's context records `gate_request: U-nnnn/S-nnnn`, and Check opens no second gate for the same key, so a Check repeated after a crash asks once. A request the schema would refuse (an unknown checkpoint_type, no prompt, no options, an option without a consequence) is a defect in the session: Check opens no gate and sends the unit back with the reason, so the question is never lost. An option written as `{label}` is read as `{option}`.
+Check reads gate-request.json before result.json, so a request is never treated as a pass. A valid request opens a gate at L3 holding the requesting unit, and the unit moves to blocked. The gate's context records `gate_request: U-nnnn/S-nnnn`, and Check opens no second gate for the same key, so a Check repeated after a crash asks once. A request the schema would refuse (an unknown checkpoint_type, no prompt, no options, an option without a consequence) is a defect in the session: Check opens no gate and sends the unit back with the reason, so the question is never lost. An option written as `{label}` is read as `{option}`. An unlock_paths entry with no path or no reason is refused the same way.
 
 When the person answers, the unit returns to ready and the answer is appended to its redispatch notes as one line naming the prompt, the option chosen, any free text, and each decision's answer. The next session's brief carries that line, so the session that continues the work reads the decision rather than asking again.
 

@@ -202,8 +202,43 @@ class MechanicalCheckTest(FakeBinCase):
         self.run_dir = self.project / "runs" / "acme-1"
         (self.run_dir / "artifacts").mkdir(parents=True)
 
-    def check(self):
-        return mechanical_check(self.session, self.project, self.run_dir, self.project, "U-0001", time.time() - 60)
+    def check(self, gating=None):
+        return mechanical_check(self.session, self.project, self.run_dir, self.project, "U-0001", time.time() - 60,
+                                gating=gating)
+
+    PR = {"status": "pass", "outcome": "pr", "pr": {"number": 3, "branch": "unit/U-0001", "base": "main"},
+          "touched_paths": ["src/app.ts"]}
+
+    def test_the_harness_runs_the_gating_commands_itself_at_the_head(self):
+        """The reference run's retries were receipts a session took before a later commit,
+        and checks recorded as tests. The harness now runs the unit's commands itself,
+        so a session that wrote no receipt at all passes when its code does."""
+        self.write(**self.PR)
+        gating = [{"name": "unit", "command": "python3 -c \"print('Ran 3 tests')\"", "kind": "test"},
+                  {"name": "lint", "command": "python3 -c \"print('clean')\"", "kind": "check"},
+                  {"name": "parity", "command": "python3 -c \"print('equal')\"", "kind": "product"}]
+        self.assertEqual(self.check(gating).status, "pass")
+        receipt = json.loads((self.session / "check" / "receipts" / "unit.json").read_text())
+        head = subprocess.run(["git", "-C", str(self.project), "rev-parse", "HEAD"], capture_output=True,
+                              text=True).stdout.strip()
+        self.assertEqual((receipt["tests_ran"], receipt["head"]), (3, head))
+
+    def test_a_failing_gating_command_is_a_defect_that_names_it_and_its_output(self):
+        self.write(**self.PR)
+        gating = [{"name": "lint", "command": "python3 -c \"import sys; print('rule no-floating'); sys.exit(3)\"",
+                   "kind": "check"}]
+        result = self.check(gating)
+        self.assertEqual((result.status, result.failure_class), ("fail", "defect"))
+        for needle in ("gating command lint", "failed with exit 3", "rule no-floating"):
+            self.assertIn(needle, result.detail)
+
+    def test_a_test_command_must_report_a_count(self):
+        self.write(**self.PR)
+        result = self.check([{"name": "unit", "command": "python3 -c \"print('all good')\"", "kind": "test"}])
+        self.assertIn("printed no test count", result.detail)
+        counted = self.check([{"name": "unit", "command": "python3 -c \"print('ok 7 checks')\"", "kind": "test",
+                               "count_regex": r"ok (\d+) checks"}])
+        self.assertEqual(counted.status, "pass")
 
     def write(self, **result):
         (self.session / "result.json").write_text(json.dumps(result))
@@ -299,6 +334,35 @@ class OrchestratorTest(FakeBinCase):
         error = json.loads((self.project / "runs/acme-1/plan/error-001.json").read_text())
         self.assertIn("nobody is not an agent", error["error"])
 
+    def test_a_build_unit_without_a_test_command_is_refused_and_the_next_ask_says_why(self):
+        """The reference run's scaffold had no test runner, so its unit failed Check twice.
+        The plan is refused instead, and the planner reads why when it is asked again."""
+        (self.project / ".claude/agents/spgr-agent-frontend-developer.md").write_text("---\n---\n")
+        build = {**self.PLAN["units"][0], "key": "skeleton", "agent": "spgr-agent-frontend-developer",
+                 "gating_commands": [{"name": "build", "command": "npm run build", "kind": "check"}]}
+        self.plan_file.write_text(json.dumps({**self.PLAN, "units": [build]}))
+        self.assertIsNone(self.ask())
+        error = json.loads((self.project / "runs/acme-1/plan/error-001.json").read_text())
+        self.assertIn("names no test gating command", error["error"])
+        fixed = {**build, "gating_commands": build["gating_commands"] + [
+            {"name": "unit", "command": "npm test", "kind": "test"}]}
+        self.plan_file.write_text(json.dumps({**self.PLAN, "units": [fixed]}))
+        self.planner._error_at = 0
+        batch = self.ask()
+        self.assertEqual([g["name"] for g in batch.units[0].gating_commands], ["build", "unit"])
+        prompt = " ".join(self.calls()[-1]["args"])
+        self.assertIn("Your last answer was refused", prompt)
+        self.assertIn("names no test gating command", prompt)
+
+    def test_a_gating_command_needs_a_kebab_name_a_command_and_a_kind(self):
+        for bad in ({"name": "Unit Tests", "command": "npm test", "kind": "test"},
+                    {"name": "unit", "command": "", "kind": "test"},
+                    {"name": "unit", "command": "npm test", "kind": "suite"}):
+            with self.subTest(bad):
+                output = {**self.PLAN, "units": [{**self.PLAN["units"][0], "gating_commands": [bad]}]}
+                problems = self.planner.problems(output, {"keys_used": {}})
+                self.assertTrue(any("gating command" in p for p in problems), problems)
+
     def test_a_batch_written_as_text_is_read_with_defaults(self):
         from springer_harness.providers.claude_code import json_from_text
         from springer_harness.scheduler.orchestrator import normalize
@@ -390,7 +454,7 @@ class RestackTest(unittest.TestCase):
 
 
 class LocalHostTest(unittest.TestCase):
-    """The default source host: changes merge in the project checkout, then main is pushed."""
+    """The default source host: changes merge off the project checkout, then main is pushed."""
 
     ENV = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
 
@@ -440,7 +504,7 @@ class LocalHostTest(unittest.TestCase):
         self.host.merge("acme", second)
         self.assertEqual((self.project / "f.txt").read_text(), "A\nB\n")
 
-    def test_a_conflict_or_a_dirty_checkout_is_refused_and_leaves_main_alone(self):
+    def test_a_conflict_is_refused_and_leaves_main_alone(self):
         from springer_harness.providers.local import LocalMergeError
         branch = self.unit("U-0001", {"f.txt": "unit"})
         (self.project / "f.txt").write_text("main")
@@ -453,9 +517,41 @@ class LocalHostTest(unittest.TestCase):
             self.host.merge("acme", number)
         self.assertEqual(self.git(self.project, "rev-parse", "HEAD").stdout, before)
         self.assertEqual(self.git(self.project, "status", "--porcelain").stdout, "")
+
+    def test_a_persons_unrelated_edit_does_not_refuse_the_merge_and_is_kept(self):
+        """The reference run's merges were refused for a modified run log and an
+        uncommitted brief. The merge is made off the checkout, and git keeps the edit."""
+        branch = self.unit("U-0001", {"app.ts": "one"})
+        number = self.host.open("acme", branch, "main")
         (self.project / "notes.md").write_text("a person's edit")
-        with self.assertRaisesRegex(LocalMergeError, "uncommitted"):
+        sha = self.host.merge("acme", number)
+        self.assertEqual(self.git(self.project, "rev-parse", "HEAD").stdout.strip(), sha)
+        self.assertEqual((self.project / "app.ts").read_text(), "one")
+        self.assertEqual((self.project / "notes.md").read_text(), "a person's edit")
+        self.assertEqual(self.git(self.project, "status", "--porcelain").stdout, "?? notes.md\n")
+
+    def test_an_edit_the_merge_would_overwrite_is_refused_and_kept(self):
+        from springer_harness.providers.local import LocalMergeError
+        (self.project / "app.ts").write_text("zero")
+        self.git(self.project, "add", "-A")
+        self.git(self.project, "commit", "-qm", "app")
+        branch = self.unit("U-0001", {"app.ts": "one"})
+        number = self.host.open("acme", branch, "main")
+        before = self.git(self.project, "rev-parse", "HEAD").stdout
+        (self.project / "app.ts").write_text("a person's edit")
+        with self.assertRaisesRegex(LocalMergeError, "overwrite uncommitted work"):
             self.host.merge("acme", number)
+        self.assertEqual(self.git(self.project, "rev-parse", "HEAD").stdout, before)
+        self.assertEqual((self.project / "app.ts").read_text(), "a person's edit")
+
+    def test_a_checkout_on_another_branch_does_not_refuse_the_merge(self):
+        branch = self.unit("U-0001", {"app.ts": "one"})
+        number = self.host.open("acme", branch, "main")
+        self.git(self.project, "checkout", "-q", "-b", "experiment")
+        sha = self.host.merge("acme", number)
+        self.assertEqual(self.git(self.project, "rev-parse", "main").stdout.strip(), sha)
+        self.assertEqual(self.git(self.project, "symbolic-ref", "--short", "HEAD").stdout.strip(), "experiment")
+        self.assertFalse((self.project / "app.ts").exists(), "the person's checkout is not touched")
 
     def test_the_session_contract_follows_the_source_host(self):
         from springer_harness.providers.claude_code import PR_STEPS
@@ -549,7 +645,7 @@ class ReviewPackageTest(unittest.TestCase):
 
 
 class IntegrateTest(unittest.TestCase):
-    """An artifact unit's branch lands on the default branch in the main checkout."""
+    """An artifact unit's branch lands on the default branch, merged off the main checkout."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -581,6 +677,14 @@ class IntegrateTest(unittest.TestCase):
         (self.project / "runs/acme-1/artifacts/prd.json").write_text('{"newer": true}')
         self.assertIn("would be overwritten", self.trees.integrate("U-0001"))
         self.assertEqual((self.project / "runs/acme-1/artifacts/prd.json").read_text(), '{"newer": true}')
+
+    def test_a_dirty_checkout_does_not_refuse_an_integration(self):
+        self.commit("docs/prd.md", "PRD")
+        (self.project / "notes.md").write_text("a person's edit")
+        self.assertIsNone(self.trees.integrate("U-0001"))
+        self.assertEqual((self.project / "docs/prd.md").read_text(), "PRD")
+        self.assertEqual((self.project / "notes.md").read_text(), "a person's edit")
+        self.assertEqual(self.trees.claimed(), ["U-0001"], "the merge scratch tree is gone")
 
     def test_only_unit_worktrees_count_as_claimed(self):
         (self.trees.root / ".venv").mkdir()

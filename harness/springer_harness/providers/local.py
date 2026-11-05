@@ -1,7 +1,8 @@
 """The local source host, the default. A unit's branch is a numbered change the harness
-opens itself, reviews from the local diff, and merges into the default branch in the
-project's own checkout with a merge commit. Nothing goes to a hosted service. When the
-project has an origin, the default branch is pushed after each merge."""
+opens itself, reviews from the local diff, and merges into the default branch with a
+merge commit made in a scratch worktree, so the person's checkout never has to be clean
+or on that branch. Nothing goes to a hosted service. When the project has an origin, the
+default branch is pushed after each merge."""
 
 import subprocess
 import sys
@@ -9,9 +10,7 @@ import threading
 from pathlib import Path
 
 from ..common import read_json, write_json
-
-IDENTITY = ("-c", "user.name=Springer", "-c", "user.email=springer@local")
-IGNORED = ("runs/", ".worktrees/")
+from ..merge import merge_off_checkout
 
 
 def _git(cwd, *args, timeout=120):
@@ -79,25 +78,14 @@ class LocalSourceHost:
         return "conflicting" if probe.returncode == 1 else "unknown"
 
     def merge(self, project, number):
-        """A merge commit on the base in the project's checkout. The checkout must be on
-        the base with no uncommitted work outside the run store, so a person's edits are
-        never mixed into a merge."""
+        """A merge commit on the base, made off the person's checkout. Their uncommitted
+        work is kept, and the merge is refused only when it would overwrite it."""
         change = self._change(project, number)
-        path = self.project_path_of(project)
-        head = _git(path, "symbolic-ref", "--short", "HEAD").stdout.strip()
-        if head != change["base"]:
-            raise LocalMergeError(f"the project checkout is on {head or 'a detached HEAD'}, not {change['base']}")
-        dirty = [line for line in _git(path, "status", "--porcelain").stdout.splitlines()
-                 if not line[3:].startswith(IGNORED)]
-        if dirty:
-            raise LocalMergeError("the project checkout has uncommitted changes")
         message = f"Merge change {number}: {change['title'] or change['branch']}"
-        done = _git(path, *IDENTITY, "merge", "--no-ff", "--no-edit", "-m", message, change["branch"])
-        if done.returncode:
-            _git(path, "merge", "--abort")
-            said = " ".join(l for l in (done.stdout + done.stderr).splitlines() if l and not l.startswith("hint:"))
-            raise LocalMergeError(said[-300:] or "git merge failed")
-        sha = _git(path, "rev-parse", "HEAD").stdout.strip()
+        sha, problem = merge_off_checkout(self.project_path_of(project), change["branch"], change["base"], message,
+                                          self.store_dir / "scratch")
+        if problem:
+            raise LocalMergeError(problem)
         self._update(project, number, state="merged", sha=sha)
         problem = self.publish(project, change["base"])
         if problem:
@@ -112,7 +100,7 @@ class LocalSourceHost:
         return _git(self.project_path_of(project), "diff", f"{change['base']}...{change['branch']}").stdout
 
     def sync(self, project):
-        """The merge happened in the project checkout, so there is nothing to pull."""
+        """The merge moved the local default branch, so there is nothing to pull."""
 
     def publish(self, project, branch):
         """Push the branch when the project has an origin. A failed push leaves the

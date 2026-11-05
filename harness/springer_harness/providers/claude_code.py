@@ -79,7 +79,9 @@ commands from there with relative paths: do not cd first and do not use git -C, 
 a headless session cannot ask anyone to approve a command outside its allowlist, and a
 denied command is a failed unit. Validate with `python3 schemas/validate.py <path>`.
 
-Use {session_dir} as the unit directory for receipt.py. Write run artifacts to
+Use {session_dir} as the unit directory for receipt.py. The harness runs the gating
+commands your brief lists at your branch head after you return, and those runs are the
+evidence, so commit all your work before you return. Write run artifacts to
 {run_dir}/artifacts/ by that absolute path, and do not commit copies of anything under
 runs/ in your worktree. Write and amend your artifacts there, including a decision-log
 line on an ADR. Never edit a cycle (CYCLE-), gate (G-), or escalation (E-) record, which
@@ -269,7 +271,7 @@ class ClaudeSession:
 
 class ClaudeCodeProvider:
     name = "claude-code"
-    mechanical = True  # Check runs receipts, classification, and schema validation
+    mechanical = True  # Check runs the gating commands, classification, and schema validation
     reviews = True  # every PR gets a Code Reviewer before it can merge
 
     def __init__(self, binary="claude", extra_args=()):

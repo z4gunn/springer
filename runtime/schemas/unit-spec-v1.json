@@ -144,6 +144,43 @@
       "minLength": 1,
       "description": "The command that proves the outcome. Null only for a unit whose outcome is an artifact validated by schema."
     },
+    "gating_commands": {
+      "type": "array",
+      "description": "The commands the harness runs itself at the branch head when the session returns. Their receipts are the evidence the merge reads. A unit planned before this field existed has none, and its session's own receipts are verified instead.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "command",
+          "kind"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "test",
+              "check",
+              "product"
+            ]
+          },
+          "count_regex": {
+            "type": "string"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
     "review_of": {
       "type": [
         "string",

@@ -18,6 +18,7 @@ class UnitDraft:
     workstream: str | None = None
     executable_check: str | None = None
     wall_clock_seconds: int = 3600
+    gating_commands: tuple = ()  # {name, command, kind, count_regex?} the harness runs at Check
 
 
 @dataclass
