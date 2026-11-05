@@ -1,13 +1,20 @@
 """Mechanical Check for a real session, ported from the in-session loop's step 4.
 
-The green path costs no model tokens: the session's own result.json, its receipts
-verified at the worktree's head, and every artifact it wrote validated against its
-schema. A failure is classified by classify-failure.py, so only a defect spends a
-retry. The scripts are the instance's own, run from the unit's worktree, so the
-daemon and the runtime cannot disagree about what a receipt or a class is.
+The green path costs no model tokens: the session's own result.json, the unit's
+gating commands run by the harness at the worktree's head, and every artifact the
+session wrote validated against its schema. A failure is classified by
+classify-failure.py, so only a defect spends a retry. The scripts are the
+instance's own, run from the unit's worktree, so the daemon and the runtime cannot
+disagree about what a receipt or a class is.
+
+The harness runs the gating commands itself rather than trusting receipts the session
+wrote. In the reference run most retries were receipts a session took before a later
+commit, or a check recorded as a test. A unit whose spec names no gating commands (one
+planned before they existed) keeps the old path: its session's receipts are verified.
 """
 
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import replace
@@ -48,6 +55,46 @@ def verify_receipts(session_dir, cwd):
     return None if done.returncode == 0 else (done.stdout + done.stderr).strip()[-600:]
 
 
+GATING_TIMEOUT = 1800
+OUTPUT_SHOWN = 800
+
+
+def run_gating(commands, session_dir, cwd):
+    """Run each gating command at the worktree's head through receipt.py, into the
+    session's check folder, in order. None when every one passes, else the defect
+    detail naming the first that did not, with the tail of its output. A product
+    command is judged by its exit code, as a check is, because the receipt's test
+    count only reads a test runner's summary."""
+    script = Path(cwd) / SCRIPTS / "receipt.py"
+    if not script.exists():
+        return "receipt.py is missing from the worktree"
+    out = Path(session_dir) / "check"
+    shutil.rmtree(out, ignore_errors=True)  # a Check repeated after a crash runs at the current head
+    for command in commands:
+        name, kind = command["name"], "check" if command["kind"] == "product" else command["kind"]
+        args = [script, "run", out, "--name", name, "--kind", kind, "--cwd", cwd,
+                "--timeout", str(command.get("timeout") or GATING_TIMEOUT)]
+        if command.get("count_regex"):
+            args += ["--count-regex", command["count_regex"]]
+        try:
+            _run([*args, "--", command["command"]], cwd, timeout=(command.get("timeout") or GATING_TIMEOUT) + 60)
+        except subprocess.TimeoutExpired:
+            return f"gating command {name} ({command['command']}) did not finish"
+        receipt = out / "receipts" / f"{name}.json"
+        try:
+            body = json.loads(receipt.read_text())
+        except (OSError, ValueError):
+            return f"gating command {name} ({command['command']}) left no receipt"
+        if body.get("result") != "pass":
+            why = {"unknown-count": "printed no test count the harness can read. Use a runner that reports one, "
+                                    "or give the command a count_regex",
+                   "zero-run": "ran no tests", "fail": f"failed with exit {body.get('exit_code')}",
+                   "error": "could not run"}.get(body.get("result"), str(body.get("result")))
+            tail = (body.get("output_tail") or "").strip()[-OUTPUT_SHOWN:]
+            return f"gating command {name} ({command['command']}) {why}. Its output ends: {tail}"
+    return None
+
+
 HARNESS_OWNED = ("CYCLE-", "G-", "E-")  # the daemon writes these, never a session
 
 
@@ -74,9 +121,11 @@ def validate_artifacts(paths, project):
     return problems
 
 
-def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch, require_receipts=True):
+def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch, require_receipts=True,
+                     gating=None):
     """A CheckResult for one returned session. The order is the in-session loop's:
-    the result the session left, then receipts, then the artifacts it wrote."""
+    the result the session left, then the gating commands (or, for a unit with none,
+    the session's receipts), then the artifacts it wrote."""
     session_dir, cwd = Path(session_dir), Path(cwd)
     result = read_result(session_dir)
     has_result = (session_dir / "result.json").exists()
@@ -88,7 +137,13 @@ def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch,
         chosen = cls if cls in ("transient", "context", "environment") or not given else given
         detail = result.detail if has_result else f"no result.json. {evidence}"
         return replace(result, status="fail", failure_class=chosen, detail=detail.strip())
-    if require_receipts and result.outcome == "pr" and not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths):
+    code = not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths)
+    if gating and (result.outcome == "pr" or code):
+        # Code reported as an artifact still becomes a PR, so it is checked as one.
+        problem = run_gating(gating, session_dir, cwd)
+        if problem:
+            return replace(result, status="fail", failure_class="defect", detail=problem)
+    elif require_receipts and result.outcome == "pr" and code:
         problem = verify_receipts(session_dir, cwd)
         if problem:
             return replace(result, status="fail", failure_class="defect", detail=f"receipts do not hold: {problem}")

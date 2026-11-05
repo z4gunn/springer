@@ -30,6 +30,17 @@ from .worktrees import RULINGS
 RETRY_NOTE_CHARS = 1500
 UNLOCK = "unlock"  # the gate option that records a config-unlock ruling
 
+
+def gating_note(commands):
+    """What the session is told about the commands the harness runs after it returns."""
+    if not commands:
+        return ""
+    lines = "\n".join(f"- {c['name']} ({c['kind']}): {c['command']}" for c in commands)
+    return ("\n\nGating commands. The harness runs these itself at your branch head after you return, and "
+            "their result is the evidence the merge reads. Commit all your work before you return. Run them "
+            "yourself while you work so you return green. A test command must print a count of tests run.\n"
+            + lines)
+
 GATE_TYPES = ("direction-review", "architecture-options-selection", "architecture-confirmation", "prd-approval",
               "design-direction-selection", "pr-merge", "security-compliance-flag", "scope-change", "discovery-go-no-go",
               "structure-confirmation", "scope-review", "taste-review", "production-release", "provisioning-required")
@@ -320,7 +331,8 @@ class RunEngine:
         record = self.sessions(unit_id).get(state["sessions"][-1])
         return mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path, unit_id,
                                 parse_iso(record["started_at"]),
-                                require_receipts=self.settings()["ci_signal"] in ("receipts", "both"))
+                                require_receipts=self.settings()["ci_signal"] in ("receipts", "both"),
+                                gating=self._spec(unit_id).get("gating_commands"))
 
     # --- review ---
 
@@ -815,7 +827,8 @@ class RunEngine:
                     "workstream": draft.workstream, "declared_paths": list(draft.declared_paths), "allowlist": [],
                     "mcp_config_ref": None, "budget": {"tokens": 200000, "wall_clock_seconds": draft.wall_clock_seconds},
                     "risk_baseline": draft.risk_baseline, "dependencies": [self.keys[k] for k in draft.depends_on],
-                    "executable_check": draft.executable_check}
+                    "executable_check": draft.executable_check,
+                    "gating_commands": [dict(g) for g in draft.gating_commands]}
             self.units.create(spec)
             routed.append({"agent": draft.agent, "unit_id": unit_id, "expected_outcome": draft.expected_outcome,
                            "workstream": draft.workstream, "input_artifact_refs": []})
@@ -857,7 +870,7 @@ class RunEngine:
         store = self.sessions(unit_id)
         tier = self._tier(unit_id, state)
         session_id = next_id("S", store.ids())
-        brief = spec["brief"]
+        brief = spec["brief"] + gating_note(spec.get("gating_commands"))
         notes = self._notes(unit_id)
         if notes:
             brief += "\n\n" + notes

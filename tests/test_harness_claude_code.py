@@ -202,8 +202,43 @@ class MechanicalCheckTest(FakeBinCase):
         self.run_dir = self.project / "runs" / "acme-1"
         (self.run_dir / "artifacts").mkdir(parents=True)
 
-    def check(self):
-        return mechanical_check(self.session, self.project, self.run_dir, self.project, "U-0001", time.time() - 60)
+    def check(self, gating=None):
+        return mechanical_check(self.session, self.project, self.run_dir, self.project, "U-0001", time.time() - 60,
+                                gating=gating)
+
+    PR = {"status": "pass", "outcome": "pr", "pr": {"number": 3, "branch": "unit/U-0001", "base": "main"},
+          "touched_paths": ["src/app.ts"]}
+
+    def test_the_harness_runs_the_gating_commands_itself_at_the_head(self):
+        """The reference run's retries were receipts a session took before a later commit,
+        and checks recorded as tests. The harness now runs the unit's commands itself,
+        so a session that wrote no receipt at all passes when its code does."""
+        self.write(**self.PR)
+        gating = [{"name": "unit", "command": "python3 -c \"print('Ran 3 tests')\"", "kind": "test"},
+                  {"name": "lint", "command": "python3 -c \"print('clean')\"", "kind": "check"},
+                  {"name": "parity", "command": "python3 -c \"print('equal')\"", "kind": "product"}]
+        self.assertEqual(self.check(gating).status, "pass")
+        receipt = json.loads((self.session / "check" / "receipts" / "unit.json").read_text())
+        head = subprocess.run(["git", "-C", str(self.project), "rev-parse", "HEAD"], capture_output=True,
+                              text=True).stdout.strip()
+        self.assertEqual((receipt["tests_ran"], receipt["head"]), (3, head))
+
+    def test_a_failing_gating_command_is_a_defect_that_names_it_and_its_output(self):
+        self.write(**self.PR)
+        gating = [{"name": "lint", "command": "python3 -c \"import sys; print('rule no-floating'); sys.exit(3)\"",
+                   "kind": "check"}]
+        result = self.check(gating)
+        self.assertEqual((result.status, result.failure_class), ("fail", "defect"))
+        for needle in ("gating command lint", "failed with exit 3", "rule no-floating"):
+            self.assertIn(needle, result.detail)
+
+    def test_a_test_command_must_report_a_count(self):
+        self.write(**self.PR)
+        result = self.check([{"name": "unit", "command": "python3 -c \"print('all good')\"", "kind": "test"}])
+        self.assertIn("printed no test count", result.detail)
+        counted = self.check([{"name": "unit", "command": "python3 -c \"print('ok 7 checks')\"", "kind": "test",
+                               "count_regex": r"ok (\d+) checks"}])
+        self.assertEqual(counted.status, "pass")
 
     def write(self, **result):
         (self.session / "result.json").write_text(json.dumps(result))
@@ -298,6 +333,35 @@ class OrchestratorTest(FakeBinCase):
         self.assertIsNone(self.ask())
         error = json.loads((self.project / "runs/acme-1/plan/error-001.json").read_text())
         self.assertIn("nobody is not an agent", error["error"])
+
+    def test_a_build_unit_without_a_test_command_is_refused_and_the_next_ask_says_why(self):
+        """The reference run's scaffold had no test runner, so its unit failed Check twice.
+        The plan is refused instead, and the planner reads why when it is asked again."""
+        (self.project / ".claude/agents/spgr-agent-frontend-developer.md").write_text("---\n---\n")
+        build = {**self.PLAN["units"][0], "key": "skeleton", "agent": "spgr-agent-frontend-developer",
+                 "gating_commands": [{"name": "build", "command": "npm run build", "kind": "check"}]}
+        self.plan_file.write_text(json.dumps({**self.PLAN, "units": [build]}))
+        self.assertIsNone(self.ask())
+        error = json.loads((self.project / "runs/acme-1/plan/error-001.json").read_text())
+        self.assertIn("names no test gating command", error["error"])
+        fixed = {**build, "gating_commands": build["gating_commands"] + [
+            {"name": "unit", "command": "npm test", "kind": "test"}]}
+        self.plan_file.write_text(json.dumps({**self.PLAN, "units": [fixed]}))
+        self.planner._error_at = 0
+        batch = self.ask()
+        self.assertEqual([g["name"] for g in batch.units[0].gating_commands], ["build", "unit"])
+        prompt = " ".join(self.calls()[-1]["args"])
+        self.assertIn("Your last answer was refused", prompt)
+        self.assertIn("names no test gating command", prompt)
+
+    def test_a_gating_command_needs_a_kebab_name_a_command_and_a_kind(self):
+        for bad in ({"name": "Unit Tests", "command": "npm test", "kind": "test"},
+                    {"name": "unit", "command": "", "kind": "test"},
+                    {"name": "unit", "command": "npm test", "kind": "suite"}):
+            with self.subTest(bad):
+                output = {**self.PLAN, "units": [{**self.PLAN["units"][0], "gating_commands": [bad]}]}
+                problems = self.planner.problems(output, {"keys_used": {}})
+                self.assertTrue(any("gating command" in p for p in problems), problems)
 
     def test_a_batch_written_as_text_is_read_with_defaults(self):
         from springer_harness.providers.claude_code import json_from_text

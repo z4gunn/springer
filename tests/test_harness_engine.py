@@ -173,6 +173,16 @@ class GateRequestTest(EngineCase):
         self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")
         self.assertEqual(schema_errors("hil-checkpoint-v2", engine.gates.all()[0]), [])
 
+    def test_the_brief_names_the_gating_commands_the_harness_will_run(self):
+        engine = self.engine([batch(unit("a", gating_commands=(
+            {"name": "unit", "command": "npm test", "kind": "test"},)))])
+        engine.tick()
+        spec = engine._spec("U-0001")
+        self.assertEqual(spec["gating_commands"], [{"name": "unit", "command": "npm test", "kind": "test"}])
+        brief = self.provider.spawned[0].brief
+        self.assertIn("The harness runs these itself at your branch head", brief)
+        self.assertIn("- unit (test): npm test", brief)
+
     def test_a_session_learns_where_the_run_store_is(self):
         engine = self.engine([batch(unit("a"))])
         engine.tick()
