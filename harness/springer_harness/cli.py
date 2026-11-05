@@ -1,7 +1,7 @@
 """The springer command. With no arguments it opens the TUI from any directory, and
 starts the daemon in the background first when none is running. The daemon outlives
-the TUI, because a run keeps going after the window closes. Onboarding lands later and
-will install the daemon as a service.
+the TUI, because a run keeps going after the window closes. springer service install
+puts it under launchd, which restarts it after a crash or a reboot.
 """
 
 import argparse
@@ -74,6 +74,10 @@ def ensure_daemon(home):
             # daemon is replaced. Its sessions are recovered at the next start, with no
             # retry spent.
             stop_daemon(home)
+        from . import service
+        if service.installed():
+            # launchd owns the daemon. A second one started here would fight it for the port.
+            return _wait_for_service(home, service)
         log_path = home / "daemon.log"
         package_parent = str(Path(__file__).resolve().parents[1])
         env = {**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [package_parent, os.environ.get("PYTHONPATH")]))}
@@ -91,6 +95,45 @@ def ensure_daemon(home):
             time.sleep(0.1)
         tail = log_path.read_text()[-600:] if log_path.exists() else ""
         raise RuntimeError(f"the daemon did not start. See {log_path}\n{tail}")
+
+
+def _wait_for_service(home, service):
+    service.kickstart()
+    deadline = time.time() + START_TIMEOUT_SECONDS
+    while time.time() < deadline:
+        record = running(home)
+        if record and record["build"] == build_id():
+            return record
+        time.sleep(0.2)
+    raise RuntimeError(f"the service did not bring the daemon up. See {Path(home) / 'daemon.log'} "
+                       "and springer service status")
+
+
+def restart_process(home):
+    """Replace this daemon process. Under launchd, exiting is enough, because the agent
+    is kept alive. Otherwise a detached helper starts the next daemon once this one is
+    gone. Either way this process stops through its own clean shutdown."""
+    if not os.environ.get("SPRINGER_SERVICE"):
+        package_parent = str(Path(__file__).resolve().parents[1])
+        env = {**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [package_parent, os.environ.get("PYTHONPATH")]))}
+        with open(Path(home) / "daemon.log", "a") as log:
+            subprocess.Popen([sys.executable, "-m", "springer_harness.cli", "--home", str(home), "respawn",
+                              "--after", str(os.getpid())], stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                             cwd=home, env=env, start_new_session=True)
+    os.kill(os.getpid(), signal.SIGTERM)
+
+
+def respawn(home, after_pid, timeout=120):
+    """Wait for the old daemon to exit, then start the next one."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            os.kill(after_pid, 0)
+        except OSError:
+            break
+        time.sleep(0.2)
+    ensure_daemon(home)
+    return 0
 
 
 def stop_daemon(home):
@@ -149,12 +192,16 @@ def serve(home, port):
     daemon = build_daemon(home)
     app = create_app(daemon)
     daemon.home.write_port(port)
+    daemon.restart_process = lambda: restart_process(home)
     daemon.start()
+    daemon.resume_after_restart()
     if daemon.config is not None:
         from .notify.notifier import start_notifications
         start_notifications(daemon, app.state.operations)
     # A TUI's open event stream must not hold the daemon's shutdown.
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning", timeout_graceful_shutdown=1)
+    daemon.stop()
+    daemon.mark_clean_stop()
     return 0
 
 
@@ -193,7 +240,10 @@ def leave(home):
         runs = active_runs(home)
     except (OSError, ValueError, urllib.error.URLError):
         return "Springer closed."
+    from . import service
     if not runs:
+        if service.installed():
+            return "Springer closed. The service keeps the daemon up."
         stop_daemon(home)
         return "Springer closed."
     waiting = sum(run["open_gates"] for run in runs)
@@ -213,6 +263,10 @@ def main(argv=None):
     sub.add_parser("doctor", help="check the setup and repair what is safe to repair")
     notes = sub.add_parser("notifications", help="send gates to Slack and answer them from your phone")
     notes.add_argument("action", nargs="?", default="setup", choices=("setup", "test", "manifest", "off"))
+    svc = sub.add_parser("service", help="keep the daemon running under launchd, across crashes and reboots")
+    svc.add_argument("action", choices=("install", "uninstall", "status"))
+    again = sub.add_parser("respawn")  # internal: the helper a drained restart leaves behind
+    again.add_argument("--after", type=int, required=True)
     run_daemon = sub.add_parser("daemon", help="run the daemon in the foreground")
     run_daemon.add_argument("--home", dest="daemon_home", default=None)
     run_daemon.add_argument("--port", type=int, default=DEFAULT_PORT)
@@ -229,9 +283,17 @@ def main(argv=None):
     if args.command == "notifications":
         from .notify.setup import notifications
         return notifications(home, args.action)
+    if args.command == "service":
+        from .service import service
+        return service(home, args.action)
+    if args.command == "respawn":
+        return respawn(home, args.after)
     if args.command == "stop":
         stopped = stop_daemon(home)
         print("springer: daemon stopped." if stopped else "springer: no daemon is running.")
+        from . import service
+        if stopped and service.installed():
+            print("springer: the service starts it again. springer service uninstall keeps it stopped.")
         return 0
     return open_tui(home)
 

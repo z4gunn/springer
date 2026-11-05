@@ -1,40 +1,58 @@
 """Slack, over Socket Mode: the daemon opens an outbound websocket, so nothing listens
-on a public port. Gate messages go to a direct message with the one person allowed to
-answer. A button press is a gate.answer from the channel actor, refused for anyone
-else. A gate with decisions gets one Answer button that opens a form instead. /springer answers status, gates, pause, and resume.
+on a public port. Slack is the whole control plane for a person away from the TUI.
 
-The block builders and the two handlers are plain functions over dicts, so they are
-tested without Slack. Only SlackService touches slack_sdk.
+Gate messages go to a direct message with the one person allowed to answer. Every gate
+has one-tap option buttons where it can take one, and an Answer with notes button that
+opens a form with the option, any decisions, and notes. A reply in a gate's thread is a
+note held for the answer, or the answer itself when it starts with an option number or
+name. A reply in a run's feed thread is a note for the next session of each open unit.
+/springer reads status and drives runs and units. A change that needs confirming comes
+back with a Confirm button. Every change is an operation from the channel actor,
+refused for anyone but the set-up person.
+
+The block builders and the handlers are plain functions over dicts, so they are tested
+without Slack. Only SlackService touches slack_sdk.
 """
 
 import json
-from pathlib import Path
 import re
+import shlex
+import threading
 import uuid
+from pathlib import Path
 
 from ..errors import HarnessError
+from .notifier import join_notes, trim
 
 BOT_TOKEN = "slack-bot-token"
 APP_TOKEN = "slack-app-token"
 SECRET_SCOPE = "_harness"
 ACTOR = "channel:slack"
 DANGER = ("cancel", "discard", "send_back")
-PRIMARY = ("approve", "proceed", "accept")
 FORM_ACTION = "gate_form"
 FORM_CALLBACK = "gate_answer"
+CONFIRM_ACTION = "op_confirm"
+CANCEL_ACTION = "op_cancel"
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+UNIT_ID = re.compile(r"^(?:([A-Za-z0-9][A-Za-z0-9._-]*):)?(U-\d{4})$")
+TIERS = ("haiku", "sonnet", "opus")
+LOG_CHARS = 1800
+ONLY_YOU = "Only the person this app was set up for can do that."
+USAGE = ("status | gates | units [project] | pause <project> | resume <project> | redispatch <unit> [tier] | "
+         "cancel <unit> | log <unit> | ruling [project] <text> | unlock [project] <path> <reason> | restart")
 
 MANIFEST = {
-    "display_information": {"name": "Springer", "description": "Gates and run status from the Springer harness"},
+    "display_information": {"name": "Springer", "description": "Gates, run progress, and run control for Springer"},
     "features": {
-        "app_home": {"home_tab_enabled": False, "messages_tab_enabled": True, "messages_tab_read_only_enabled": True},
+        # The messages tab is writable, because a reply in a thread is how a person adds notes.
+        "app_home": {"home_tab_enabled": False, "messages_tab_enabled": True, "messages_tab_read_only_enabled": False},
         "bot_user": {"display_name": "springer", "always_online": True},
-        "slash_commands": [{"command": "/springer", "description": "Run status, open gates, pause or resume a run",
-                            "usage_hint": "status | gates | pause <project> | resume <project>",
-                            "should_escape": False}],
+        "slash_commands": [{"command": "/springer", "description": "Run status, gates, and run and unit control",
+                            "usage_hint": USAGE[:100], "should_escape": False}],
     },
-    "oauth_config": {"scopes": {"bot": ["chat:write", "im:write", "commands"]}},
-    "settings": {"interactivity": {"is_enabled": True}, "org_deploy_enabled": False, "socket_mode_enabled": True,
+    "oauth_config": {"scopes": {"bot": ["chat:write", "im:write", "im:history", "commands"]}},
+    "settings": {"event_subscriptions": {"bot_events": ["message.im"]},
+                 "interactivity": {"is_enabled": True}, "org_deploy_enabled": False, "socket_mode_enabled": True,
                  "token_rotation_enabled": False},
 }
 
@@ -42,7 +60,12 @@ MANIFEST = {
 # --- messages ---
 
 def gate_text(view):
-    return f"{view['project']} · {view['run_id']} · {view['gate_id']} ({view['level']}): {view['prompt']}"
+    return f"{view['project']} · {view['run_id']} · {view['gate_id']} ({view['level']}): {trim(view['prompt'], 300)}"
+
+
+def option_label(number, option):
+    name = option["option"].replace("_", " ")
+    return f"{number}. {name}" + (" (recommended)" if option.get("recommended") else "")
 
 
 def _review_lines(view):
@@ -63,27 +86,34 @@ def gate_blocks(view):
     review = _review_lines(view)
     if review:
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(review)}})
-    consequences = [f"{o['option'].replace('_', ' ')}: {o['consequence']}" for o in view["options"] if o["consequence"]]
-    if consequences:
-        blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": "\n".join(consequences)[:2900]}]})
+    listing = [option_label(n, o) + (f": {o['consequence']}" if o["consequence"] else "")
+               for n, o in enumerate(view["options"], 1)]
+    blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": "\n".join(listing)[:2900]}]})
     target = {"p": view["project"], "r": view["run_id"], "g": view["gate_id"]}
+    elements = []
+    if view["answerable"]:
+        for number, option in enumerate(view["options"][:5], 1):
+            button = {"type": "button", "action_id": f"gate:{option['option']}",
+                      "text": {"type": "plain_text", "text": option_label(number, option)[:75]},
+                      "value": json.dumps({**target, "o": option["option"]})}
+            # Only the recommended option is styled to draw the eye. A styled first
+            # button drew a tap the person did not mean.
+            if option.get("recommended"):
+                button["style"] = "primary"
+            elif option["option"] in DANGER:
+                button["style"] = "danger"
+            elements.append(button)
+    form = {"type": "button", "action_id": FORM_ACTION, "value": json.dumps(target),
+            "text": {"type": "plain_text", "text": "Answer with notes" if view["answerable"] else "Answer"}}
     if not view["answerable"]:
-        # Decisions take written answers, so the tap opens a form instead of answering.
-        blocks.append({"type": "actions", "block_id": f"gate-{view['gate_id']}", "elements": [
-            {"type": "button", "action_id": FORM_ACTION, "style": "primary", "value": json.dumps(target),
-             "text": {"type": "plain_text", "text": "Answer"}}]})
-        return blocks
-    buttons = []
-    for option in view["options"][:5]:
-        button = {"type": "button", "action_id": f"gate:{option['option']}",
-                  "text": {"type": "plain_text", "text": option["option"].replace("_", " ")[:75]},
-                  "value": json.dumps({**target, "o": option["option"]})}
-        if option["option"] in PRIMARY:
-            button["style"] = "primary"
-        elif option["option"] in DANGER:
-            button["style"] = "danger"
-        buttons.append(button)
-    blocks.append({"type": "actions", "block_id": f"gate-{view['gate_id']}", "elements": buttons})
+        form["style"] = "primary"
+    elements.append(form)
+    blocks.append({"type": "actions", "block_id": f"gate-{view['gate_id']}", "elements": elements})
+    hint = ("Reply in this thread to add a note to your answer, or reply with an option number or name and "
+            "a colon to answer with notes, for example `1: looks good`.")
+    if not view["answerable"]:
+        hint = "This one has decisions to fill in. Tap Answer. A reply in this thread is added as a note."
+    blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": hint}]})
     return blocks
 
 
@@ -92,6 +122,8 @@ def closed_blocks(view):
         response = view["response"]
         by = {"channel:slack": "from Slack", "tui": "in the TUI"}.get(response.get("by"), f"by {response.get('by')}")
         outcome = f"Answered {response['option'].replace('_', ' ')} {by}."
+        if response.get("free_text"):
+            outcome += f" Notes: {trim(response['free_text'], 300)}"
     else:
         outcome = "Withdrawn: the work went back to its builder."
     return [{"type": "section", "text": {"type": "mrkdwn", "text": f"~{view['gate_id']}~ ({view['level']}) in "
@@ -99,12 +131,13 @@ def closed_blocks(view):
             {"type": "context", "elements": [{"type": "mrkdwn", "text": outcome}]}]
 
 
-# --- the answer form, for a gate with decisions ---
+# --- the answer form ---
 
 def form_view(target, content):
     """A modal: the option as a dropdown, one text box per decision, and optional notes."""
     options = content["options"]
-    listing = "\n".join(f"*{n}.* {o['option']}" + (f"\n{o['consequence']}" if o.get("consequence") else "")
+    listing = "\n".join(f"*{n}.* {o['option']}" + (" (recommended)" if o.get("recommended_because") else "")
+                        + (f"\n{o['consequence']}" if o.get("consequence") else "")
                         for n, o in enumerate(options, 1))
     choices = [{"text": {"type": "plain_text", "text": f"{n}. {o['option']}"[:75]}, "value": str(n - 1)}
                for n, o in enumerate(options, 1)]
@@ -113,7 +146,7 @@ def form_view(target, content):
     recommended = next((c for c, o in zip(choices, options) if o.get("recommended_because")), None)
     if recommended:
         pick["initial_option"] = recommended
-    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": content["decision_prompt"][:3000]}},
+    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": trim(content["decision_prompt"], 2900)}},
               {"type": "section", "text": {"type": "mrkdwn", "text": listing[:3000]}},
               {"type": "input", "block_id": "option", "label": {"type": "plain_text", "text": "Option"},
                "element": pick}]
@@ -124,6 +157,7 @@ def form_view(target, content):
                        "element": {"type": "plain_text_input", "action_id": "answer", "multiline": True}})
     blocks.append({"type": "input", "block_id": "notes", "optional": True,
                    "label": {"type": "plain_text", "text": "Notes"},
+                   "hint": {"type": "plain_text", "text": "Notes you replied in the gate's thread are added too."},
                    "element": {"type": "plain_text_input", "action_id": "answer", "multiline": True}})
     return {"type": "modal", "callback_id": FORM_CALLBACK, "private_metadata": json.dumps(target),
             "title": {"type": "plain_text", "text": f"Answer {target['g']}"[:24]},
@@ -144,6 +178,28 @@ def _gate_content(daemon, target):
         raise HarnessError(f"{target['g']} is not a gate of {target['r']}.") from None
 
 
+def _key(target):
+    return f"{target['p']}/{target['r']}/{target['g']}"
+
+
+def _answer(operations, op_id, target, option, notes=None, decisions=(), extra=None):
+    """One gate.answer from the channel, with any notes held from the thread on it."""
+    held = notes.take(_key(target)) if notes is not None else None
+    args = {"gate_id": target["g"], "option": option, "decisions": list(decisions)}
+    free_text = join_notes(held, extra)
+    if free_text:
+        args["free_text"] = free_text
+    try:
+        outcome = operations.apply(op_id, "gate.answer", target["p"], target["r"], args, None, ACTOR)
+    except HarnessError as exc:
+        if held and notes is not None:
+            notes.add(_key(target), held, f"returned-{op_id}")
+        return f"{target['g']} not answered: {exc}"
+    if outcome.get("status") == "needs_confirmation":
+        return f"{target['g']} needs a confirmation. Answer it in the TUI."
+    return None
+
+
 def open_form(payload, daemon, allowed_user):
     """The Answer tap. Returns (view, None) to open, or (None, note) to post instead."""
     if payload.get("user", {}).get("id") != allowed_user:
@@ -160,7 +216,7 @@ def open_form(payload, daemon, allowed_user):
     return form_view(target, content), None
 
 
-def handle_submission(payload, daemon, operations, allowed_user):
+def handle_submission(payload, daemon, operations, allowed_user, notes=None):
     """The form's Answer. Returns a note to post when it did not answer the gate."""
     if payload.get("user", {}).get("id") != allowed_user:
         return "Only the person this app was set up for can answer gates."
@@ -177,79 +233,291 @@ def handle_submission(payload, daemon, operations, allowed_user):
         return str(exc)
     decisions = [{"decision_id": block[2:], "response": (field.get("answer", {}).get("value") or "").strip()}
                  for block, field in values.items() if block.startswith("d:")]
-    notes = (values.get("notes", {}).get("answer", {}).get("value") or "").strip()
-    args = {"gate_id": target["g"], "option": option, "decisions": decisions}
-    if notes:
-        args["free_text"] = notes
-    op_id = f"slack-{view.get('id') or uuid.uuid4().hex}"
-    try:
-        outcome = operations.apply(op_id, "gate.answer", target["p"], target["r"], args, None, ACTOR)
-    except HarnessError as exc:
-        return f"{target['g']} not answered: {exc}"
-    if outcome.get("status") == "needs_confirmation":
-        return f"{target['g']} needs a confirmation. Answer it in the TUI."
-    return None
+    typed = (values.get("notes", {}).get("answer", {}).get("value") or "").strip()
+    return _answer(operations, f"slack-{view.get('id') or uuid.uuid4().hex}", target, option, notes, decisions, typed)
 
 
-# --- handlers ---
-
-def handle_action(payload, operations, allowed_user):
+def handle_action(payload, operations, allowed_user, notes=None):
     """A button press. Returns the line to post back in the gate's thread."""
     if payload.get("user", {}).get("id") != allowed_user:
         return "Only the person this app was set up for can answer gates."
     action = (payload.get("actions") or [{}])[0]
     try:
         target = json.loads(action.get("value", ""))
-    except ValueError:
+        target["o"]
+    except (ValueError, KeyError, TypeError):
         return "That button carried no gate."
-    op_id = f"slack-{action.get('action_ts') or uuid.uuid4().hex}"
-    try:
-        outcome = operations.apply(op_id, "gate.answer", target["p"], target["r"],
-                                   {"gate_id": target["g"], "option": target["o"]}, None, ACTOR)
-    except HarnessError as exc:
-        return f"Not answered: {exc}"
-    if outcome.get("status") == "needs_confirmation":
-        return "This answer needs a confirmation. Answer it in the TUI."
+    return _answer(operations, f"slack-{action.get('action_ts') or uuid.uuid4().hex}", target, target["o"], notes)
+
+
+# --- thread replies ---
+
+def _match_option(head, options):
+    """An option by its number or its name, spaces and underscores alike."""
+    head = head.strip().lower().replace("_", " ")
+    if head.isdigit() and 1 <= int(head) <= len(options):
+        return options[int(head) - 1]["option"]
+    for option in options:
+        if option["option"].lower().replace("_", " ") == head:
+            return option["option"]
     return None
 
 
-def handle_command(text, daemon, operations, user, allowed_user):
-    """/springer. Returns the reply, shown only to the person who typed it."""
-    words = (text or "").split()
-    verb = words[0].lower() if words else "status"
-    if verb in ("status", "gates"):
-        return _status(daemon) if verb == "status" else _gates(daemon)
-    if verb in ("pause", "resume"):
-        if user != allowed_user:
-            return "Only the person this app was set up for can pause or resume a run."
-        if len(words) < 2:
-            return f"Which project? /springer {verb} <project>"
-        slug = words[1]
-        with daemon.lock:
-            try:
-                daemon.home.project(slug)
-            except HarnessError:
-                return f"No project named {slug}."
-            run_id = daemon.active_run(slug)
-        if not run_id:
-            return f"{slug} has no run in progress."
-        args = {"reason": "paused from Slack"} if verb == "pause" else {}
+def handle_message(event, daemon, operations, allowed_user, notifier):
+    """A message in the direct message. Returns (reply, thread_ts) or None to stay quiet."""
+    if event.get("bot_id") or event.get("subtype") or not event.get("text"):
+        return None
+    thread = event.get("thread_ts")
+    if event.get("user") != allowed_user:
+        return ONLY_YOU, thread or event.get("ts")
+    text = event["text"].strip()
+    about = notifier.thread_for(thread) if notifier is not None and thread else None
+    if about is None:
+        return ("Reply in a gate's thread to add a note or answer it, reply in a run's progress thread to leave "
+                f"a note for its next sessions, or use /springer: {USAGE}"), thread or event.get("ts")
+    if about[0] == "gate":
+        _, project, run_id, gate_id = about
+        target = {"p": project, "r": run_id, "g": gate_id}
         try:
-            operations.apply(f"slack-{uuid.uuid4().hex}", f"run.{verb}", slug, run_id, args, None, ACTOR)
+            content = _gate_content(daemon, target)
         except HarnessError as exc:
-            return f"Not done: {exc}"
-        return f"{run_id} {'paused' if verb == 'pause' else 'resumed'}."
-    return "Try /springer status, /springer gates, /springer pause <project>, or /springer resume <project>."
+            return str(exc), thread
+        if content.get("response"):
+            return f"{gate_id} is already answered. The note was not kept.", thread
+        head, colon, rest = text.partition(":")
+        option = _match_option(head if colon else text, content["options"])
+        if option and not content.get("decisions"):
+            note = _answer(operations, f"slack-msg-{event.get('ts')}", target, option, notifier.notes,
+                           extra=rest if colon else None)
+            return note or f"Answered {option.replace('_', ' ')}.", thread
+        notifier.notes.add(_key(target), text, event.get("ts"))
+        return f"Noted. It goes with your answer to {gate_id}.", thread
+    _, project, run_id = about
+    try:
+        outcome = operations.apply(f"slack-msg-{event.get('ts')}", "run.note", project, run_id, {"text": text},
+                                   None, ACTOR)
+    except HarnessError as exc:
+        return f"Not noted: {exc}", thread
+    units = outcome.get("result", {}).get("units") or []
+    return (f"Noted for {', '.join(units)}." if units else "Noted. No unit is open, so the next one planned reads it "
+                                                            "in the run feed only."), thread
 
 
-def _runs(daemon):
+# --- commands ---
+
+PENDING = {}
+_PENDING_LOCK = threading.Lock()
+
+
+def _pending_add(entry):
+    key = uuid.uuid4().hex[:16]
+    with _PENDING_LOCK:
+        PENDING[key] = entry
+    return key
+
+
+def _pending_take(key):
+    with _PENDING_LOCK:
+        return PENDING.pop(key, None)
+
+
+def _apply(operations, kind, project, run_id, args, done):
+    """Apply an operation from a command. One that needs confirming comes back as a
+    message with Confirm and Cancel buttons, and the token stays here."""
+    op_id = f"slack-{uuid.uuid4().hex}"
+    try:
+        outcome = operations.apply(op_id, kind, project, run_id, args, None, ACTOR)
+    except HarnessError as exc:
+        return f"Not done: {exc}"
+    if outcome.get("status") != "needs_confirmation":
+        return done(outcome)
+    key = _pending_add({"op_id": op_id, "kind": kind, "project": project, "run_id": run_id, "args": args,
+                        "token": outcome["confirm_token"], "done": done})
+    summary = outcome.get("preview", {}).get("summary", kind)
+    return {"text": f"Confirm {kind}: {summary}",
+            "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": f"*Confirm {kind}*\n{summary}"}},
+                       {"type": "actions", "elements": [
+                           {"type": "button", "action_id": CONFIRM_ACTION, "style": "primary", "value": key,
+                            "text": {"type": "plain_text", "text": "Confirm"}},
+                           {"type": "button", "action_id": CANCEL_ACTION, "value": key,
+                            "text": {"type": "plain_text", "text": "Cancel"}}]}]}
+
+
+def handle_confirm(payload, operations, allowed_user):
+    """The Confirm or Cancel tap on a command's confirmation. Returns the reply."""
+    if payload.get("user", {}).get("id") != allowed_user:
+        return ONLY_YOU
+    action = (payload.get("actions") or [{}])[0]
+    entry = _pending_take(action.get("value", ""))
+    if entry is None:
+        return "That confirmation has expired or was already used. Run the command again."
+    if action.get("action_id") == CANCEL_ACTION:
+        return f"Cancelled {entry['kind']}."
+    try:
+        outcome = operations.apply(entry["op_id"], entry["kind"], entry["project"], entry["run_id"], entry["args"],
+                                   entry["token"], ACTOR)
+    except HarnessError as exc:
+        return f"Not done: {exc}"
+    return entry["done"](outcome)
+
+
+def _active(daemon):
+    """(project, run_id, engine) for each run in progress."""
+    found = []
     with daemon.lock:
         for slug, record in daemon.home.projects().items():
             if record.get("archived"):
                 continue
             run_id = daemon.active_run(slug)
             if run_id:
-                yield slug, run_id, daemon.engine(slug, run_id).project()["content"]
+                found.append((slug, run_id, daemon.engine(slug, run_id)))
+    return found
+
+
+def _find_unit(daemon, ref):
+    """The run a unit belongs to, from `U-0001` or `project:U-0001`."""
+    match = UNIT_ID.match(ref or "")
+    if not match:
+        raise HarnessError(f"{ref or 'nothing'} is not a unit. Name one like U-0004 or project:U-0004.")
+    project, unit_id = match.groups()
+    found = [(slug, run_id) for slug, run_id, engine in _active(daemon)
+             if (project in (None, slug)) and unit_id in engine.units.ids()]
+    if not found:
+        raise HarnessError(f"No run in progress has {unit_id}.")
+    if len(found) > 1:
+        raise HarnessError(f"{unit_id} is in more than one run. Name it as project:{unit_id}.")
+    return found[0][0], found[0][1], unit_id
+
+
+def _one_project(daemon, words):
+    """The project a command names first, or the only one with a run in progress, and the
+    words after it."""
+    projects = daemon.home.projects()
+    if words and words[0] in projects:
+        return words[0], words[1:]
+    active = [slug for slug, _, _ in _active(daemon)]
+    if len(active) == 1:
+        return active[0], words
+    raise HarnessError("Which project? Name it first.")
+
+
+def _clean_log(text, project_path, home):
+    text = text.replace(str(project_path).rstrip("/") + "/", "").replace(str(home), "~")
+    return re.sub(r"/(?:Users|home|private|var|tmp|opt)/\S+", "<path>", text)
+
+
+def _log(daemon, ref):
+    slug, run_id, unit_id = _find_unit(daemon, ref)
+    with daemon.lock:
+        engine = daemon.engine(slug, run_id)
+        state = engine.units.state(unit_id)
+        if not state["sessions"]:
+            return f"{unit_id} has not run a session yet. It is {state['state']}."
+        session_dir = engine.sessions(unit_id).dir(state["sessions"][-1])
+    path = session_dir / "result.md"
+    if not path.exists():
+        return f"{unit_id} {state['sessions'][-1]} left no result.md. It is {state['state']}."
+    body = _clean_log(path.read_text(), daemon.project_path(slug), Path.home())
+    if len(body) > LOG_CHARS:
+        body = body[:LOG_CHARS].rstrip() + "\n…"
+    return f"{unit_id} {state['sessions'][-1]} ({state['state']}):\n```{body}```"
+
+
+def _units(daemon, words):
+    runs = [(s, r, e) for s, r, e in _active(daemon) if not words or s == words[0]]
+    lines = []
+    with daemon.lock:
+        for slug, run_id, engine in runs:
+            lines.append(f"{run_id}:")
+            for unit_id in engine.units.ids():
+                state = engine.units.state(unit_id)
+                agent = str(engine._spec(unit_id).get("agent", "")).removeprefix("spgr-agent-")
+                lines.append(f"  {unit_id} {state['state']} · {agent}")
+    return "\n".join(lines[:60]) or "No run in progress."
+
+
+def handle_command(text, daemon, operations, user, allowed_user):
+    """/springer. Returns the reply, shown only to the person who typed it: text, or a
+    dict with text and blocks when it asks for a confirmation."""
+    try:
+        words = shlex.split(text or "")
+    except ValueError:
+        words = (text or "").split()
+    verb = words[0].lower() if words else "status"
+    rest = words[1:]
+    if verb in ("status", "gates"):
+        return _status(daemon) if verb == "status" else _gates(daemon)
+    if verb == "units":
+        return _units(daemon, rest)
+    if verb == "help":
+        return f"/springer {USAGE}"
+    if verb not in ("pause", "resume", "redispatch", "cancel", "log", "ruling", "unlock", "restart"):
+        return f"Try /springer {USAGE}"
+    if user != allowed_user:
+        return ONLY_YOU
+    try:
+        if verb in ("pause", "resume"):
+            return _pause(daemon, operations, verb, rest)
+        if verb == "log":
+            return _log(daemon, rest[0] if rest else "")
+        if verb in ("redispatch", "cancel"):
+            slug, run_id, unit_id = _find_unit(daemon, rest[0] if rest else "")
+            if verb == "cancel":
+                return _apply(operations, "unit.cancel", slug, run_id, {"unit_id": unit_id},
+                              lambda _: f"{unit_id} cancelled.")
+            args = {"unit_id": unit_id}
+            if len(rest) > 1:
+                if rest[1] not in TIERS:
+                    return f"The tier is one of {', '.join(TIERS)}."
+                args["model_tier"] = rest[1]
+            return _apply(operations, "unit.redispatch", slug, run_id, args,
+                          lambda _: f"{unit_id} goes out again with a fresh session.")
+        if verb == "ruling":
+            slug, rest = _one_project(daemon, rest)
+            ruling = " ".join(rest).strip()
+            if not ruling:
+                return 'What is the ruling? /springer ruling "R-1107: the hero keeps its 2:1 ratio"'
+            front, _ = daemon.brief(slug).load()
+            pinned = list(front.get("pinned_rulings") or []) + [ruling]
+            return _apply(operations, "brief.update_facts", slug, None,
+                          {"facts": {"pinned_rulings": pinned}, "base_version": front["brief_version"]},
+                          lambda outcome: "Pinned." + (f" {outcome['result']['gate_id']} asks you to apply it."
+                                                       if outcome.get("result", {}).get("gate_id") else ""))
+        if verb == "unlock":
+            slug, rest = _one_project(daemon, rest)
+            if len(rest) < 2:
+                return "Name the path and the reason: /springer unlock eslint.config.js \"the scaffold needs import order\""
+            path, reason = rest[0], " ".join(rest[1:])
+            return _apply(operations, "project.unlock_config", slug, None, {"path": path, "reason": reason},
+                          lambda _: f"{path} is unlocked for the next session that needs it.")
+        return _apply(operations, "daemon.restart", None, None, {},
+                      lambda _: "Draining: every run is paused, and the daemon restarts once no session is "
+                                "running. The runs resume after it.")
+    except HarnessError as exc:
+        return str(exc)
+
+
+def _pause(daemon, operations, verb, rest):
+    if not rest:
+        return f"Which project? /springer {verb} <project>"
+    slug = rest[0]
+    with daemon.lock:
+        try:
+            daemon.home.project(slug)
+        except HarnessError:
+            return f"No project named {slug}."
+        run_id = daemon.active_run(slug)
+    if not run_id:
+        return f"{slug} has no run in progress."
+    args = {"reason": "paused from Slack"} if verb == "pause" else {}
+    return _apply(operations, f"run.{verb}", slug, run_id, args,
+                  lambda _: f"{run_id} {'paused' if verb == 'pause' else 'resumed'}.")
+
+
+def _runs(daemon):
+    for slug, run_id, engine in _active(daemon):
+        with daemon.lock:
+            yield slug, run_id, engine.project()["content"]
 
 
 def _status(daemon):
@@ -304,9 +572,18 @@ class SlackChannel:
     def post(self, text):
         self.web.chat_postMessage(channel=self.dm(), text=text)
 
+    def feed(self, ref, run_id, text):
+        """Lines in the run's progress thread, which the first lines open."""
+        if ref is None:
+            sent = self.web.chat_postMessage(channel=self.dm(), text=f"{run_id} progress. Reply in this thread to "
+                                                                       "leave a note for its next sessions.")
+            ref = {"channel": sent["channel"], "ts": sent["ts"]}
+        self.reply(ref, text)
+        return ref
+
 
 class SlackService(SlackChannel):
-    """The channel plus the Socket Mode listener for buttons and /springer."""
+    """The channel plus the Socket Mode listener for buttons, forms, replies, and /springer."""
 
     def __init__(self, bot_token, app_token, user, daemon, operations, base_url=None):
         from slack_sdk import WebClient
@@ -328,8 +605,10 @@ class SlackService(SlackChannel):
         def ack():
             client.send_socket_mode_response(SocketModeResponse(envelope_id=request.envelope_id))
 
-        def respond(url, text):
-            WebhookClient(url).send(text=text, response_type="ephemeral")
+        def respond(url, reply):
+            reply = reply if isinstance(reply, dict) else {"text": reply}
+            WebhookClient(url).send(text=reply["text"], blocks=reply.get("blocks"), response_type="ephemeral",
+                                    replace_original=bool(reply.get("replace")))
 
         def open_view(trigger_id, view):
             self.web.views_open(trigger_id=trigger_id, view=view)
@@ -342,38 +621,63 @@ def route(kind, payload, ack, respond, post, daemon, operations, allowed_user, o
     """One Socket Mode request. Slack wants the ack within 3 seconds and a tick holds the
     daemon lock through git and merge work, so the ack goes first and the answer after:
     a command's reply through its response_url, a button's note in the gate's thread, a
-    form's note in the direct message. The Answer tap opens its form without the lock,
-    because the trigger it carries expires 3 seconds after the tap."""
+    form's note in the direct message, a thread reply's answer in its thread. The Answer
+    tap opens its form without the lock, because its trigger expires 3 seconds after the tap."""
     ack()
-    if kind == "slash_commands":
-        text = handle_command(payload.get("text", ""), daemon, operations, payload.get("user_id"), allowed_user)
-        if payload.get("response_url"):
-            respond(payload["response_url"], text)
-        return
     notifier = getattr(daemon, "notifier", None)
-    if kind == "interactive" and payload.get("type") == "view_submission":
+    notes = getattr(notifier, "notes", None)
+
+    def kick():
+        if notifier is not None:
+            notifier.kick.set()
+
+    if kind == "slash_commands":
+        reply = handle_command(payload.get("text", ""), daemon, operations, payload.get("user_id"), allowed_user)
+        if payload.get("response_url"):
+            respond(payload["response_url"], reply)
+        kick()
+        return
+    if kind == "events_api":
+        event = payload.get("event") or {}
+        if event.get("type") != "message" or event.get("channel_type", "im") != "im":
+            return
+        answer = handle_message(event, daemon, operations, allowed_user, notifier)
+        if answer:
+            text, thread = answer
+            post(channel=event.get("channel") or (dm() if dm else None), thread_ts=thread, text=text)
+        kick()
+        return
+    if kind != "interactive":
+        return
+    if payload.get("type") == "view_submission":
         if (payload.get("view") or {}).get("callback_id") != FORM_CALLBACK:
             return
-        note = handle_submission(payload, daemon, operations, allowed_user)
+        note = handle_submission(payload, daemon, operations, allowed_user, notes)
         if note and dm is not None:
             post(channel=dm(), text=note)
-        if notifier is not None:
-            notifier.kick.set()
+        kick()
         return
-    if kind == "interactive" and payload.get("type") == "block_actions":
-        message = payload.get("container", {})
-        if (payload.get("actions") or [{}])[0].get("action_id") == FORM_ACTION:
-            view, note = open_form(payload, daemon, allowed_user)
-            if view is not None and open_view is not None:
-                open_view(payload.get("trigger_id"), view)
-            elif note and message.get("channel_id"):
-                post(channel=message["channel_id"], thread_ts=message.get("message_ts"), text=note)
-            return
-        note = handle_action(payload, operations, allowed_user)
-        if note and message.get("channel_id"):
+    if payload.get("type") != "block_actions":
+        return
+    message = payload.get("container", {})
+    action_id = (payload.get("actions") or [{}])[0].get("action_id")
+    if action_id in (CONFIRM_ACTION, CANCEL_ACTION):
+        reply = handle_confirm(payload, operations, allowed_user)
+        if payload.get("response_url"):
+            respond(payload["response_url"], {"text": reply, "replace": True})
+        kick()
+        return
+    if action_id == FORM_ACTION:
+        view, note = open_form(payload, daemon, allowed_user)
+        if view is not None and open_view is not None:
+            open_view(payload.get("trigger_id"), view)
+        elif note and message.get("channel_id"):
             post(channel=message["channel_id"], thread_ts=message.get("message_ts"), text=note)
-        if notifier is not None:
-            notifier.kick.set()
+        return
+    note = handle_action(payload, operations, allowed_user, notes)
+    if note and message.get("channel_id"):
+        post(channel=message["channel_id"], thread_ts=message.get("message_ts"), text=note)
+    kick()
 
 
 def tokens(secrets):

@@ -596,6 +596,42 @@ class OperationCatalogTest(ApiCase):
         self.assertEqual(engine.units.state(unit_id)["sessions"][-1], "S-0002")
         self.assertEqual(engine.sessions(unit_id).all()[-1]["tier"], "opus")
 
+    def test_run_note_reaches_the_next_session_of_each_open_unit(self):
+        run_id = self.run_started()
+        unit_id = self.unit["unit_id"]
+        body = self.op("run.note", {"text": "Keep the hero copy."}, run_id=run_id)
+        self.assertEqual(body["result"]["units"], [unit_id])
+        engine = self.daemon.engine("acme", run_id)
+        notes = (engine.units.unit_dir(unit_id) / "redispatch-notes.txt").read_text()
+        self.assertIn("A note from the human (tui): Keep the hero copy.", notes)
+        with self.assertRaises(Exception):
+            self.app.state.operations.apply(op_id(), "run.note", "acme", run_id, {"text": "x"}, None, "chat")
+
+    def test_project_unlock_config_records_a_ruling_the_hook_reads(self):
+        self.confirmed("project.unlock_config", {"path": "./tsconfig.json", "reason": "ADR-004 adds an alias."})
+        self.confirmed("project.unlock_config", {"path": "tsconfig.json", "reason": "Ruled again."})
+        record = json.loads((self.project_path / "runs" / "_config-unlock.json").read_text())
+        self.assertEqual([e["path"] for e in record["paths"]], ["tsconfig.json"], "one entry per path")
+        self.assertIn("Ruled again.", record["paths"][0]["reason"])
+        first = self.op("project.unlock_config", {"path": "../x", "reason": "r"})
+        self.op("project.unlock_config", {"path": "../x", "reason": "r"}, token=first["confirm_token"], expect=400)
+
+    def test_daemon_restart_pauses_the_runs_and_drains_before_it_restarts(self):
+        run_id = self.run_started()
+        engine = self.daemon.engine("acme", run_id)
+        restarted = []
+        self.daemon.restart_process = lambda: restarted.append(self.daemon.sessions_running())
+        engine.units.by_state = lambda *states: []
+        self.confirmed("daemon.restart", {}, project=None)
+        for _ in range(100):
+            if restarted:
+                break
+            time.sleep(0.05)
+        self.assertEqual(restarted, [0], "it restarts only once no session is running")
+        self.assertTrue(engine.paused())
+        first = self.op("daemon.restart", {}, project=None)
+        self.op("daemon.restart", {}, project=None, token=first["confirm_token"], expect=409)
+
     def _open_gate(self, run_id, kind="scope-review"):
         return self.daemon.engine("acme", run_id).gates.open(
             kind, "L3", [], "Decide.", [{"option": "yes", "consequence": "It happens."}],
@@ -730,6 +766,9 @@ COVERAGE = {
     "backlog.answer_unknown": "test_backlog_answer_unknown",
     "provisioning.set_secret": "test_provisioning_set_secret_records_no_value_anywhere",
     "config.set_role_model": "test_config_set_role_model", "config.set_gate_channels": "test_config_set_gate_channels",
+    "run.note": "test_run_note_reaches_the_next_session_of_each_open_unit",
+    "project.unlock_config": "test_project_unlock_config_records_a_ruling_the_hook_reads",
+    "daemon.restart": "test_daemon_restart_pauses_the_runs_and_drains_before_it_restarts",
 }
 
 

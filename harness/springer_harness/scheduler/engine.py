@@ -101,6 +101,16 @@ class RunEngine:
         with open(self.units.unit_dir(unit_id) / "redispatch-notes.txt", "a") as fh:
             fh.write(text + "\n")
 
+    def add_note(self, text, by):
+        """A person's note for the next session of every unit still open. Returns the units
+        it reached. A unit done or cancelled has no next session."""
+        reached = []
+        for unit_id in self.units.ids():
+            if not is_terminal(self.units.state(unit_id)):
+                self._append_note(unit_id, f"A note from the human ({by}): {text}")
+                reached.append(unit_id)
+        return reached
+
     def _notes(self, unit_id):
         path = self.units.unit_dir(unit_id) / "redispatch-notes.txt"
         return path.read_text() if path.exists() else ""
