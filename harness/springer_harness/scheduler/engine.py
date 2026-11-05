@@ -25,8 +25,10 @@ from ..state.projection import is_paused, rebuild
 from ..state.sessions import SessionStore
 from ..state.units import MAX_RETRIES, TIERS, UnitStore, is_terminal
 from .plan import Snapshot
+from .worktrees import RULINGS
 
 RETRY_NOTE_CHARS = 1500
+UNLOCK = "unlock"  # the gate option that records a config-unlock ruling
 
 GATE_TYPES = ("direction-review", "architecture-options-selection", "architecture-confirmation", "prd-approval",
               "design-direction-selection", "pr-merge", "security-compliance-flag", "scope-change", "discovery-go-no-go",
@@ -453,15 +455,30 @@ class RunEngine:
         elif not all(isinstance(d, dict) and d.get("decision_id") and d.get("kind") in DECISION_KINDS and d.get("prompt")
                      for d in decisions):
             problem = f"every decision needs decision_id, prompt, and a kind from {sorted(DECISION_KINDS)}"
+        unlock = request.get("unlock_paths") or []
+        if not problem and (not isinstance(unlock, list) or not all(
+                isinstance(u, dict) and isinstance(u.get("path"), str) and u["path"].strip()
+                and str(u.get("reason") or "").strip() for u in unlock)):
+            problem = "every unlock_paths entry needs a path and a reason"
         if problem:
             return (f"gate-request.json was refused: {problem}. Write it again as the spgr-notify-human "
                     "skill's step 0 describes, and return.")
         key = f"{unit_id}/{session_id}"
+        context = {"gate_request": key}
+        if unlock:
+            # A config edit the story needs is a ruling the person makes with one answer.
+            # The harness, not the session, writes it, because the hook refuses the file
+            # to every agent.
+            context["unlock_paths"] = [{"path": u["path"].strip(), "reason": str(u["reason"]).strip()} for u in unlock]
+            if not any(o["option"] == UNLOCK for o in options):
+                named = ", ".join(u["path"] for u in context["unlock_paths"])
+                options = [{"option": UNLOCK, "consequence": f"The harness records the ruling for {named}, and the "
+                                                             "unit continues with those files editable."}] + options
         # Check runs again after a crash, so the same request must not open two gates.
         if not any(g["content"]["context"].get("gate_request") == key for g in self.gates.all()):
             self.gates.open(request["checkpoint_type"], "L3", [unit_id], request["decision_prompt"], options,
                             artifact_ref=request.get("artifact_ref") or "none", decisions=decisions or None,
-                            context={"gate_request": key})
+                            context=context)
         self.units.transition(unit_id, "blocked", f"waiting on a gate: {request['decision_prompt']}")
         return True
 
@@ -680,9 +697,23 @@ class RunEngine:
                     # The next session reads why the unit stopped and what the human said, and
                     # a human retry is a fresh budget: left spent, the first defect would block
                     # again before the session could act on the answer.
+                    if option == UNLOCK and content["context"].get("unlock_paths"):
+                        self._record_unlock(content["checkpoint_id"], content["context"]["unlock_paths"])
                     self._append_note(unit_id, self._answer_note(content, response))
                     self.units.transition(unit_id, "ready", f"gate {content['checkpoint_id']} answered {option}",
                                           retries_spent=0)
+
+    def _record_unlock(self, gate_id, entries):
+        """Add the approved paths to the project's rulings. The unit's worktree gets a
+        copy when it is claimed for the next session."""
+        path = self.project_path / RULINGS
+        rulings = read_json(path) or {}
+        kept = [e for e in rulings.get("paths", []) if isinstance(e, dict)]
+        named = {e["path"] for e in entries}
+        kept = [e for e in kept if e.get("path") not in named]
+        kept += [{"path": e["path"], "reason": f"{e['reason']} Ruled by the human at {gate_id}."} for e in entries]
+        write_json(path, {**rulings, "paths": kept})
+        self.ledger.append("config_unlocked", gate_id=gate_id, paths=sorted(named))
 
     def _answer_note(self, content, response):
         """What the next session's brief says about the gate this unit asked for."""

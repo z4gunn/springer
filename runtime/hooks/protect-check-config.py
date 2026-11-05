@@ -9,16 +9,23 @@ file-editing tools stops it before it lands: an edit to an existing file of
 that kind is refused with exit 2, and the reason tells the agent to report
 the need instead.
 
-Protected, when the file already exists (creating one, as a scaffold does,
-passes): lint, format, type, test-runner, coverage, and pre-commit
+Protected, when the file existed before the unit started (creating one, as a
+scaffold does, passes, and so does the unit's own later edit to a file it
+created): lint, format, type, test-runner, coverage, and pre-commit
 configuration, the instance's `.claude/settings.json` and `.claude/hooks/`,
 and the inputs under `tests/fixtures/real/`. CI workflows and
 `runs/_product-check.json` are not protected here, because the DevOps agent
 and the implementing units edit them as part of their work, and the review
 package tags every change to them for a disposition.
 
-A change the story really needs is a ruling. The harness records it and lists
-the path with its reason in `runs/_config-unlock.json`:
+"Before the unit started" is the unit's base commit, which the harness puts in
+SPRINGER_BASE. Outside a harness session, or when the base cannot be read, the
+file on disk stands in for it.
+
+A change the story really needs is a ruling. The session asks for it with a
+gate request that names the paths in `unlock_paths`, and when the person
+approves, the harness lists each path with its reason in
+`runs/_config-unlock.json`:
 
     {"paths": [{"path": "tsconfig.json", "reason": "ADR-004 adds a path alias"}]}
 
@@ -42,6 +49,7 @@ import json
 import os
 import re
 import shlex
+import subprocess
 import sys
 
 UNLOCK_REL = "runs/_config-unlock.json"
@@ -68,6 +76,19 @@ def unlocked(project, rel):
                for e in entries)
 
 
+def existed_before(project, rel, absolute):
+    """True when the file is in the unit's base commit. Without a readable base,
+    whether it is on disk now."""
+    base = os.environ.get("SPRINGER_BASE")
+    if base:
+        git = ["git", "-C", project]
+        known = subprocess.run([*git, "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}"],
+                               capture_output=True)
+        if known.returncode == 0:
+            return subprocess.run([*git, "cat-file", "-e", f"{base}:{rel}"], capture_output=True).returncode == 0
+    return os.path.exists(absolute)
+
+
 def decide(project, file_path):
     """Return the refusal message, or None when the edit passes."""
     if not file_path:
@@ -82,12 +103,13 @@ def decide(project, file_path):
     if EVIDENCE.search(rel):
         return (f"protect-check-config: {rel} is evidence the merge gate reads. Receipts are written by "
                 "receipt.py and product-check.py, and runs/_risk.json by the human. Rerun the check instead.")
-    if not PROTECTED.search(rel) or not os.path.exists(absolute) or unlocked(project, rel):
+    if not PROTECTED.search(rel) or unlocked(project, rel) or not existed_before(project, rel, absolute):
         return None
     return (f"protect-check-config: {rel} sets the bar a check measures against, and editing it can turn a "
             "failing check green without fixing anything. Fix the code instead. If the story really needs "
-            "this change, stop and report it as a concern naming the file and the reason. The harness "
-            f"records a ruling and unlocks the path in {UNLOCK_REL}.")
+            "this change, ask for a ruling: write gate-request.json as the spgr-notify-human skill's step 0 "
+            f'describes, with "unlock_paths": [{{"path": "{rel}", "reason": "<why the story needs it>"}}], '
+            f"and return. When the person approves, the harness unlocks the path in {UNLOCK_REL}.")
 
 
 def bash_targets(command):

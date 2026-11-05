@@ -135,6 +135,29 @@ class GateRequestTest(EngineCase):
                 self.assertEqual(engine.units.state("U-0001")["retries_spent"], 1, "refused is a defect, not a pass")
                 self.assertIn("gate-request.json was refused", self.provider.spawned[-1].brief)
 
+    def test_an_unlock_request_records_the_ruling_when_approved(self):
+        """The reference run's scaffold needed two locked config files and the rulings
+        had to be written by hand. A request naming unlock_paths gets an unlock option,
+        and approving it writes the ruling the protection hook reads."""
+        request = {**self.REQUEST, "decision_prompt": "Fix the lint config?",
+                   "unlock_paths": [{"path": "eslint.config.js", "reason": "drop a redundant rule block"}]}
+        engine = self.run_until_blocked(request)
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")
+        gate = engine.gates.open_gates()[0]["content"]
+        self.assertEqual(gate["options"][0]["option"], "unlock")
+        self.assertIn("eslint.config.js", gate["options"][0]["consequence"])
+        engine.gates.answer(gate["checkpoint_id"], "unlock", "human")
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+        rulings = json.loads((self.project / "runs" / "_config-unlock.json").read_text())["paths"]
+        self.assertEqual(rulings[0]["path"], "eslint.config.js")
+        self.assertIn(f"Ruled by the human at {gate['checkpoint_id']}", rulings[0]["reason"])
+
+    def test_an_unlock_entry_without_a_reason_is_refused(self):
+        engine = self.run_until_blocked({**self.REQUEST, "unlock_paths": [{"path": "tsconfig.json"}]})
+        self.tick_until(engine, lambda: len(engine.units.state("U-0001")["sessions"]) > 1)
+        self.assertEqual(engine.gates.all(), [])
+        self.assertIn("unlock_paths entry needs a path and a reason", self.provider.spawned[-1].brief)
+
     def test_an_option_written_as_a_label_opens_the_gate(self):
         """The first real request a session wrote used {id, label}, and the question was lost."""
         request = {**self.REQUEST, "options": [{"id": "unlock", "label": "Record the ruling", "consequence": "It edits."},

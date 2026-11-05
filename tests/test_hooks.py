@@ -327,7 +327,26 @@ class ProtectCheckConfigTest(unittest.TestCase):
             for path in (rel, str(self.project / rel)):
                 rc, _, err = self.edit(path, "Write")
                 self.assertEqual(rc, 2, path)
-                self.assertIn("report it as a concern", err)
+                self.assertIn("unlock_paths", err)
+
+    def test_a_file_the_unit_created_stays_its_own_to_edit(self):
+        """The reference run's scaffold created eslint.config.js, then could not fix it,
+        because the file was on disk. Only what existed at the unit's base is protected."""
+        env = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+        subprocess.run(["git", "init", "-q", "-b", "main", str(self.project)], check=True)
+        subprocess.run(["git", "-C", str(self.project), "add", "tsconfig.json"], check=True)
+        subprocess.run(["git", "-C", str(self.project), *env, "commit", "-qm", "base"], check=True)
+        def edit(rel):
+            return run_hook("protect-check-config.py",
+                            {"hook_event_name": "PreToolUse", "tool_name": "Edit", "tool_input": {"file_path": rel}},
+                            self.project, env={"SPRINGER_BASE": "main"})
+        self.assertEqual(edit("tsconfig.json")[0], 2, "in the base commit")
+        self.assertEqual(edit("eslint.config.mjs")[0], 0, "created by the unit, not in the base")
+        self.assertEqual(run_hook("protect-check-config.py",
+                                  {"hook_event_name": "PreToolUse", "tool_name": "Edit",
+                                   "tool_input": {"file_path": "eslint.config.mjs"}},
+                                  self.project, env={"SPRINGER_BASE": "no-such-ref"})[0], 2,
+                         "an unreadable base falls back to the file on disk")
 
     def test_new_files_source_ci_and_product_checks_pass(self):
         for rel in ("src/app.ts", ".github/workflows/ci.yml", "runs/_product-check.json",
