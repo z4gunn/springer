@@ -390,7 +390,7 @@ class RestackTest(unittest.TestCase):
 
 
 class LocalHostTest(unittest.TestCase):
-    """The default source host: changes merge in the project checkout, then main is pushed."""
+    """The default source host: changes merge off the project checkout, then main is pushed."""
 
     ENV = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
 
@@ -440,7 +440,7 @@ class LocalHostTest(unittest.TestCase):
         self.host.merge("acme", second)
         self.assertEqual((self.project / "f.txt").read_text(), "A\nB\n")
 
-    def test_a_conflict_or_a_dirty_checkout_is_refused_and_leaves_main_alone(self):
+    def test_a_conflict_is_refused_and_leaves_main_alone(self):
         from springer_harness.providers.local import LocalMergeError
         branch = self.unit("U-0001", {"f.txt": "unit"})
         (self.project / "f.txt").write_text("main")
@@ -453,9 +453,41 @@ class LocalHostTest(unittest.TestCase):
             self.host.merge("acme", number)
         self.assertEqual(self.git(self.project, "rev-parse", "HEAD").stdout, before)
         self.assertEqual(self.git(self.project, "status", "--porcelain").stdout, "")
+
+    def test_a_persons_unrelated_edit_does_not_refuse_the_merge_and_is_kept(self):
+        """The reference run's merges were refused for a modified run log and an
+        uncommitted brief. The merge is made off the checkout, and git keeps the edit."""
+        branch = self.unit("U-0001", {"app.ts": "one"})
+        number = self.host.open("acme", branch, "main")
         (self.project / "notes.md").write_text("a person's edit")
-        with self.assertRaisesRegex(LocalMergeError, "uncommitted"):
+        sha = self.host.merge("acme", number)
+        self.assertEqual(self.git(self.project, "rev-parse", "HEAD").stdout.strip(), sha)
+        self.assertEqual((self.project / "app.ts").read_text(), "one")
+        self.assertEqual((self.project / "notes.md").read_text(), "a person's edit")
+        self.assertEqual(self.git(self.project, "status", "--porcelain").stdout, "?? notes.md\n")
+
+    def test_an_edit_the_merge_would_overwrite_is_refused_and_kept(self):
+        from springer_harness.providers.local import LocalMergeError
+        (self.project / "app.ts").write_text("zero")
+        self.git(self.project, "add", "-A")
+        self.git(self.project, "commit", "-qm", "app")
+        branch = self.unit("U-0001", {"app.ts": "one"})
+        number = self.host.open("acme", branch, "main")
+        before = self.git(self.project, "rev-parse", "HEAD").stdout
+        (self.project / "app.ts").write_text("a person's edit")
+        with self.assertRaisesRegex(LocalMergeError, "overwrite uncommitted work"):
             self.host.merge("acme", number)
+        self.assertEqual(self.git(self.project, "rev-parse", "HEAD").stdout, before)
+        self.assertEqual((self.project / "app.ts").read_text(), "a person's edit")
+
+    def test_a_checkout_on_another_branch_does_not_refuse_the_merge(self):
+        branch = self.unit("U-0001", {"app.ts": "one"})
+        number = self.host.open("acme", branch, "main")
+        self.git(self.project, "checkout", "-q", "-b", "experiment")
+        sha = self.host.merge("acme", number)
+        self.assertEqual(self.git(self.project, "rev-parse", "main").stdout.strip(), sha)
+        self.assertEqual(self.git(self.project, "symbolic-ref", "--short", "HEAD").stdout.strip(), "experiment")
+        self.assertFalse((self.project / "app.ts").exists(), "the person's checkout is not touched")
 
     def test_the_session_contract_follows_the_source_host(self):
         from springer_harness.providers.claude_code import PR_STEPS
@@ -549,7 +581,7 @@ class ReviewPackageTest(unittest.TestCase):
 
 
 class IntegrateTest(unittest.TestCase):
-    """An artifact unit's branch lands on the default branch in the main checkout."""
+    """An artifact unit's branch lands on the default branch, merged off the main checkout."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -581,6 +613,14 @@ class IntegrateTest(unittest.TestCase):
         (self.project / "runs/acme-1/artifacts/prd.json").write_text('{"newer": true}')
         self.assertIn("would be overwritten", self.trees.integrate("U-0001"))
         self.assertEqual((self.project / "runs/acme-1/artifacts/prd.json").read_text(), '{"newer": true}')
+
+    def test_a_dirty_checkout_does_not_refuse_an_integration(self):
+        self.commit("docs/prd.md", "PRD")
+        (self.project / "notes.md").write_text("a person's edit")
+        self.assertIsNone(self.trees.integrate("U-0001"))
+        self.assertEqual((self.project / "docs/prd.md").read_text(), "PRD")
+        self.assertEqual((self.project / "notes.md").read_text(), "a person's edit")
+        self.assertEqual(self.trees.claimed(), ["U-0001"], "the merge scratch tree is gone")
 
     def test_only_unit_worktrees_count_as_claimed(self):
         (self.trees.root / ".venv").mkdir()

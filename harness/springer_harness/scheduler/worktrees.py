@@ -14,6 +14,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ..merge import merge_off_checkout
+
 
 def _git(cwd, *args):
     return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
@@ -89,45 +91,30 @@ class Worktrees:
         return [p for p in changed.splitlines() if p and not p.startswith(ARTIFACT_PATHS)]
 
     def integrate(self, unit_id):
-        """Merge the unit's branch into the default branch in the main checkout.
-        Returns None, "nothing to integrate", or why it was refused. A checkout with
-        a person's uncommitted work, or on another branch, is never touched."""
+        """Merge the unit's branch into the default branch, off the person's checkout.
+        Returns None, "nothing to integrate", or why it was refused. Their uncommitted
+        work is kept, and the merge is refused only when it would overwrite it."""
         branch, base = f"unit/{unit_id}", self.default_branch()
         ahead = _git(self.project, "rev-list", "--count", f"{base}..{branch}").stdout.strip()
         if not ahead or ahead == "0":
             return "nothing to integrate"
-        dirty = [line for line in _git(self.project, "status", "--porcelain").stdout.splitlines()
-                 if not line[3:].startswith(("runs/", ".worktrees/"))]
-        if dirty:
-            return "the main checkout has uncommitted changes"
-        message = f"chore: integrate {branch}"
-        # The harness authors this commit, as it does the brief and profile commits, so
-        # a machine with no git identity configured can still integrate.
-        merge = ("-c", "user.name=Springer", "-c", "user.email=springer@local", "merge", "--no-edit", "--no-ff",
-                 "-m", message, branch)
-        done = _git(self.project, *merge)
-        if done.returncode and self._clear_identical_copies(branch, done.stderr):
-            done = _git(self.project, *merge)
-        if done.returncode and self._resolve_docs_index():
-            done = _git(self.project, "-c", "user.name=Springer", "-c", "user.email=springer@local",
-                        "commit", "--no-edit", "--quiet")
-        if done.returncode:
-            _git(self.project, "merge", "--abort")
-            return done.stderr.strip() or done.stdout.strip() or "git merge failed"
-        return None
+        _, problem = merge_off_checkout(self.project, branch, base, f"chore: integrate {branch}", self.root,
+                                        resolve=self._resolve_docs_index,
+                                        clear=lambda error: self._clear_identical_copies(branch, error))
+        return problem
 
-    def _resolve_docs_index(self):
+    def _resolve_docs_index(self, tree):
         """Parallel units each rebuild the docs index from what their branch has, so two
         of them collide on it. The index only ever gains links, so the two sides merge
         by heading. True when that was the only conflict and it is now resolved."""
-        conflicted = _git(self.project, "diff", "--name-only", "--diff-filter=U").stdout.split()
+        conflicted = _git(tree, "diff", "--name-only", "--diff-filter=U").stdout.split()
         if conflicted != [DOCS_INDEX]:
             return False
-        ours, theirs = (_git(self.project, "show", f":{stage}:{DOCS_INDEX}") for stage in (2, 3))
+        ours, theirs = (_git(tree, "show", f":{stage}:{DOCS_INDEX}") for stage in (2, 3))
         if ours.returncode or theirs.returncode:
             return False
-        (self.project / DOCS_INDEX).write_text(merge_index(ours.stdout, theirs.stdout))
-        return _git(self.project, "add", DOCS_INDEX).returncode == 0
+        (Path(tree) / DOCS_INDEX).write_text(merge_index(ours.stdout, theirs.stdout))
+        return _git(tree, "add", DOCS_INDEX).returncode == 0
 
     def _clear_identical_copies(self, branch, error):
         """git refuses a merge that would overwrite untracked files. A session that
