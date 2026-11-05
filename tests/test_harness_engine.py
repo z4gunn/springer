@@ -168,6 +168,21 @@ class FailureTest(EngineCase):
         engine.gates.answer(engine.gates.open_gates()[0]["content"]["checkpoint_id"], "retry", "human")
         self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
 
+    def test_a_human_retry_is_a_fresh_budget_and_the_next_session_reads_why(self):
+        """A retry answered at the gate of an exhausted unit once left the budget spent,
+        so the first defect after it blocked again, and the human's notes were dropped."""
+        self.provider.script["spgr-agent-backend-developer"] = [
+            Attempt(result=fail_result("defect", "no passing test receipt"))] * 4 + [Attempt()]
+        engine = self.engine([batch(unit("a"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "blocked")
+        gate = engine.gates.open_gates()[0]["content"]
+        engine.gates.answer(gate["checkpoint_id"], "retry", "human", free_text="Add a test runner")
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+        self.assertEqual(len(engine.units.state("U-0001")["sessions"]), 5)
+        brief = self.provider.spawned[3].brief
+        self.assertIn("Add a test runner", brief)
+        self.assertIn("no passing test receipt", brief)
+
     def test_transient_and_environment_spend_no_retry(self):
         for cause in ("transient", "environment", "context"):
             with self.subTest(cause):

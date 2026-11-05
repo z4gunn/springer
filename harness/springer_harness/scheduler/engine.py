@@ -615,9 +615,12 @@ class RunEngine:
                     self.units.transition(unit_id, "cancelled", f"gate {content['checkpoint_id']} answered cancel",
                                           cancelled_by=response["by"])
                 elif state["state"] == "blocked" and self._last_gate(unit_id) == content["checkpoint_id"]:
-                    if content["context"].get("gate_request"):
-                        self._append_note(unit_id, self._answer_note(content, response))
-                    self.units.transition(unit_id, "ready", f"gate {content['checkpoint_id']} answered {option}")
+                    # The next session reads why the unit stopped and what the human said, and
+                    # a human retry is a fresh budget: left spent, the first defect would block
+                    # again before the session could act on the answer.
+                    self._append_note(unit_id, self._answer_note(content, response))
+                    self.units.transition(unit_id, "ready", f"gate {content['checkpoint_id']} answered {option}",
+                                          retries_spent=0)
 
     def _answer_note(self, content, response):
         """What the next session's brief says about the gate this unit asked for."""
