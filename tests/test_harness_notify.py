@@ -12,7 +12,7 @@ from test_harness_api import ApiCase, op_id
 from springer_harness.notify import setup as notify_setup
 from springer_harness.notify.notifier import Notifier, load_settings, quiet, save_settings
 from springer_harness.notify.slack import (APP_TOKEN, BOT_TOKEN, MANIFEST, SECRET_SCOPE, closed_blocks, gate_blocks,
-                                           handle_action, handle_command, route)
+                                           handle_action, handle_command, handle_submission, open_form, route)
 from springer_harness.notify.slack import slack_channel_factory
 from springer_harness.providers.secrets import MemorySecrets
 from slack_fake import FakeSlack
@@ -215,14 +215,60 @@ class SlackHandlerTest(NotifyCase):
         self.assertEqual([(b["action_id"], b.get("style")) for b in actions["elements"]],
                          [("gate:approve", "primary"), ("gate:send_back", "danger")])
 
-    def test_a_gate_with_decisions_is_left_to_the_tui(self):
+    def direction_gate(self):
+        options = [dict(OPTIONS[0], recommended_because="fits"), OPTIONS[1]]
+        return self.engine.gates.open("direction-review", "L3", [], "Review the direction", options, decisions=[
+            {"decision_id": "D-1", "kind": "question", "prompt": "Which setup?", "response": None},
+            {"decision_id": "D-2", "kind": "question", "prompt": "Hydrate?", "response": None}])["content"]["checkpoint_id"]
+
+    def tap(self, gate_id, user=ME):
+        return {"user": {"id": user}, "trigger_id": "t-1", "actions": [
+            {"action_id": "gate_form", "value": json.dumps({"p": "acme", "r": self.run_id, "g": gate_id})}]}
+
+    def submission(self, view, option="0", answers=("A", "yes"), notes="", user=ME):
+        values = {"option": {"pick": {"selected_option": {"value": option}}},
+                  "notes": {"answer": {"value": notes}}}
+        for block, answer in zip(["d:D-1", "d:D-2"], answers):
+            values[block] = {"answer": {"value": answer}}
+        return {"type": "view_submission", "user": {"id": user},
+                "view": {"id": "V1", "callback_id": "gate_answer", "private_metadata": view["private_metadata"],
+                         "state": {"values": values}}}
+
+    def test_a_gate_with_decisions_gets_one_answer_button_that_opens_a_form(self):
         self.set_up_slack()
-        self.engine.gates.open("direction-review", "L3", [], "Review the direction", OPTIONS,
-                               decisions=[{"decision_id": "D-1", "prompt": "Which option?", "response": None}])
+        gate_id = self.direction_gate()
         self.notifier.poll()
         view = next(v for k, v in self.channel.sent if k == "gate")
         self.assertFalse(view["answerable"])
-        self.assertNotIn("actions", [b["type"] for b in gate_blocks(view)])
+        actions = gate_blocks(view)[-1]
+        self.assertEqual([e["action_id"] for e in actions["elements"]], ["gate_form"])
+        form, note = open_form(self.tap(gate_id), self.daemon, ME)
+        self.assertIsNone(note)
+        inputs = [b["block_id"] for b in form["blocks"] if b["type"] == "input"]
+        self.assertEqual(inputs, ["option", "d:D-1", "d:D-2", "notes"])
+        pick = form["blocks"][2]["element"]
+        self.assertEqual(pick["initial_option"]["value"], "0", "the recommended option is preselected")
+        self.assertEqual(open_form(self.tap(gate_id, SOMEONE), self.daemon, ME)[1][:15], "Only the person")
+
+    def test_the_form_answers_the_gate_with_its_decisions_and_notes(self):
+        gate_id = self.direction_gate()
+        form, _ = open_form(self.tap(gate_id), self.daemon, ME)
+        ops = self.app.state.operations
+        self.assertIn("Only the person", handle_submission(self.submission(form, user=SOMEONE), self.daemon, ops, ME))
+        self.assertIsNone(self.engine.gates.get(gate_id)["content"]["response"])
+        self.assertIsNone(handle_submission(self.submission(form, notes="ship it"), self.daemon, ops, ME))
+        content = self.engine.gates.get(gate_id)["content"]
+        self.assertEqual((content["response"]["option"], content["response"]["by"], content["response"]["free_text"]),
+                         ("approve", "channel:slack", "ship it"))
+        self.assertEqual([d["response"] for d in content["decisions"]], ["A", "yes"])
+        self.assertIn("already answered", open_form(self.tap(gate_id), self.daemon, ME)[1])
+
+    def test_a_form_that_names_no_real_gate_answers_nothing(self):
+        bad = {"user": {"id": ME}, "trigger_id": "t", "actions": [
+            {"action_id": "gate_form", "value": json.dumps({"p": "acme", "r": "../x", "g": "G-0001"})}]}
+        self.assertEqual(open_form(bad, self.daemon, ME), (None, "That button carried no gate."))
+        missing = self.tap("G-9999")
+        self.assertIn("not a gate", open_form(missing, self.daemon, ME)[1])
 
 
 class SocketModeTest(NotifyCase):
@@ -275,6 +321,33 @@ class SocketModeTest(NotifyCase):
         reply = self.slack.wait(lambda: self.slack.responses)[0]
         self.assertEqual(reply["response_type"], "ephemeral")
         self.assertIn(self.run_id, reply["text"])
+
+    def test_the_answer_form_opens_and_submits_through_socket_mode(self):
+        gate_id = self.engine.gates.open("direction-review", "L3", [], "Review the direction", OPTIONS, decisions=[
+            {"decision_id": "D-1", "kind": "question", "prompt": "Which setup?", "response": None}])["content"]["checkpoint_id"]
+        self.notifier.poll()
+        posted = self.slack.wait(lambda: self.slack.methods("chat.postMessage"))[0]
+        button = next(b for b in posted["blocks"] if b["type"] == "actions")["elements"][0]
+        self.slack.wait(lambda: self.slack.client)
+        self.slack.push("e-form", "interactive", {
+            "type": "block_actions", "user": {"id": ME}, "trigger_id": "trig-1",
+            "actions": [{"action_id": button["action_id"], "value": button["value"], "action_ts": "4.1"}],
+            "container": {"channel_id": "D0SPRINGER", "message_ts": "1700000000.000001"}})
+        opened = self.slack.wait(lambda: self.slack.methods("views.open"))[0]
+        self.assertEqual(opened["trigger_id"], "trig-1")
+        view = opened["view"] if isinstance(opened["view"], dict) else json.loads(opened["view"])
+        self.slack.push("e-submit", "interactive", {
+            "type": "view_submission", "user": {"id": ME},
+            "view": {"id": "V9", "callback_id": view["callback_id"], "private_metadata": view["private_metadata"],
+                     "state": {"values": {"option": {"pick": {"selected_option": {"value": "1"}}},
+                                          "d:D-1": {"answer": {"value": "B"}},
+                                          "notes": {"answer": {"value": None}}}}}})
+        self.slack.wait(lambda: self.engine.gates.get(gate_id)["content"]["response"])
+        content = self.engine.gates.get(gate_id)["content"]
+        self.assertEqual((content["response"]["option"], content["decisions"][0]["response"]), ("send_back", "B"))
+        self.notifier.poll()
+        updated = self.slack.wait(lambda: self.slack.methods("chat.update"))[0]
+        self.assertIn("Answered send back from Slack", json.dumps(updated["blocks"]))
 
 
 class SetupTest(unittest.TestCase):

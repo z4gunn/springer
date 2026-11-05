@@ -1,13 +1,15 @@
 """Slack, over Socket Mode: the daemon opens an outbound websocket, so nothing listens
 on a public port. Gate messages go to a direct message with the one person allowed to
 answer. A button press is a gate.answer from the channel actor, refused for anyone
-else. /springer answers status, gates, pause, and resume.
+else. A gate with decisions gets one Answer button that opens a form instead. /springer answers status, gates, pause, and resume.
 
 The block builders and the two handlers are plain functions over dicts, so they are
 tested without Slack. Only SlackService touches slack_sdk.
 """
 
 import json
+from pathlib import Path
+import re
 import uuid
 
 from ..errors import HarnessError
@@ -18,6 +20,9 @@ SECRET_SCOPE = "_harness"
 ACTOR = "channel:slack"
 DANGER = ("cancel", "discard", "send_back")
 PRIMARY = ("approve", "proceed", "accept")
+FORM_ACTION = "gate_form"
+FORM_CALLBACK = "gate_answer"
+SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 MANIFEST = {
     "display_information": {"name": "Springer", "description": "Gates and run status from the Springer harness"},
@@ -61,16 +66,18 @@ def gate_blocks(view):
     consequences = [f"{o['option'].replace('_', ' ')}: {o['consequence']}" for o in view["options"] if o["consequence"]]
     if consequences:
         blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": "\n".join(consequences)[:2900]}]})
+    target = {"p": view["project"], "r": view["run_id"], "g": view["gate_id"]}
     if not view["answerable"]:
-        blocks.append({"type": "context", "elements": [{"type": "mrkdwn",
-                                                        "text": "This one has decisions to fill in. Answer it in the TUI."}]})
+        # Decisions take written answers, so the tap opens a form instead of answering.
+        blocks.append({"type": "actions", "block_id": f"gate-{view['gate_id']}", "elements": [
+            {"type": "button", "action_id": FORM_ACTION, "style": "primary", "value": json.dumps(target),
+             "text": {"type": "plain_text", "text": "Answer"}}]})
         return blocks
     buttons = []
     for option in view["options"][:5]:
         button = {"type": "button", "action_id": f"gate:{option['option']}",
                   "text": {"type": "plain_text", "text": option["option"].replace("_", " ")[:75]},
-                  "value": json.dumps({"p": view["project"], "r": view["run_id"], "g": view["gate_id"],
-                                       "o": option["option"]})}
+                  "value": json.dumps({**target, "o": option["option"]})}
         if option["option"] in PRIMARY:
             button["style"] = "primary"
         elif option["option"] in DANGER:
@@ -90,6 +97,98 @@ def closed_blocks(view):
     return [{"type": "section", "text": {"type": "mrkdwn", "text": f"~{view['gate_id']}~ ({view['level']}) in "
                                                                   f"{view['run_id']}\n{view['prompt']}"}},
             {"type": "context", "elements": [{"type": "mrkdwn", "text": outcome}]}]
+
+
+# --- the answer form, for a gate with decisions ---
+
+def form_view(target, content):
+    """A modal: the option as a dropdown, one text box per decision, and optional notes."""
+    options = content["options"]
+    listing = "\n".join(f"*{n}.* {o['option']}" + (f"\n{o['consequence']}" if o.get("consequence") else "")
+                        for n, o in enumerate(options, 1))
+    choices = [{"text": {"type": "plain_text", "text": f"{n}. {o['option']}"[:75]}, "value": str(n - 1)}
+               for n, o in enumerate(options, 1)]
+    pick = {"type": "static_select", "action_id": "pick", "options": choices[:100],
+            "placeholder": {"type": "plain_text", "text": "Pick an option"}}
+    recommended = next((c for c, o in zip(choices, options) if o.get("recommended_because")), None)
+    if recommended:
+        pick["initial_option"] = recommended
+    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": content["decision_prompt"][:3000]}},
+              {"type": "section", "text": {"type": "mrkdwn", "text": listing[:3000]}},
+              {"type": "input", "block_id": "option", "label": {"type": "plain_text", "text": "Option"},
+               "element": pick}]
+    for decision in content.get("decisions") or []:
+        blocks.append({"type": "input", "block_id": f"d:{decision['decision_id']}",
+                       "label": {"type": "plain_text", "text": decision["prompt"][:2000]},
+                       "hint": {"type": "plain_text", "text": decision["decision_id"]},
+                       "element": {"type": "plain_text_input", "action_id": "answer", "multiline": True}})
+    blocks.append({"type": "input", "block_id": "notes", "optional": True,
+                   "label": {"type": "plain_text", "text": "Notes"},
+                   "element": {"type": "plain_text_input", "action_id": "answer", "multiline": True}})
+    return {"type": "modal", "callback_id": FORM_CALLBACK, "private_metadata": json.dumps(target),
+            "title": {"type": "plain_text", "text": f"Answer {target['g']}"[:24]},
+            "submit": {"type": "plain_text", "text": "Answer"},
+            "close": {"type": "plain_text", "text": "Cancel"}, "blocks": blocks}
+
+
+def _gate_content(daemon, target):
+    """The gate record, read without the daemon lock: a modal must open within 3 seconds
+    of the tap and a tick can hold the lock longer. Records are written atomically."""
+    names = (target.get("p"), target.get("r"), target.get("g"))
+    if not all(isinstance(n, str) and SAFE_NAME.match(n) for n in names):
+        raise HarnessError("That button carried no gate.")
+    path = Path(daemon.project_path(target["p"])) / "runs" / target["r"] / "artifacts" / f"{target['g']}.json"
+    try:
+        return json.loads(path.read_text())["content"]
+    except (OSError, ValueError, KeyError):
+        raise HarnessError(f"{target['g']} is not a gate of {target['r']}.") from None
+
+
+def open_form(payload, daemon, allowed_user):
+    """The Answer tap. Returns (view, None) to open, or (None, note) to post instead."""
+    if payload.get("user", {}).get("id") != allowed_user:
+        return None, "Only the person this app was set up for can answer gates."
+    try:
+        target = json.loads((payload.get("actions") or [{}])[0].get("value", ""))
+        content = _gate_content(daemon, target)
+    except (ValueError, AttributeError):
+        return None, "That button carried no gate."
+    except HarnessError as exc:
+        return None, str(exc)
+    if content.get("response"):
+        return None, f"{target['g']} is already answered."
+    return form_view(target, content), None
+
+
+def handle_submission(payload, daemon, operations, allowed_user):
+    """The form's Answer. Returns a note to post when it did not answer the gate."""
+    if payload.get("user", {}).get("id") != allowed_user:
+        return "Only the person this app was set up for can answer gates."
+    view = payload.get("view") or {}
+    values = (view.get("state") or {}).get("values") or {}
+    try:
+        target = json.loads(view.get("private_metadata") or "")
+        content = _gate_content(daemon, target)
+        index = int(values["option"]["pick"]["selected_option"]["value"])
+        option = content["options"][index]["option"]
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+        return "That form carried no gate or no option."
+    except HarnessError as exc:
+        return str(exc)
+    decisions = [{"decision_id": block[2:], "response": (field.get("answer", {}).get("value") or "").strip()}
+                 for block, field in values.items() if block.startswith("d:")]
+    notes = (values.get("notes", {}).get("answer", {}).get("value") or "").strip()
+    args = {"gate_id": target["g"], "option": option, "decisions": decisions}
+    if notes:
+        args["free_text"] = notes
+    op_id = f"slack-{view.get('id') or uuid.uuid4().hex}"
+    try:
+        outcome = operations.apply(op_id, "gate.answer", target["p"], target["r"], args, None, ACTOR)
+    except HarnessError as exc:
+        return f"{target['g']} not answered: {exc}"
+    if outcome.get("status") == "needs_confirmation":
+        return f"{target['g']} needs a confirmation. Answer it in the TUI."
+    return None
 
 
 # --- handlers ---
@@ -232,26 +331,47 @@ class SlackService(SlackChannel):
         def respond(url, text):
             WebhookClient(url).send(text=text, response_type="ephemeral")
 
+        def open_view(trigger_id, view):
+            self.web.views_open(trigger_id=trigger_id, view=view)
+
         route(request.type, request.payload or {}, ack, respond, self.web.chat_postMessage, self.daemon,
-              self.operations, self.user)
+              self.operations, self.user, open_view=open_view, dm=self.dm)
 
 
-def route(kind, payload, ack, respond, post, daemon, operations, allowed_user):
+def route(kind, payload, ack, respond, post, daemon, operations, allowed_user, open_view=None, dm=None):
     """One Socket Mode request. Slack wants the ack within 3 seconds and a tick holds the
     daemon lock through git and merge work, so the ack goes first and the answer after:
-    a command's reply through its response_url, a button's note in the gate's thread."""
+    a command's reply through its response_url, a button's note in the gate's thread, a
+    form's note in the direct message. The Answer tap opens its form without the lock,
+    because the trigger it carries expires 3 seconds after the tap."""
     ack()
     if kind == "slash_commands":
         text = handle_command(payload.get("text", ""), daemon, operations, payload.get("user_id"), allowed_user)
         if payload.get("response_url"):
             respond(payload["response_url"], text)
         return
+    notifier = getattr(daemon, "notifier", None)
+    if kind == "interactive" and payload.get("type") == "view_submission":
+        if (payload.get("view") or {}).get("callback_id") != FORM_CALLBACK:
+            return
+        note = handle_submission(payload, daemon, operations, allowed_user)
+        if note and dm is not None:
+            post(channel=dm(), text=note)
+        if notifier is not None:
+            notifier.kick.set()
+        return
     if kind == "interactive" and payload.get("type") == "block_actions":
-        note = handle_action(payload, operations, allowed_user)
         message = payload.get("container", {})
+        if (payload.get("actions") or [{}])[0].get("action_id") == FORM_ACTION:
+            view, note = open_form(payload, daemon, allowed_user)
+            if view is not None and open_view is not None:
+                open_view(payload.get("trigger_id"), view)
+            elif note and message.get("channel_id"):
+                post(channel=message["channel_id"], thread_ts=message.get("message_ts"), text=note)
+            return
+        note = handle_action(payload, operations, allowed_user)
         if note and message.get("channel_id"):
             post(channel=message["channel_id"], thread_ts=message.get("message_ts"), text=note)
-        notifier = getattr(daemon, "notifier", None)
         if notifier is not None:
             notifier.kick.set()
 

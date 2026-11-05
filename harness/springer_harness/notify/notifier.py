@@ -65,7 +65,7 @@ def gate_view(project, run_id, content):
         "level": content["level"], "type": content["checkpoint_type"], "prompt": content["decision_prompt"],
         "options": [{"option": o["option"], "consequence": o.get("consequence", "")} for o in content["options"]],
         "review": context.get("review"), "findings": summarize_findings(context.get("findings") or []),
-        # A gate with decisions to fill in, or one that wants written notes, is answered in the TUI.
+        # A gate with decisions to fill in is answered through a form, not one tap.
         "answerable": not content.get("decisions"),
         "response": content.get("response"), "retired": bool(context.get("retired")),
     }
