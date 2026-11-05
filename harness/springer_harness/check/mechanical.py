@@ -59,17 +59,22 @@ GATING_TIMEOUT = 1800
 OUTPUT_SHOWN = 800
 
 
-def run_gating(commands, session_dir, cwd):
-    """Run each gating command at the worktree's head through receipt.py, into the
-    session's check folder, in order. None when every one passes, else the defect
-    detail naming the first that did not, with the tail of its output. A product
-    command is judged by its exit code, as a check is, because the receipt's test
-    count only reads a test runner's summary."""
+def needs_gating(result):
+    """A PR, or code reported as an artifact, which still becomes a PR."""
+    return result.outcome == "pr" or not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths)
+
+
+def run_gating(commands, out, cwd):
+    """Run each gating command at the worktree's head through receipt.py, writing the
+    receipts under out, in order. None when every one passes, else the defect detail
+    naming the first that did not, with the tail of its output. A product command is
+    judged by its exit code, as a check is, because the receipt's test count only reads
+    a test runner's summary."""
     script = Path(cwd) / SCRIPTS / "receipt.py"
     if not script.exists():
         return "receipt.py is missing from the worktree"
-    out = Path(session_dir) / "check"
-    shutil.rmtree(out, ignore_errors=True)  # a Check repeated after a crash runs at the current head
+    out = Path(out)
+    shutil.rmtree(out, ignore_errors=True)
     for command in commands:
         name, kind = command["name"], "check" if command["kind"] == "product" else command["kind"]
         args = [script, "run", out, "--name", name, "--kind", kind, "--cwd", cwd,
@@ -138,9 +143,10 @@ def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch,
         detail = result.detail if has_result else f"no result.json. {evidence}"
         return replace(result, status="fail", failure_class=chosen, detail=detail.strip())
     code = not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths)
-    if gating and (result.outcome == "pr" or code):
-        # Code reported as an artifact still becomes a PR, so it is checked as one.
-        problem = run_gating(gating, session_dir, cwd)
+    if gating and needs_gating(result):
+        # Run in place, for a caller with no tick to protect. The daemon runs them off
+        # the tick through GatingRuns and passes none here.
+        problem = run_gating(gating, session_dir / "check", cwd)
         if problem:
             return replace(result, status="fail", failure_class="defect", detail=problem)
     elif require_receipts and result.outcome == "pr" and code:

@@ -10,7 +10,8 @@ import signal
 from pathlib import Path
 
 from ..check import review
-from ..check.mechanical import mechanical_check
+from ..check.gating import GatingRuns
+from ..check.mechanical import mechanical_check, needs_gating
 from ..check.risk import LEVELS, triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
 from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
@@ -95,6 +96,7 @@ class RunEngine:
         self.handles = {}
         self.keys = self._load_keys()
         self.settings = settings or (lambda: {"ci_signal": "receipts"})
+        self.gating_runs = GatingRuns()
 
     # --- helpers ---
 
@@ -283,6 +285,8 @@ class RunEngine:
             self._on_failure(unit_id, state, CheckResult(status="fail", failure_class="defect", detail=requested))
             return
         result = self._result(unit_id, state, session_dir)
+        if result is None:
+            return  # the gating commands are still running, and a later tick reads the verdict
         if result.status != "pass":
             self._on_failure(unit_id, state, result)
             return
@@ -329,10 +333,21 @@ class RunEngine:
         if not getattr(self.provider, "mechanical", False):
             return read_result(session_dir)
         record = self.sessions(unit_id).get(state["sessions"][-1])
+        gating = self._spec(unit_id).get("gating_commands")
+        if gating:
+            # The commands run on a thread, because the tick holds the daemon lock and a
+            # product check can take minutes. None leaves the unit in checking.
+            said = read_result(session_dir)
+            if said.status == "pass" and needs_gating(said):
+                verdict = self.gating_runs.poll((unit_id, state["sessions"][-1]), gating, session_dir,
+                                                self.worktrees.path(unit_id))
+                if verdict is None:
+                    return None
+                if verdict:
+                    return CheckResult(status="fail", failure_class="defect", detail=verdict)
         return mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path, unit_id,
                                 parse_iso(record["started_at"]),
-                                require_receipts=self.settings()["ci_signal"] in ("receipts", "both"),
-                                gating=self._spec(unit_id).get("gating_commands"))
+                                require_receipts=not gating and self.settings()["ci_signal"] in ("receipts", "both"))
 
     # --- review ---
 

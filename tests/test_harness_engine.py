@@ -5,6 +5,7 @@ window, and a stale lock takeover, plus one canned run from plan to complete."""
 
 import json
 import shutil
+import time
 import unittest
 
 from harness_support import HAVE_JSONSCHEMA, OWNER, EngineCase, registry, schema_errors
@@ -190,6 +191,62 @@ class GateRequestTest(EngineCase):
         self.assertEqual(env["SPRINGER_PROJECT_DIR"], str(self.project))
         self.assertEqual(env["SPRINGER_RUN_ID"], "demo")
         self.assertEqual(env["SPRINGER_SESSION_DIR"], str(engine.sessions("U-0001").dir("S-0001")))
+
+
+class GatingOffTheTickTest(EngineCase):
+    """The unit's gating commands run on a thread. The tick holds the daemon lock, and
+    the reference run's product check ran Lighthouse five times, which takes minutes."""
+
+    def setUp(self):
+        super().setUp()
+        import subprocess
+        from helpers import REPO
+        self.provider.mechanical = True
+        scripts = self.project / ".claude/skills/spgr-run-harness/scripts"
+        scripts.mkdir(parents=True)
+        for name in ("receipt.py", "classify-failure.py"):
+            (scripts / name).write_text((REPO / "runtime/skills/spgr-run-harness/scripts" / name).read_text())
+        env = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+        subprocess.run(["git", "-C", str(self.project), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.project), *env, "commit", "-qm", "scripts"], check=True)
+        self.provider.script["spgr-agent-backend-developer"] = [Attempt(result=pr_result(1, touched=("src/a.ts",)))]
+
+    def gated(self, command, kind="test"):
+        return self.engine([batch(unit("a", gating_commands=({"name": "unit", "command": command, "kind": kind},)))])
+
+    def wait_out(self, engine, seconds=30):
+        deadline = time.monotonic() + seconds
+        while self.states(engine)["U-0001"] == "checking" and time.monotonic() < deadline:
+            engine.tick()
+            time.sleep(0.1)
+
+    def test_a_slow_command_runs_off_the_tick_and_its_verdict_lands_on_a_later_tick(self):
+        engine = self.gated("python3 -c \"import time; time.sleep(2); print('Ran 2 tests')\"")
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "checking")
+        started = time.monotonic()
+        engine.tick()
+        engine.tick()
+        self.assertLess(time.monotonic() - started, 1.5, "a tick never waits on a gating command")
+        self.assertEqual(self.states(engine)["U-0001"], "checking")
+        self.assertTrue(engine.gating_runs.running(("U-0001", "S-0001")))
+        self.wait_out(engine)
+        self.assertEqual(self.states(engine)["U-0001"], "gated")
+        receipt = engine.sessions("U-0001").dir("S-0001") / "check" / "receipts" / "unit.json"
+        self.assertEqual(json.loads(receipt.read_text())["tests_ran"], 2)
+
+    def test_a_restart_mid_check_runs_it_again_and_a_partial_receipt_is_not_evidence(self):
+        counter = self.root / "ran.txt"
+        engine = self.gated(f"python3 -c \"open(r'{counter}', 'a').write('x'); raise SystemExit(4)\"", kind="check")
+        engine.gating_runs._run = lambda *args: None  # the daemon dies before the run writes anything
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "checking")
+        session = engine.sessions("U-0001").dir("S-0001")
+        (session / "check" / "receipts").mkdir(parents=True)
+        (session / "check" / "receipts" / "unit.json").write_text(json.dumps({"name": "unit", "result": "pass"}))
+        restarted = self.engine([])  # a new daemon: no thread knows the run, no verdict is on disk
+        self.wait_out(restarted)
+        self.assertEqual(counter.read_text(), "x", "the restarted daemon ran the command once")
+        history = [h["reason"] for h in restarted.units.state("U-0001")["history"] if h["state"] == "retry"]
+        self.assertIn("failed with exit 4", history[0], "the half-written pass receipt was not taken")
 
 
 class FailureTest(EngineCase):
