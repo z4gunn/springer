@@ -450,7 +450,10 @@ autonomy, rulings, interfaces) lives in the brief, never in the preamble,
 so dispatches of one agent share a cached prompt prefix. A claim with no
 receipt is unverified, and Check reads receipts with `receipt.py verify`,
 never the result file's prose, so a receipt for another commit or a moved tree
-is stale.
+is stale. In a daemon run the harness runs the gating commands a unit's spec
+names itself, through `receipt.py run`, at the branch head after the session
+returns, so those receipts are always for the commit the merge takes and a
+session's own receipts are not evidence.
 
 The contract travels in files, not in the prompt and not in the return value,
 so neither the task text nor the diff transits the main session.
