@@ -16,6 +16,10 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+
+# The launchd agent lives in the home folder. A test that reaches the service code reads
+# and writes a throwaway folder instead, and never finds a real installed service.
+os.environ["SPRINGER_LAUNCH_AGENTS"] = __import__("tempfile").mkdtemp(prefix="springer-agents-")
 SCRIPTS = REPO / "runtime" / "skills" / "spgr-run-harness" / "scripts"
 HOOKS = REPO / "runtime" / "hooks"
 SCHEMAS = REPO / "runtime" / "schemas"
