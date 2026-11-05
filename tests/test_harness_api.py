@@ -431,6 +431,17 @@ class OperationCatalogTest(ApiCase):
         restored = next(s for s in self.get("/v1/projects/acme/brief")["sections"] if s["name"] == "Problem")
         self.assertEqual(restored["body"], GOOD_SECTIONS["Problem"])
 
+    def test_an_applied_brief_change_is_committed(self):
+        """Left in the working tree, it reached no unit worktree and refused every local merge."""
+        run_id = self.start()
+        version = self.get("/v1/projects/acme/brief")["version"]
+        body = self.confirmed("brief.update_section", {"section": "Problem", "body": "Changed.", "base_version": version})
+        self.op("gate.answer", {"gate_id": body["result"]["gate_id"], "option": "apply"}, run_id=run_id)
+        git = lambda *a: subprocess.run(["git", "-C", str(self.project_path), *a], capture_output=True, text=True).stdout
+        self.assertEqual(git("status", "--porcelain", "--", "docs/brief.md"), "")
+        self.assertIn("Changed.", git("show", "HEAD:docs/brief.md"))
+        self.assertIn("applied at G-", git("log", "-1", "--format=%s"))
+
     def test_brief_confirm_section_clears_proposed(self):
         store = BriefStore(self.project_path)
         front, sections = store.load()

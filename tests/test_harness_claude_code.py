@@ -586,6 +586,13 @@ class IntegrateTest(unittest.TestCase):
         (self.trees.root / ".venv").mkdir()
         self.assertEqual(self.trees.claimed(), ["U-0001"])
 
+    def test_code_paths_name_what_is_not_an_artifact(self):
+        self.commit("docs/prd.md", "PRD")
+        self.commit("design/variants-1/a.html", "<p>")
+        self.assertEqual(self.trees.code_paths("U-0001"), [])
+        self.commit("src/Hero.tsx", "export {}")
+        self.assertEqual(self.trees.code_paths("U-0001"), ["src/Hero.tsx"])
+
     def test_nothing_committed_is_nothing_to_integrate(self):
         self.assertEqual(self.trees.integrate("U-0001"), "nothing to integrate")
 

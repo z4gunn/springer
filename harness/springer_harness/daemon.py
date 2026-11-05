@@ -217,9 +217,10 @@ class Daemon:
         self.engines[(slug, run_id)] = self._new_engine(slug, path, run_id, kind)
         return run_id
 
-    def commit_brief(self, slug, path, run_id):
-        """Start run is the commit: a unit's worktree is cut from a commit, so a brief
-        that lives only in the working tree is a brief no session can read."""
+    def commit_brief(self, slug, path, run_id, message=None):
+        """Start run is the commit, and so is an applied brief change: a unit's worktree
+        is cut from a commit, so a brief that lives only in the working tree is a brief
+        no session can read, and an uncommitted change refuses every local merge."""
         brief = "docs/brief.md"
         changed = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "--", brief],
                                  capture_output=True, text=True).stdout.strip()
@@ -227,7 +228,7 @@ class Daemon:
             return
         subprocess.run(["git", "-C", str(path), "add", "--", brief], capture_output=True)
         done = subprocess.run(["git", "-C", str(path), "-c", "user.name=Springer", "-c", "user.email=springer@local",
-                               "commit", "-q", "-m", f"docs: the brief for {run_id}", "--", brief],
+                               "commit", "-q", "-m", message or f"docs: the brief for {run_id}", "--", brief],
                               capture_output=True, text=True)
         if done.returncode:
             sys.stderr.write(f"could not commit the brief in {path}: {done.stderr.strip()}\n")

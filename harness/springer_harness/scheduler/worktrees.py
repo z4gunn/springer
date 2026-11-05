@@ -5,6 +5,9 @@ A removal git refuses is logged and left for the human, never forced.
 
 DOCS_INDEX = "docs/README.md"
 RULINGS = "runs/_config-unlock.json"
+# What an artifact unit may land with no PR: the run store, rendered docs, and design
+# variants. Anything else is code, and code reaches the default branch only through a gate.
+ARTIFACT_PATHS = ("runs/", "docs/", "design/")
 
 import shutil
 import subprocess
@@ -77,6 +80,13 @@ class Worktrees:
             shutil.copyfile(source, target)
         elif target.exists():
             target.unlink()
+
+    def code_paths(self, unit_id):
+        """The paths the unit's branch changes against the default branch that are not
+        artifacts. A branch stacked on an unmerged parent carries the parent's code too,
+        so this is not empty for it either."""
+        changed = _git(self.project, "diff", "--name-only", f"{self.default_branch()}...unit/{unit_id}").stdout
+        return [p for p in changed.splitlines() if p and not p.startswith(ARTIFACT_PATHS)]
 
     def integrate(self, unit_id):
         """Merge the unit's branch into the default branch in the main checkout.

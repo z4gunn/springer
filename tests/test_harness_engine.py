@@ -307,9 +307,19 @@ class SchedulingTest(EngineCase):
         self.assertEqual(engine.units.state("U-0001")["retries_spent"], 0)
 
 
+def brief_with_autonomy(project, autonomy):
+    """A low-risk PR merges alone only under autopilot, so a test of that path says so."""
+    from springer_harness.state.brief import BriefStore, render
+    store = BriefStore(project)
+    store.create("app")
+    front, sections = store.load()
+    store.path.write_text(render({**front, "autonomy": autonomy}, sections))
+
+
 class MergePolicyTest(EngineCase):
     def setUp(self):
         super().setUp()
+        brief_with_autonomy(self.project, "autopilot")
         self.provider.script.update({
             "routine": [Attempt(result=pr_result(1, touched=("packages/ui/button.tsx",)))],
             "notable": [Attempt(result=pr_result(2, touched=("packages/ui/x.tsx",), raised_level="L1"))],
@@ -400,6 +410,22 @@ class MergePolicyTest(EngineCase):
         self.assertEqual(engine.gates.open_gates()[0]["content"]["decision_prompt"], "Merge change 7 for U-0001?")
         self.assertEqual(self.provider.spawned[0].env["SPRINGER_SOURCE_HOST"], "local")
 
+    def test_under_standard_a_low_risk_pr_waits_for_a_person(self):
+        """The harness once merged L0 and L1 alone whatever the autonomy, so a standard
+        run whose brief said every merge waits for the human merged without asking."""
+        for autonomy in ("standard", "supervised"):
+            with self.subTest(autonomy):
+                shutil.rmtree(self.project / "runs", ignore_errors=True)
+                brief_with_autonomy(self.project, autonomy)
+                engine = self.engine([batch(unit("a", agent="notable"))])
+                self.tick_until(engine, lambda: engine.gates.open_gates())
+                gate = engine.gates.open_gates()[0]["content"]
+                self.assertEqual((gate["checkpoint_type"], gate["digest"]), ("pr-merge", False))
+                self.assertEqual(self.host.merged, [])
+                engine.gates.answer(gate["checkpoint_id"], "approve", "human")
+                self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+                self.host.merged.clear()
+
     def test_l1_merges_alone_and_leaves_a_digest_entry_that_holds_nothing(self):
         engine = self.engine([batch(unit("a", agent="notable"))])
         self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
@@ -440,6 +466,30 @@ class MergePolicyTest(EngineCase):
         self.assertEqual(self.host.retargeted, [(4, "main")])
         self.assertEqual(engine.units.state("U-0002")["pr"]["base"], "main")
 
+    def test_an_artifact_outcome_that_changes_code_goes_through_a_gate(self):
+        """A stacked DevOps unit reported an artifact, and its integration took its
+        unapproved parent's code to main with no merge gate."""
+        opened = []
+        self.host.open = lambda project, branch, base, title="": opened.append((branch, base)) or 9
+        engine = self.engine([batch(unit("a", agent="notable"))])
+        engine.worktrees.code_paths = lambda unit_id: ["src/Hero.tsx"]
+        integrated = []
+        engine.worktrees.integrate = lambda unit_id: integrated.append(unit_id)
+        self.provider.script["notable"] = [Attempt(result={"status": "pass", "outcome": "artifact"})]
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") in ("gated", "done"))
+        self.assertEqual(integrated, [], "code never integrates without a gate")
+        self.assertEqual(opened, [("unit/U-0001", "main")])
+        self.assertEqual(engine.units.state("U-0001")["pr"]["number"], 9)
+
+    def test_on_github_an_artifact_outcome_that_changes_code_is_a_defect(self):
+        engine = self.engine([batch(unit("a", agent="notable"))])
+        engine.worktrees.code_paths = lambda unit_id: ["src/Hero.tsx"]
+        engine.worktrees.integrate = lambda unit_id: self.fail("integrated code")
+        self.provider.script["notable"] = [Attempt(result={"status": "pass", "outcome": "artifact"}),
+                                           Attempt(result=pr_result(5, touched=("src/Hero.tsx",)))]
+        self.tick_until(engine, lambda: len(self.provider.spawned) == 2)
+        self.assertIn("the branch changes code (src/Hero.tsx)", self.provider.spawned[1].brief)
+
     def test_sending_a_merge_back_spends_a_retry_and_opens_a_fresh_gate(self):
         self.provider.script["risky"].append(self.provider.script["risky"][0])
         engine = self.engine([batch(unit("a", agent="risky"))])
@@ -475,6 +525,7 @@ class ReviewTest(EngineCase):
 
     def setUp(self):
         super().setUp()
+        brief_with_autonomy(self.project, "autopilot")
         self.provider.reviews = True
         self.provider.script["routine"] = [Attempt(result=pr_result(1, touched=("packages/ui/button.tsx",)))]
 

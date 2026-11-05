@@ -288,6 +288,9 @@ def gate_answer(c):
     previous = gate.get("context", {}).get("previous_brief")
     if previous and c.args.option == "discard":
         c.brief.restore(previous)
+    elif previous and c.args.option == "apply":
+        c.daemon.commit_brief(c.project, c.daemon.project_path(c.project), c.run_id,
+                              f"docs: the brief change applied at {c.args.gate_id}")
     if c.args.rule_change:
         c.daemon.home.audit({"type": "risk.rule_change", "gate_id": c.args.gate_id, "rule": c.args.rule_change,
                              "actor": c.actor, "project": c.project}, c.daemon.now())

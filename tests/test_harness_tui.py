@@ -1094,7 +1094,7 @@ class WholeRunTest(TuiCase):
                     await self.until(pilot, lambda: not isinstance(self.app.screen, FormDialog))
             else:
                 self.fail(f"the run never completed on screen:\n{self.text()}")
-            self.assertEqual(len(answered), 3, "a direction review and two risky merges: session, then login")
+            self.assertEqual(len(answered), 5, "a standard run: a direction review and a merge gate for each of four PRs")
             self.assertCountEqual(self.host.merged, [1, 2, 3, 4])
             await self.see(pilot, "complete", "at list price")
 

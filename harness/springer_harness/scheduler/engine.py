@@ -17,6 +17,7 @@ from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_
 from ..errors import IllegalTransition, RunExternallyHeld
 from ..providers.coding_agent import CheckResult, SpawnRequest
 from ..state.cycles import CycleStore
+from ..state.brief import BriefStore
 from ..state.gates import GateStore
 from ..state.ledger import Ledger
 from ..state.lock import RunLock
@@ -278,8 +279,17 @@ class RunEngine:
         level = risk_for(result, self._spec(unit_id)["risk_baseline"])
         write_json(self.units.unit_dir(unit_id) / "risk.json",
                    {"level": level, "triggers": triggers(result.touched_paths), "findings": list(result.findings)})
-        if result.outcome == "pr" and result.pr:
-            pr = self._opened(unit_id, result.pr)
+        code = [] if result.outcome == "pr" or not self.worktrees.path(unit_id).exists() \
+            else self.worktrees.code_paths(unit_id)
+        if code and not hasattr(self.source_host, "open"):
+            # Reported as an artifact but it changes code, and on GitHub only the session
+            # can open the PR. Integrating it would land code with no gate.
+            self._on_failure(unit_id, state, CheckResult(
+                status="fail", failure_class="defect",
+                detail=f"the outcome was an artifact but the branch changes code ({', '.join(code[:5])}). Open a PR."))
+            return
+        if (result.outcome == "pr" and result.pr) or code:
+            pr = self._opened(unit_id, result.pr or {"branch": f"unit/{unit_id}"})
             self.units.transition(unit_id, "gated", f"PR open, risk {level}", pr=pr)
         else:
             self._integrate(unit_id)
@@ -403,7 +413,8 @@ class RunEngine:
     def _integrate(self, unit_id):
         """An artifact unit's commits (a PRD render, design directions) land on the
         default branch at once, so the docs and the design page read them before the
-        gate that needs them. Nothing here is code, so no PR and no review."""
+        gate that needs them. Check sends a branch that changes code to a PR instead,
+        so nothing here is code and it needs no review."""
         if not self.worktrees.path(unit_id).exists():
             return
         reason = self.worktrees.integrate(unit_id)
@@ -527,7 +538,7 @@ class RunEngine:
             if self._review_pending(state):
                 continue
             level = self._level(unit_id)
-            if level in ("L0", "L1"):
+            if level in ("L0", "L1") and self._autopilot():
                 self._merge(unit_id, state, level)
             else:
                 gates = self.gates.holding(unit_id, "pr-merge")
@@ -536,6 +547,15 @@ class RunEngine:
                 elif gates[-1]["content"]["response"] and \
                         gates[-1]["content"]["response"]["option"] == "approve":
                     self._merge(unit_id, state, level)
+
+    def _autopilot(self):
+        """Only autopilot merges a low-risk PR on review alone. Under standard and
+        supervised every merge waits for a person, and a brief that cannot be read gates
+        too, because an unwanted merge costs more than one tap."""
+        try:
+            return BriefStore(self.project_path).load()[0].get("autonomy") == "autopilot"
+        except Exception:  # noqa: BLE001, an unreadable brief must not merge
+            return False
 
     def _open_merge_gate(self, unit_id, state, level):
         risk = read_json(self.units.unit_dir(unit_id) / "risk.json") or {}
