@@ -649,6 +649,37 @@ class ControlPlaneTest(NotifyCase):
         self.assertIn("is not a unit", handle_command("cancel nonsense", self.daemon, self.ops, ME, ME))
         self.assertIn("No run in progress has U-0999", handle_command("log U-0999", self.daemon, self.ops, ME, ME))
 
+    def test_polish_and_build_start_a_run_after_a_confirm(self):
+        self.assertIn("already has", handle_command('polish acme "x"', self.daemon, self.ops, ME, ME))
+        self.confirmed("run.cancel", run_id=self.run_id)
+        self.assertIn("Only the person", handle_command('polish acme "x"', self.daemon, self.ops, SOMEONE, ME))
+        self.assertIn("What is the issue?", handle_command("polish acme", self.daemon, self.ops, ME, ME))
+        self.assertIn("Which project?", handle_command("build", self.daemon, self.ops, ME, ME))
+        self.assertIn("No project named nope", handle_command("build nope", self.daemon, self.ops, ME, ME))
+        reply = handle_command('polish acme "the footer link is the wrong color"', self.daemon, self.ops, ME, ME)
+        self.assertIn("Confirm run.start", reply["text"])
+        self.assertIsNone(self.daemon.active_run("acme"), "nothing starts before the tap")
+        done = self.confirm(reply)
+        run_id = self.daemon.active_run("acme")
+        self.assertEqual(done, f"Started {run_id}. Its progress thread opens in this DM.")
+        self.assertNotEqual(run_id, self.run_id)
+        self.confirmed("run.cancel", run_id=run_id)
+        record = self.daemon.home.project("acme")
+        front, _ = self.daemon.brief("acme").load()
+        self.daemon.home.save_project("acme", {**record, "adopted": True,
+                                               "adopted_brief_version": front["brief_version"]})
+        self.assertIn("has not changed since it was adopted", handle_command("build acme", self.daemon, self.ops, ME,
+                                                                              ME))
+        self.daemon.home.save_project("acme", {**record, "adopted": False})
+        self.assertTrue(self.confirm(handle_command("build acme", self.daemon, self.ops, ME, ME)).startswith("Started"))
+
+    def test_a_refused_start_lists_the_brief_errors(self):
+        from springer_harness.errors import HarnessError
+        from springer_harness.notify.slack import _refusal
+        exc = HarnessError("The brief has blocking errors.", {"critique": {"errors": [
+            {"rule": "r", "section": "goals", "message": "Goals is empty."}]}})
+        self.assertEqual(_refusal(exc), "Not done: The brief has blocking errors.\n- goals: Goals is empty.")
+
     def test_a_ruling_pins_through_the_brief_and_opens_its_gate(self):
         reply = handle_command('ruling "R-2001: keep the 2:1 hero"', self.daemon, self.ops, ME, ME)
         done = self.confirm(reply)

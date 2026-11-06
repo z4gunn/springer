@@ -38,8 +38,9 @@ UNIT_ID = re.compile(r"^(?:([A-Za-z0-9][A-Za-z0-9._-]*):)?(U-\d{4})$")
 TIERS = ("haiku", "sonnet", "opus")
 LOG_CHARS = 1800
 ONLY_YOU = "Only the person this app was set up for can do that."
-USAGE = ("status | gates | units [project] | pause <project> | resume <project> | redispatch <unit> [tier] | "
-         "cancel <unit> | log <unit> | ruling [project] <text> | unlock [project] <path> <reason> | restart")
+USAGE = ("status | gates | units [project] | polish <project> <issue> | build <project> | pause <project> | "
+         "resume <project> | redispatch <unit> [tier] | cancel <unit> | log <unit> | ruling [project] <text> | "
+         "unlock [project] <path> <reason> | restart")
 
 MANIFEST = {
     "display_information": {"name": "Springer", "description": "Gates, run progress, and run control for Springer"},
@@ -328,7 +329,7 @@ def _apply(operations, kind, project, run_id, args, done):
     try:
         outcome = operations.apply(op_id, kind, project, run_id, args, None, ACTOR)
     except HarnessError as exc:
-        return f"Not done: {exc}"
+        return _refusal(exc)
     if outcome.get("status") != "needs_confirmation":
         return done(outcome)
     key = _pending_add({"op_id": op_id, "kind": kind, "project": project, "run_id": run_id, "args": args,
@@ -341,6 +342,13 @@ def _apply(operations, kind, project, run_id, args, done):
                             "text": {"type": "plain_text", "text": "Confirm"}},
                            {"type": "button", "action_id": CANCEL_ACTION, "value": key,
                             "text": {"type": "plain_text", "text": "Cancel"}}]}]}
+
+
+def _refusal(exc):
+    """A refused operation, with the brief's blocking errors listed when a start is refused."""
+    errors = (getattr(exc, "details", None) or {}).get("critique", {}).get("errors") or []
+    lines = [f"Not done: {exc}"] + [f"- {e.get('section') or 'brief'}: {e.get('message')}" for e in errors[:10]]
+    return "\n".join(lines)
 
 
 def handle_confirm(payload, operations, allowed_user):
@@ -357,7 +365,7 @@ def handle_confirm(payload, operations, allowed_user):
         outcome = operations.apply(entry["op_id"], entry["kind"], entry["project"], entry["run_id"], entry["args"],
                                    entry["token"], ACTOR)
     except HarnessError as exc:
-        return f"Not done: {exc}"
+        return _refusal(exc)
     return entry["done"](outcome)
 
 
@@ -451,11 +459,14 @@ def handle_command(text, daemon, operations, user, allowed_user):
         return _units(daemon, rest)
     if verb == "help":
         return f"/springer {USAGE}"
-    if verb not in ("pause", "resume", "redispatch", "cancel", "log", "ruling", "unlock", "restart"):
+    if verb not in ("polish", "build", "pause", "resume", "redispatch", "cancel", "log", "ruling", "unlock",
+                    "restart"):
         return f"Try /springer {USAGE}"
     if user != allowed_user:
         return ONLY_YOU
     try:
+        if verb in ("polish", "build"):
+            return _start(daemon, operations, verb, rest)
         if verb in ("pause", "resume"):
             return _pause(daemon, operations, verb, rest)
         if verb == "log":
@@ -495,6 +506,36 @@ def handle_command(text, daemon, operations, user, allowed_user):
                                 "running. The runs resume after it.")
     except HarnessError as exc:
         return str(exc)
+
+
+def _start(daemon, operations, lane, rest):
+    """polish <project> <issue> or build <project>: start a run, after a Confirm tap."""
+    if not rest:
+        return (f'Which project? /springer polish <project> "the issue in your words"' if lane == "polish"
+                else "Which project? /springer build <project>")
+    slug = rest[0]
+    with daemon.lock:
+        try:
+            record = daemon.home.project(slug)
+        except HarnessError:
+            return f"No project named {slug}."
+        if record.get("archived"):
+            return f"{slug} is archived."
+        running = daemon.active_run(slug)
+        front, _ = daemon.brief(slug).load()
+    if running:
+        return f"{slug} already has {running} in progress. Wait for it to finish or cancel it first."
+    args = {"base_version": front["brief_version"], "lane": lane}
+    if lane == "polish":
+        issue = " ".join(rest[1:]).strip()
+        if not issue:
+            return f'What is the issue? /springer polish {slug} "the footer link is the wrong color"'
+        args["issue"] = issue
+    elif record.get("adopted") and front.get("brief_version") == record.get("adopted_brief_version"):
+        return (f"{slug}'s brief has not changed since it was adopted, so a build has nothing to add. Describe the "
+                f"change in the brief first, or use /springer polish {slug} \"the issue\" for one fix.")
+    return _apply(operations, "run.start", slug, None, args,
+                  lambda outcome: f"Started {outcome['result']['run_id']}. Its progress thread opens in this DM.")
 
 
 def _pause(daemon, operations, verb, rest):
