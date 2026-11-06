@@ -99,6 +99,11 @@ class UnlockConfig(Args):
     reason: str = Field(min_length=1, max_length=1000)
 
 
+class SetRelease(Args):
+    command: str = Field(min_length=1, max_length=500)  # the project's own deploy command
+    confirm: str | None = Field(default=None, max_length=40, pattern=r"^[A-Za-z0-9_-]+$")  # the word its prompt wants
+
+
 class MarkViewed(Args):
     gate_ids: list[str]
 
@@ -329,6 +334,20 @@ def unlock_config(c):
     return {"path": rel, "unlocked": len(entries)}
 
 
+def set_release(c):
+    return {"settings": c.daemon.save_settings(c.project, release_command=c.args.command.strip(),
+                                               release_confirm=c.args.confirm)}
+
+
+def project_release(c):
+    """A release a person asked for, outside a run's release gate. The confirm on this
+    operation is the go."""
+    out_dir, why_not = c.daemon.release(c.project, c.actor, reason="asked for")
+    if why_not:
+        raise IllegalTransition(why_not)
+    return {"started": True}
+
+
 def daemon_restart(c):
     c.daemon.request_restart(c.actor)
     return {}
@@ -447,6 +466,12 @@ CATALOG = {op.type: op for op in [
     Operation("project.unlock_config", UnlockConfig, unlock_config,
               "Records a ruling in runs/_config-unlock.json that lets a session edit one protected check file.",
               confirm=True, confirm_rule="yes", chat=False),
+    Operation("project.set_release", SetRelease, set_release,
+              "Sets the command the daemon runs to deploy to production after a person says go, and the word "
+              "it types when that command asks for one.", confirm=True, confirm_rule="yes", chat=False),
+    Operation("project.release", NoArgs, project_release,
+              "Deploys the project's default branch head to production with its release command, now.",
+              confirm=True, confirm_rule="yes", chat=False, status="accepted"),
     Operation("daemon.restart", NoArgs, daemon_restart,
               "Pauses every run, waits until no session is running, restarts the daemon, and resumes the runs.",
               scope="none", confirm=True, confirm_rule="yes", chat=False),

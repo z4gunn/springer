@@ -145,6 +145,10 @@ events.jsonl keeps its current line format and its existing event names (agent_d
 | restacked, restack_failed | unit_id, pr, and onto or detail. After a squash merge, a stacked branch keeps only its own commits |
 | tick_failed | detail, written once per distinct error so a stalled run is visible in its ledger |
 | tick_stalled | count, detail, written when a run's tick fails three times in a row, so a person hears of it at once |
+| check_warning | unit_id, detail. A test command exited 0 with a count the harness cannot read, so the unit passed at L2 and its merge waits on a person rather than spending a retry |
+| release_started | sha, by, reason, command. A person said go at the production-release gate or with /springer release |
+| release_finished, release_failed | sha, by, exit_code, detail (the output tail). A refusal before the command runs (a dirty checkout) is a release_failed with no exit code |
+| release_declined | gate_id, by. The run completes and nothing ships |
 | retrieval | unit_id, record ids supplied |
 | window_sample | provider, used fraction, resets at |
 | operation_applied | op_id, type, actor, args. A secret value is never in args |
@@ -154,6 +158,8 @@ A human intervention is recorded as operation_applied rather than as a cycle rec
 ## Gate record (hil-checkpoint-v2)
 
 Changes from v1: checkpoint_type gains discovery-go-no-go, structure-confirmation, scope-review, taste-review, production-release, provisioning-required, and routine-decision, level (L0, L1, L2, L3) is added, holds narrows from phase names and ids to the unit ids whose merge or start waits and becomes required, options stay as they are and are ordered recommended first, digest (true when the gate is informational and closes on view) is added, channel_refs (where it was sent) is added, response (option chosen, free text, rule change, by, at) is added. A gate with holds empty and level L1 is a digest entry, not a pause, so a digest gate records pipeline_status resumed.
+
+A run whose project has a release command and that merged work opens one production-release gate (L3, holds empty, options go and no_go) when its last unit is terminal, and completes only after the answer. Go starts the release command in the project checkout on a pseudo-terminal, typing the configured confirm word at its prompt, and the run completes when the command exits. No_go completes the run and ships nothing.
 
 ## Gate requests
 

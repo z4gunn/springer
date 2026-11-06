@@ -18,11 +18,12 @@ import json
 import re
 import shlex
 import threading
+import time
 import uuid
 from pathlib import Path
 
 from ..errors import HarnessError
-from .notifier import join_notes, trim
+from .notifier import finished_at, join_notes, run_summary, trim
 
 BOT_TOKEN = "slack-bot-token"
 APP_TOKEN = "slack-app-token"
@@ -38,8 +39,9 @@ UNIT_ID = re.compile(r"^(?:([A-Za-z0-9][A-Za-z0-9._-]*):)?(U-\d{4})$")
 TIERS = ("haiku", "sonnet", "opus")
 LOG_CHARS = 1800
 ONLY_YOU = "Only the person this app was set up for can do that."
-USAGE = ("status | gates | units [project] | polish <project> <issue> | build <project> | pause <project> | "
-         "resume <project> | redispatch <unit> [tier] | cancel <unit> | log <unit> | ruling [project] <text> | "
+USAGE = ("status | gates | units [project] | polish <project> <issue> | build <project> | release <project> | "
+         "release-command <project> <command> [word] | pause <project> | resume <project> | "
+         "redispatch <unit> [tier] | cancel <unit> | log <unit> | ruling [project] <text> | "
          "unlock [project] <path> <reason> | restart")
 
 MANIFEST = {
@@ -459,14 +461,16 @@ def handle_command(text, daemon, operations, user, allowed_user):
         return _units(daemon, rest)
     if verb == "help":
         return f"/springer {USAGE}"
-    if verb not in ("polish", "build", "pause", "resume", "redispatch", "cancel", "log", "ruling", "unlock",
-                    "restart"):
+    if verb not in ("polish", "build", "release", "release-command", "pause", "resume", "redispatch", "cancel",
+                    "log", "ruling", "unlock", "restart"):
         return f"Try /springer {USAGE}"
     if user != allowed_user:
         return ONLY_YOU
     try:
         if verb in ("polish", "build"):
             return _start(daemon, operations, verb, rest)
+        if verb in ("release", "release-command"):
+            return _release(daemon, operations, verb, rest)
         if verb in ("pause", "resume"):
             return _pause(daemon, operations, verb, rest)
         if verb == "log":
@@ -538,6 +542,32 @@ def _start(daemon, operations, lane, rest):
                   lambda outcome: f"Started {outcome['result']['run_id']}. Its progress thread opens in this DM.")
 
 
+def _release(daemon, operations, verb, rest):
+    """release <project>: deploy the default branch head now, after a Confirm tap.
+    release-command <project> <command> [word]: set what release runs."""
+    if not rest:
+        return (f"Which project? /springer {verb} <project>" if verb == "release" else
+                'Which project? /springer release-command <project> "npm run deploy" go')
+    slug = rest[0]
+    with daemon.lock:
+        try:
+            daemon.home.project(slug)
+        except HarnessError:
+            return f"No project named {slug}."
+        command = daemon.settings(slug).get("release_command")
+    if verb == "release-command":
+        if len(rest) < 2:
+            return f'Name the command: /springer release-command {slug} "npm run deploy" go'
+        args = {"command": rest[1], "confirm": rest[2] if len(rest) > 2 else None}
+        return _apply(operations, "project.set_release", slug, None, args,
+                      lambda _: f"{slug} releases with: {rest[1]}"
+                                + (f", typing {rest[2]} at its prompt." if len(rest) > 2 else "."))
+    if not command:
+        return f'{slug} has no release command. Set one: /springer release-command {slug} "npm run deploy" go'
+    return _apply(operations, "project.release", slug, None, {},
+                  lambda _: f"Deploying {slug} with {command}. The result posts in its run thread.")
+
+
 def _pause(daemon, operations, verb, rest):
     if not rest:
         return f"Which project? /springer {verb} <project>"
@@ -561,6 +591,24 @@ def _runs(daemon):
             yield slug, run_id, engine.project()["content"]
 
 
+FINISHED_SHOWN = 5
+
+
+def _finished(daemon):
+    """The most recently finished runs, newest first, as (epoch, run_id, summary)."""
+    found = []
+    with daemon.lock:
+        for slug, record in daemon.home.projects().items():
+            if record.get("archived"):
+                continue
+            for run_id in daemon.run_ids(slug):
+                engine = daemon.engine(slug, run_id)
+                if engine.cycles.is_complete():
+                    found.append((finished_at(engine) or 0, run_id, engine))
+        found.sort(key=lambda item: item[0], reverse=True)
+        return [(at, run_id, run_summary(engine)) for at, run_id, engine in found[:FINISHED_SHOWN]]
+
+
 def _status(daemon):
     lines = []
     for slug, run_id, run in _runs(daemon):
@@ -568,7 +616,14 @@ def _status(daemon):
         flags = " · paused" if run["paused"] else ""
         lines.append(f"{run_id}: {run['active_phase']}{flags} · {len(run['open_gates'])} waiting on you · "
                      f"{len(run['in_flight'])} running · {units}")
-    return "\n".join(lines) or "No run in progress."
+    if not lines:
+        lines.append("No run in progress.")
+    finished = _finished(daemon)
+    if finished:
+        lines.append("Finished:")
+        lines += [f"{run_id}: {time.strftime('%b %d %H:%M', time.localtime(at)) if at else 'unknown'} · {summary}"
+                  for at, run_id, summary in finished]
+    return "\n".join(lines)
 
 
 def _gates(daemon):

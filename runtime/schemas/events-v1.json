@@ -78,6 +78,21 @@
     },
     {
       "$ref": "#/$defs/worktree_kept"
+    },
+    {
+      "$ref": "#/$defs/check_warning"
+    },
+    {
+      "$ref": "#/$defs/release_started"
+    },
+    {
+      "$ref": "#/$defs/release_finished"
+    },
+    {
+      "$ref": "#/$defs/release_failed"
+    },
+    {
+      "$ref": "#/$defs/release_declined"
     }
   ],
   "$defs": {
@@ -1206,6 +1221,222 @@
           "type": "integer",
           "minimum": 1,
           "description": "Failed ticks in a row when the run was marked stalled."
+        }
+      }
+    },
+    "check_warning": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "unit_id",
+        "detail"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "check_warning"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "release_started": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "sha",
+        "by",
+        "command"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "release_started"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha": {
+          "type": "string",
+          "minLength": 1
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "release_finished": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "sha",
+        "by",
+        "exit_code",
+        "detail"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "release_finished"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha": {
+          "type": "string",
+          "minLength": 1
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    },
+    "release_failed": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "by",
+        "exit_code",
+        "detail"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "release_failed"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    },
+    "release_declined": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "gate_id",
+        "by"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "release_declined"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }

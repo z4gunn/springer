@@ -886,6 +886,52 @@ class CannedRunTest(EngineCase):
         self.assertTrue(engine.cycles.is_complete())
         self.assertTrue(all(c["content"]["closed"] for c in engine.cycles.all()))
 
+    def release_run(self, answer):
+        """Drive to the release gate, answering every other gate with its first option."""
+        started = []
+        engine = self.engine(canned_batches())
+        engine.settings = lambda: {"ci_signal": "receipts", "release_command": "npm run deploy"}
+        out_dir = self.project / "release-out"
+        engine.release = lambda by, gate_id: (started.append((by, gate_id)), (out_dir, None))[1]
+        for _ in range(80):
+            engine.tick()
+            release = [g for g in engine.gates.open_gates() if g["content"]["checkpoint_type"] == "production-release"]
+            if release:
+                gate_id = release[0]["content"]["checkpoint_id"]
+                self.assertIn("npm run deploy", release[0]["content"]["decision_prompt"])
+                self.assertFalse(engine.cycles.is_complete(), "the gate holds completion")
+                engine.gates.answer(gate_id, answer, "channel:slack")
+                return engine, gate_id, started, out_dir
+            for gate in engine.gates.open_gates():
+                content = gate["content"]
+                if not content["digest"]:
+                    engine.gates.answer(content["checkpoint_id"], content["options"][0]["option"], "human",
+                                        decisions=[{"decision_id": d["decision_id"], "response": "A"}
+                                                   for d in content.get("decisions", [])])
+        self.fail(f"no release gate opened: {self.states(engine)}")
+
+    def test_go_at_the_release_gate_deploys_and_the_run_completes_after_it(self):
+        engine, gate_id, started, out_dir = self.release_run("go")
+        self.assertEqual(engine.tick(), "ticked")
+        self.assertEqual(started, [("channel:slack", gate_id)])
+        self.assertEqual(engine.tick(), "ticked", "the deploy is still running")
+        self.assertEqual(len(started), 1, "a go starts one deploy")
+        out_dir.mkdir()
+        (out_dir / "result.json").write_text(json.dumps({"exit_code": 0}))
+        self.assertEqual(engine.tick(), "complete")
+
+    def test_no_go_completes_the_run_and_ships_nothing(self):
+        engine, gate_id, started, _ = self.release_run("no_go")
+        self.assertEqual(engine.tick(), "complete")
+        self.assertEqual(started, [])
+        self.assertEqual([e["gate_id"] for e in self.events(engine, "release_declined")], [gate_id])
+
+    def test_a_refused_release_is_logged_and_the_run_still_completes(self):
+        engine, gate_id, _, _ = self.release_run("go")
+        engine.release = lambda by, gate_id: (None, "the project checkout has uncommitted changes")
+        self.assertEqual(engine.tick(), "complete")
+        self.assertIn("uncommitted", self.events(engine, "release_failed")[0]["detail"])
+
     def test_repeated_crashes_still_complete_with_no_retry_spent(self):
         """A crash every fourth tick, because a session needs a tick to spawn and a
         tick per poll to return. A crash on every tick can make no progress."""

@@ -61,7 +61,10 @@ COUNT_PATTERNS = [
     r"test result: \w+\. (\d+) passed",               # cargo
     r"\b(\d+) examples?, \d+ failures?",              # rspec
     r"^--- PASS: ",                                   # go test -v, counted per line
+    r"^PASS[ \t]+\S",                                    # one PASS line per test, counted per line
+    r"^ok \d+\b",                                      # tap, counted per line
 ]
+PER_LINE = (r"^--- PASS: ", r"^PASS[ \t]+\S", r"^ok \d+\b")
 ZERO_SIGNALS = [
     r"\bno tests ran\b", r"\bcollected 0 items\b", r"\bNo tests found\b",
     r"\[no test files\]", r"\bRan 0 tests\b", r"\b0 passing\b",
@@ -103,16 +106,18 @@ def fingerprint(cwd):
 
 def count_tests(output, count_regex=None):
     """The number of tests the runner says ran, 0 when it says none ran, or
-    None when no known summary line is present."""
+    None when no known summary line is present. A count_regex that matches nothing
+    falls back to the known runners, so a guessed regex cannot fail a passing suite."""
     if count_regex:
         found = [int(m) for m in re.findall(count_regex, output, re.M) if str(m).isdigit()]
-        return max(found) if found else None
+        if found:
+            return max(found)
     if any(re.search(p, output, re.M | re.I) for p in ZERO_SIGNALS):
         counts = []
     else:
         counts = None
     for pattern in COUNT_PATTERNS:
-        if pattern.startswith("^--- PASS"):
+        if pattern in PER_LINE:
             n = len(re.findall(pattern, output, re.M))
             if n:
                 counts = (counts or []) + [n]

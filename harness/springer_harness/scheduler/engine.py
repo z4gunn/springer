@@ -7,11 +7,12 @@ the only in-memory state, and losing them is what a crash is.
 
 import os
 import signal
+import subprocess
 from pathlib import Path
 
 from ..check import review
 from ..check.gating import GatingRuns
-from ..check.mechanical import mechanical_check, needs_gating
+from ..check.mechanical import hold_for_person, mechanical_check, needs_gating
 from ..check.risk import LEVELS, triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
 from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
@@ -72,9 +73,14 @@ def overlaps(paths_a, paths_b):
     return any(norm(a).startswith(norm(b)) or norm(b).startswith(norm(a)) for a in paths_a for b in paths_b)
 
 
+def _git_out(cwd, *args):
+    done = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, timeout=60)
+    return done.returncode, done.stdout.strip()
+
+
 class RunEngine:
     def __init__(self, project_slug, project_path, run_id, provider, planner, source_host, worktrees, window, owner,
-                 now, in_flight_total=None, settings=None):
+                 now, in_flight_total=None, settings=None, release=None):
         self.project_slug = project_slug
         self.project_path = Path(project_path)
         self.run_id = run_id
@@ -97,6 +103,9 @@ class RunEngine:
         self.keys = self._load_keys()
         self.settings = settings or (lambda: {"ci_signal": "receipts"})
         self.gating_runs = GatingRuns()
+        # release(by, gate_id) starts the project's deploy and returns (out_dir, None),
+        # or (None, why not). None when the daemon offers no releases (the tests' engines).
+        self.release = release
 
     # --- helpers ---
 
@@ -355,9 +364,13 @@ class RunEngine:
                     return None
                 if verdict:
                     return CheckResult(status="fail", failure_class="defect", detail=verdict)
-        return mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path, unit_id,
-                                parse_iso(record["started_at"]),
-                                require_receipts=not gating and self.settings()["ci_signal"] in ("receipts", "both"))
+        result = mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path,
+                                  unit_id, parse_iso(record["started_at"]),
+                                  require_receipts=not gating and self.settings()["ci_signal"] in ("receipts", "both"))
+        warnings = self.gating_runs.warnings(session_dir) if gating else []
+        if warnings and result.status == "pass":
+            self.ledger.append("check_warning", unit_id=unit_id, detail="; ".join(warnings))
+        return hold_for_person(result, warnings)
 
     # --- review ---
 
@@ -933,7 +946,54 @@ class RunEngine:
         open_gates = [g for g in self.gates.open_gates() if not g["content"]["digest"]]
         if states and self.planner.finished() and not open_gates and all(is_terminal(s) for s in states) \
                 and all(c["content"].get("closed") for c in self.cycles.all()):
+            if self._held_for_release():
+                return
             self.cycles.complete_run()
+
+    # --- the production release ---
+
+    RELEASE_OPTIONS = [
+        {"option": "go", "consequence": "Runs the project's deploy command at the merged head and reports the "
+                                        "result in the run thread. The run completes after it.",
+         "recommended_because": "Every merge in this run passed Check, review, and your merge gate."},
+        {"option": "no_go", "consequence": "Ships nothing. The run completes, and /springer release deploys later."},
+    ]
+
+    def _held_for_release(self):
+        """True while the release gate or the deploy it started holds the run open. A run
+        opens the gate when the project has a release command and the run merged work."""
+        command = self.settings().get("release_command")
+        if not command or self.release is None:
+            return False
+        gates = [g for g in self.gates.all() if g["content"]["checkpoint_type"] == "production-release"]
+        if not gates:
+            merged = sum(1 for e in self.ledger.read() if e.line.get("event") == "merge")
+            if not merged:
+                return False
+            _, sha = _git_out(self.project_path, "rev-parse", "--short", "HEAD")
+            self.gates.open("production-release", "L3", [], f"Deploy {sha or 'the merged head'} to production? "
+                            f"{merged} change{'s' if merged != 1 else ''} merged in {self.run_id}. The command is: "
+                            f"{command}", self.RELEASE_OPTIONS, context={"command": command, "sha": sha})
+            return True
+        content = gates[-1]["content"]
+        response = content["response"]
+        if response is None:
+            return True
+        if response["option"] != "go":
+            if not any(e.line.get("event") == "release_declined" for e in self.ledger.read()):
+                self.ledger.append("release_declined", gate_id=content["checkpoint_id"], by=response["by"])
+            return False
+        marker = self.run_dir / "release" / f"{content['checkpoint_id']}.json"
+        started = read_json(marker)
+        if started is None:
+            out_dir, why_not = self.release(response["by"], content["checkpoint_id"])
+            write_json(marker, {"out_dir": str(out_dir) if out_dir else None, "error": why_not})
+            if why_not:
+                self.ledger.append("release_failed", sha=None, by=response["by"], exit_code=None, detail=why_not)
+            return out_dir is not None
+        if not started.get("out_dir"):
+            return False
+        return not (Path(started["out_dir"]) / "result.json").exists()
 
     # --- interventions ---
 

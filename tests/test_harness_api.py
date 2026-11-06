@@ -5,6 +5,7 @@ cannot grow past its coverage. See Conformance in docs/harness/api-contract.md."
 import contextlib
 import io
 import json
+import sys
 import shutil
 import socket
 import subprocess
@@ -616,6 +617,51 @@ class OperationCatalogTest(ApiCase):
         first = self.op("project.unlock_config", {"path": "../x", "reason": "r"})
         self.op("project.unlock_config", {"path": "../x", "reason": "r"}, token=first["confirm_token"], expect=400)
 
+    def test_project_release_needs_a_command_a_run_and_a_clean_checkout(self):
+        self.op("project.set_release", {"command": "deploy", "confirm": "go now"}, expect=400)
+        first = self.op("project.release", {})
+        self.op("project.release", {}, token=first["confirm_token"], expect=409)
+        self.confirmed("project.set_release", {"command": f"{sys.executable} -c \"print('shipped')\""})
+        self.assertIsNone(self.daemon.settings("acme")["release_confirm"])
+        first = self.op("project.release", {})
+        self.op("project.release", {}, token=first["confirm_token"], expect=409)  # no run to log it under
+        run_id = self.run_started()
+        engine = self.daemon.engine("acme", run_id)
+        self.confirmed("project.release", {})
+        for _ in range(200):
+            if [e for e in engine.ledger.read() if e.line.get("event") == "release_finished"]:
+                break
+            time.sleep(0.05)
+        started = [e.line for e in engine.ledger.read() if e.line.get("event") == "release_started"]
+        self.assertEqual((len(started), started[0]["by"]), (1, "tui"))
+        self.assertTrue([e for e in engine.ledger.read() if e.line.get("event") == "release_finished"])
+        tracked = next(p for p in self.project_path.iterdir() if p.is_file() and p.name != ".gitignore")
+        tracked.write_text(tracked.read_text() + "\nedited\n")
+        first = self.op("project.release", {})
+        refused = self.op("project.release", {}, token=first["confirm_token"], expect=409)
+        self.assertIn("uncommitted", json.dumps(refused))
+        with self.assertRaises(Exception):
+            self.app.state.operations.apply(op_id(), "project.release", "acme", None, {}, None, "chat")
+
+    def test_a_finished_run_commits_its_records_and_ignores_its_working_state(self):
+        def git(*args):
+            return subprocess.run(["git", "-C", str(self.project_path), *args], capture_output=True,
+                                  text=True).stdout.strip()
+
+        run_id = self.run_started()
+        self.assertIn("runs/*/units/", git("show", "HEAD:.gitignore"), "the rules ride on the brief commit")
+        self.daemon.tick_all()
+        self.confirmed("run.cancel", run_id=run_id)
+        self.daemon.tick_all()
+        self.assertEqual(git("log", "-1", "--format=%s"), f"chore(runs): record {run_id}")
+        committed = git("show", "--name-only", "--format=", "HEAD").splitlines()
+        self.assertIn(f"runs/{run_id}/run-brief.json", committed)
+        self.assertTrue(any(p.startswith(f"runs/{run_id}/artifacts/CYCLE-") for p in committed), committed)
+        self.assertFalse([p for p in committed if "/units/" in p or p.endswith("events.jsonl")], committed)
+        self.assertEqual(git("status", "--porcelain", "--", "runs"), "", "nothing in the run store is left loose")
+        self.daemon.tick_all()
+        self.assertEqual(git("log", "-1", "--format=%s"), f"chore(runs): record {run_id}", "recorded once")
+
     def test_daemon_restart_pauses_the_runs_and_drains_before_it_restarts(self):
         run_id = self.run_started()
         engine = self.daemon.engine("acme", run_id)
@@ -769,6 +815,8 @@ COVERAGE = {
     "run.note": "test_run_note_reaches_the_next_session_of_each_open_unit",
     "project.unlock_config": "test_project_unlock_config_records_a_ruling_the_hook_reads",
     "daemon.restart": "test_daemon_restart_pauses_the_runs_and_drains_before_it_restarts",
+    "project.set_release": "test_project_release_needs_a_command_a_run_and_a_clean_checkout",
+    "project.release": "test_project_release_needs_a_command_a_run_and_a_clean_checkout",
 }
 
 

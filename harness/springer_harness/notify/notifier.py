@@ -67,6 +67,29 @@ def summarize_findings(findings):
     return {"counts": counts, "top": top, "total": len(findings)}
 
 
+def run_summary(engine):
+    """One line on what a run did: its units by end state, merges, and sessions."""
+    counts, sessions = {}, 0
+    for unit_id in engine.units.ids():
+        state = engine.units.state(unit_id)
+        counts[state["state"]] = counts.get(state["state"], 0) + 1
+        sessions += len(state.get("sessions") or [])
+    merged = sum(1 for entry in engine.ledger.read() if entry.line.get("event") == "merge")
+    units = ", ".join(f"{n} {state}" for state, n in sorted(counts.items())) or "no units"
+    return f"{units} · {merged} merged · {sessions} sessions"
+
+
+def finished_at(engine):
+    """The epoch the run completed, from its last cycle record, or None."""
+    ids = engine.cycles.ids()
+    if not ids:
+        return None
+    try:
+        return (engine.cycles.root / f"{ids[-1]}.json").stat().st_mtime
+    except OSError:
+        return None
+
+
 def gate_view(project, run_id, content):
     context = content.get("context") or {}
     return {
@@ -110,6 +133,18 @@ def feed_line(line):
         return f"{unit} could not merge (#{line.get('pr', '')}): {trim(line.get('detail'), LINE_CHARS)}"
     if name == "restack_failed":
         return f"{unit} could not be restacked (#{line.get('pr', '')})"
+    if name == "release_started":
+        return f"release of {str(line.get('sha', ''))[:7]} started by {line.get('by')}: {line.get('command')}"
+    if name == "release_finished":
+        return f"released {str(line.get('sha', ''))[:7]} to production. It ends: {trim(line.get('detail'), LINE_CHARS)}"
+    if name == "release_failed":
+        code = line.get("exit_code")
+        how = f"failed with exit {code}" if code is not None else "did not start"
+        return f"the release {how}: {trim(line.get('detail'), LINE_CHARS)}"
+    if name == "release_declined":
+        return f"no-go at {line.get('gate_id')}: nothing shipped"
+    if name == "check_warning":
+        return f"{unit} passed Check, but its merge waits on you: {trim(line.get('detail'), LINE_CHARS)}"
     if name == "tick_failed":
         return f"the daemon could not advance the run: {trim(line.get('detail'), LINE_CHARS)}"
     if name == "operation_applied" and line.get("type") == "run.pause":
@@ -280,7 +315,8 @@ class Notifier:
                         for entry in engine.ledger.read(after=state["cursors"][key]):
                             state["cursors"][key] = entry.cursor
                             events.append((slug, run_id, entry.line))
-                    runs.append((slug, run_id, engine.cycles.is_complete()))
+                    complete = engine.cycles.is_complete()
+                    runs.append((slug, run_id, run_summary(engine) if complete else None))
         return gates, events, runs, escalations
 
     def _escalations(self, slug, run_id, engine, gates):
@@ -353,16 +389,20 @@ class Notifier:
                 self.channel.post(f"{run_id} is stalled. The daemon has failed to advance it "
                                   f"{line.get('count', 3)} times in a row: {trim(line.get('detail'), 300)}")
                 sent.append(("stalled", run_id))
+            if line.get("event") in ("release_finished", "release_failed"):
+                # A release is news at any hour, so it is posted, not only batched in the feed.
+                self.channel.post(f"{run_id}: {feed_line(line)}")
+                sent.append((line["event"], run_id))
             text = feed_line(line)
             if text:
                 state["feeds"].setdefault(f"{slug}/{run_id}", {"ref": None, "pending": []})["pending"].append(text)
-        for slug, run_id, complete in runs:
+        for slug, run_id, summary in runs:
             key = f"{slug}/{run_id}"
-            if not complete and key not in state["open_runs"]:
+            if summary is None and key not in state["open_runs"]:
                 state["open_runs"].append(key)
-            elif complete and key in state["open_runs"] and key not in state["done_runs"]:
-                self.channel.post(f"{run_id} is complete.")
-                state["feeds"].setdefault(key, {"ref": None, "pending": []})["pending"].append("complete")
+            elif summary is not None and key in state["open_runs"] and key not in state["done_runs"]:
+                self.channel.post(f"{run_id} is complete: {summary}.")
+                state["feeds"].setdefault(key, {"ref": None, "pending": []})["pending"].append(f"complete: {summary}")
                 state["done_runs"].append(key)
                 state["open_runs"].remove(key)
                 sent.append(("complete", run_id))

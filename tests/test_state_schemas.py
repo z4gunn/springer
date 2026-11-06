@@ -91,6 +91,11 @@ def event(name, **fields):
 
 
 DAEMON_EVENTS = {
+    "check_warning": {"unit_id": "U-0412", "detail": "unit exited 0 but printed no test count"},
+    "release_started": {"sha": "abc123", "by": "channel:slack", "reason": "G-0009", "command": "npm run deploy"},
+    "release_finished": {"sha": "abc123", "by": "channel:slack", "exit_code": 0, "detail": "shipped"},
+    "release_failed": {"by": "channel:slack", "sha": None, "exit_code": None, "detail": "dirty checkout"},
+    "release_declined": {"gate_id": "G-0009", "by": "channel:slack"},
     "unit_state": {"unit_id": "U-0412", "from": None, "to": "planned", "reason": "cycle planned"},
     "session_started": {"unit_id": "U-0412", "session_id": "S-0001", "provider": "claude-code", "pid": 42, "model": "m", "tier": "opus"},
     "session_usage": {"unit_id": "U-0412", "session_id": "S-0001", "input_tokens": 1, "output_tokens": 1, "context_percent": 3, "cost": 0},

@@ -283,6 +283,8 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 | digest.mark_viewed | `gate_ids` | No | Closes digest entries |
 | run.note | `text` | No | Adds a person's note to the next session brief of every open unit in the run, and records it in the ledger. Refused for the chat actor |
 | project.unlock_config | `path`, `reason` | Yes | Records a ruling in the project's `runs/_config-unlock.json` that lets a session edit one protected check file. A path outside the project, or the rulings file itself, is refused. Refused for the chat actor |
+| project.set_release | `command`, `confirm` | Yes | Sets the project's production deploy command and the word the daemon types when that command prompts for one. Refused for the chat actor |
+| project.release | none | Yes | Deploys the default branch head with the release command now. The confirmation is the go. The checkout must be on the default branch with no tracked change. Refused for the chat actor |
 | daemon.restart | none | Yes | Pauses every active run, waits until no session is running, and replaces the daemon process. The next start resumes the runs it paused. Refused for the chat actor |
 | backlog.move_mvp_line | `after_feature_id` | Outside scope review | Moves the line |
 | backlog.defer_feature | `feature_id` | Outside scope review | Tags the feature deferred. Its tasks stay in the graph |

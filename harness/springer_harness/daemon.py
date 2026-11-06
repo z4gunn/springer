@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 import traceback
 import uuid
 from pathlib import Path
@@ -15,6 +16,7 @@ from .common import artifact_header, iso, read_json, write_json
 from .errors import IllegalTransition, InvalidArgs, NotFound
 from .providers.local import LocalSourceHost
 from .registry import Home
+from .release import Releases, ready_to_ship
 from .scheduler.engine import RunEngine
 from .scheduler.worktrees import Worktrees
 from .state.brief import BriefStore, derive
@@ -50,6 +52,27 @@ SETTINGS_DEFAULT = {"ci_signal": "receipts", "source_host": "local"}
 HOSTED_SIGNALS = ("self-hosted-actions", "both")
 
 
+RUN_STORE_IGNORES = (
+    "# --- Springer run store: working state. The daemon commits each run's records when it ends ---",
+    "runs/_dashboard/", "runs/*/units/", "runs/*/plan/", "runs/*/release/", "runs/*/events.jsonl",
+    "runs/*/run-state.json", "runs/*/unit-keys.json", "runs/*/.lock",
+)
+
+
+def ignore_run_store(path):
+    """Add the run store's ignore rules to the project's .gitignore. True when it changed.
+    A file already tracked stays tracked, so an older run's committed ledger is untouched."""
+    target = Path(path) / ".gitignore"
+    text = target.read_text() if target.exists() else ""
+    present = set(text.splitlines())
+    missing = [line for line in RUN_STORE_IGNORES if line not in present]
+    if not missing:
+        return False
+    target.write_text(text + ("" if not text or text.endswith("\n") else "\n") + ("\n" if text else "")
+                      + "\n".join(missing) + "\n")
+    return True
+
+
 class ProjectHost:
     """The source host a project's settings name, looked up on every call, so a
     change in Settings takes effect on the next tick."""
@@ -81,6 +104,8 @@ class Daemon:
         self.owner = daemon_owner()
         self.lock = threading.RLock()
         self.engines = {}
+        self.releases = Releases()
+        self._recorded = set()  # finished runs whose records are committed
         self._tick_errors = {}
         self._tick_failures = {}
         self.unclean_start = None  # the last heartbeat, when the daemon before did not stop cleanly
@@ -136,12 +161,44 @@ class Daemon:
     def _new_engine(self, slug, path, run_id, kind):
         return RunEngine(slug, path, run_id, self.provider, self.planner_factory(slug, run_id, kind), ProjectHost(self, slug),
                          Worktrees(self.home.root, slug, path), self.window, self.owner, self.now,
-                         in_flight_total=self._in_flight_total, settings=lambda: self.settings(slug))
+                         in_flight_total=self._in_flight_total, settings=lambda: self.settings(slug),
+                         release=lambda by, gate_id: self.release(slug, by, run_id, reason=gate_id))
 
     # --- per-project settings ---
 
     def settings(self, slug):
         return {**SETTINGS_DEFAULT, **(self.home.project(slug).get("settings") or {})}
+
+    def release(self, slug, by, run_id=None, reason=None):
+        """Start the project's deploy command on a thread, after a person's go. Returns
+        (out_dir, None) once started, or (None, why not). The run it is logged under is
+        the one named, else the project's newest, so its thread in Slack reports it."""
+        settings = self.settings(slug)
+        command = settings.get("release_command")
+        if not command:
+            return None, f"{slug} has no release command. Set one with /springer release-command {slug} \"<command>\""
+        run_ids = self.run_ids(slug)
+        run_id = run_id or (run_ids[-1] if run_ids else None)
+        if run_id is None:
+            return None, f"{slug} has no run to log the release under"
+        if self.releases.running(slug):
+            return None, f"a release of {slug} is already running"
+        path = self.project_path(slug)
+        sha, why_not = ready_to_ship(path, Worktrees(self.home.root, slug, path).default_branch())
+        if why_not:
+            return None, why_not
+        engine = self.engine(slug, run_id)
+        out_dir = engine.run_dir / "release" / f"{time.strftime('%Y%m%dT%H%M%S', time.gmtime(self.now()))}"
+        engine.ledger.append("release_started", sha=sha, by=by, reason=reason, command=command)
+
+        def done(result):
+            with self.lock:
+                event = "release_finished" if result["exit_code"] == 0 else "release_failed"
+                engine.ledger.append(event, sha=sha, by=by, exit_code=result["exit_code"],
+                                     detail=result["tail"][-600:])
+
+        self.releases.start(slug, command, settings.get("release_confirm"), path, out_dir, sha, done)
+        return out_dir, None
 
     def host_for(self, slug):
         return self.source_host if self.settings(slug)["source_host"] == "github" else self.local_host
@@ -229,20 +286,38 @@ class Daemon:
     def commit_brief(self, slug, path, run_id, message=None):
         """Start run is the commit, and so is an applied brief change: a unit's worktree
         is cut from a commit, so a brief that lives only in the working tree is a brief
-        no session can read, and an uncommitted change refuses every local merge."""
-        brief = "docs/brief.md"
-        changed = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "--", brief],
-                                 capture_output=True, text=True).stdout.strip()
+        no session can read, and an uncommitted change refuses every local merge. The
+        run store's ignore rules ride on the same commit, so they never sit as a tracked
+        change that refuses a merge or a release."""
+        files = [f for f in ("docs/brief.md", ".gitignore" if ignore_run_store(path) else None) if f]
+        self._commit(slug, path, files, message or f"docs: the brief for {run_id}", "the brief")
+
+    def commit_run_records(self, slug, run_id):
+        """A finished run's records go into git as one commit: whatever under its folder
+        the ignore rules leave (artifacts with the gate answers, escalations, cycles and
+        reviews, the run brief, the backlog, the defaults ledger), and the config rulings.
+        The working state (sessions, plans, the ledger) stays on disk, ignored. Returns
+        True when nothing is left to record."""
+        path = self.project_path(slug)
+        files = [".gitignore"] if ignore_run_store(path) else []
+        files += [p for p in (f"runs/{run_id}", "runs/_config-unlock.json") if (path / p).exists()]
+        return self._commit(slug, path, files, f"chore(runs): record {run_id}", f"the records of {run_id}")
+
+    def _commit(self, slug, path, files, message, what):
+        """Commit files that changed, and publish. True when nothing is left uncommitted."""
+        changed = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "-uall", "--", *files],
+                                 capture_output=True, text=True).stdout.strip() if files else ""
         if not changed:
-            return
-        subprocess.run(["git", "-C", str(path), "add", "--", brief], capture_output=True)
+            return True
+        subprocess.run(["git", "-C", str(path), "add", "--", *files], capture_output=True)
         done = subprocess.run(["git", "-C", str(path), "-c", "user.name=Springer", "-c", "user.email=springer@local",
-                               "commit", "-q", "-m", message or f"docs: the brief for {run_id}", "--", brief],
-                              capture_output=True, text=True)
+                               "commit", "-q", "-m", message, "--", *files], capture_output=True, text=True)
         if done.returncode:
-            sys.stderr.write(f"could not commit the brief in {path}: {done.stderr.strip()}\n")
-        elif hasattr(self.host_for(slug), "publish"):
+            sys.stderr.write(f"could not commit {what} in {path}: {done.stderr.strip() or done.stdout.strip()}\n")
+            return False
+        if hasattr(self.host_for(slug), "publish"):
             self.host_for(slug).publish(slug, "HEAD")
+        return True
 
     def _stamp_profile(self, path, profile):
         """Scaffolding happens before the brief exists, so the ruleset learns its profile
@@ -283,6 +358,11 @@ class Daemon:
                 for run_id in self.run_ids(slug):
                     engine = self.engine(slug, run_id)
                     if engine.cycles.is_complete():
+                        # Once per daemon start, and at the tick that completes it, so a run
+                        # cancelled through an operation or finished before this existed is
+                        # recorded too.
+                        if (slug, run_id) not in self._recorded and self.commit_run_records(slug, run_id):
+                            self._recorded.add((slug, run_id))
                         continue
                     try:
                         results[(slug, run_id)] = engine.tick()

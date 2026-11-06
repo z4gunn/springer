@@ -232,10 +232,22 @@ class MechanicalCheckTest(FakeBinCase):
         for needle in ("gating command lint", "failed with exit 3", "rule no-floating"):
             self.assertIn(needle, result.detail)
 
-    def test_a_test_command_must_report_a_count(self):
+    def test_an_unreadable_count_on_exit_0_holds_the_merge_instead_of_a_retry(self):
+        """The polish run's one retry: a passing self-test whose output the planner's
+        count_regex did not match. The command's shape is the plan's, so the session
+        is not sent back. The pass is raised to L2, so a person sees why at the merge."""
         self.write(**self.PR)
         result = self.check([{"name": "unit", "command": "python3 -c \"print('all good')\"", "kind": "test"}])
-        self.assertIn("printed no test count", result.detail)
+        self.assertEqual((result.status, result.raised_level), ("pass", "L2"))
+        self.assertIn("printed no test count", result.findings[-1]["detail"])
+        failed = self.check([{"name": "unit", "command": "python3 -c \"import sys; print('x'); sys.exit(1)\"",
+                              "kind": "test"}])
+        self.assertEqual((failed.status, failed.failure_class), ("fail", "defect"))
+        zero = self.check([{"name": "unit", "command": "python3 -c \"print('Ran 0 tests')\"", "kind": "test"}])
+        self.assertIn("ran no tests", zero.detail)
+        per_line = self.check([{"name": "unit", "command": "python3 -c \"print('PASS a\\nPASS b')\"",
+                                "kind": "test", "count_regex": r"(\d+) fixtures"}])
+        self.assertEqual((per_line.status, per_line.raised_level), ("pass", None))
         counted = self.check([{"name": "unit", "command": "python3 -c \"print('ok 7 checks')\"", "kind": "test",
                                "count_regex": r"ok (\d+) checks"}])
         self.assertEqual(counted.status, "pass")

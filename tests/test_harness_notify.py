@@ -207,7 +207,18 @@ class EventTest(NotifyCase):
         self.engine.cycles.is_complete = lambda: True
         self.notifier.poll()
         self.notifier.poll()
-        self.assertEqual([t for k, t in self.channel.sent if k == "post"], [f"{self.run_id} is complete."])
+        posts = [t for k, t in self.channel.sent if k == "post"]
+        self.assertEqual(len(posts), 1)
+        self.assertRegex(posts[0], rf"^{self.run_id} is complete: .+ · 0 merged · \d+ sessions\.$")
+
+    def test_status_lists_finished_runs(self):
+        from springer_harness.notify.slack import handle_command
+        self.assertNotIn("Finished:", handle_command("status", self.daemon, None, ME, ME))
+        self.engine.cycles.plan(self.engine.cycles.next_id(), "build", [], "the last batch")
+        self.engine.cycles.complete_run()
+        reply = handle_command("status", self.daemon, None, ME, ME)
+        self.assertIn("No run in progress.", reply)
+        self.assertRegex(reply, rf"Finished:\n{self.run_id}: \w{{3}} \d\d \d\d:\d\d · .+ merged · \d+ sessions")
 
     def test_quiet_hours_wrap_past_midnight(self):
         noon = time.mktime((2026, 11, 3, 12, 0, 0, 0, 0, -1))
@@ -679,6 +690,31 @@ class ControlPlaneTest(NotifyCase):
         exc = HarnessError("The brief has blocking errors.", {"critique": {"errors": [
             {"rule": "r", "section": "goals", "message": "Goals is empty."}]}})
         self.assertEqual(_refusal(exc), "Not done: The brief has blocking errors.\n- goals: Goals is empty.")
+
+    def test_release_from_slack_runs_the_command_and_posts_the_result(self):
+        self.notifier.poll()
+        self.assertIn("has no release command", handle_command("release acme", self.daemon, self.ops, ME, ME))
+        script = "import sys; a = input('Type go: '); print('shipped' if a == 'go' else 'no-go'); sys.exit(a != 'go')"
+        (self.project_path / "deploy.py").write_text(script)
+        reply = handle_command('release-command acme "python3 deploy.py" go', self.daemon, self.ops, SOMEONE, ME)
+        self.assertIn("Only the person", reply)
+        reply = handle_command('release-command acme "python3 deploy.py" go', self.daemon, self.ops, ME, ME)
+        self.assertEqual(self.confirm(reply), "acme releases with: python3 deploy.py, typing go at its prompt.")
+        self.assertEqual(self.daemon.settings("acme")["release_confirm"], "go")
+        reply = handle_command("release acme", self.daemon, self.ops, ME, ME)
+        self.assertIn("Confirm project.release", reply["text"])
+        self.assertIn("Deploying acme", self.confirm(reply))
+        for _ in range(200):
+            if self.daemon.releases.running("acme") is False and \
+                    [e for e in self.engine.ledger.read() if e.line.get("event") == "release_finished"]:
+                break
+            time.sleep(0.05)
+        finished = [e.line for e in self.engine.ledger.read() if e.line.get("event") == "release_finished"]
+        self.assertEqual(len(finished), 1, [e.line for e in self.engine.ledger.read()][-3:])
+        self.assertIn("shipped", finished[0]["detail"])
+        self.notifier.poll()
+        posts = [t for k, t in self.channel.sent if k == "post"]
+        self.assertTrue(any("released" in p and "to production" in p for p in posts), posts)
 
     def test_a_ruling_pins_through_the_brief_and_opens_its_gate(self):
         reply = handle_command('ruling "R-2001: keep the 2:1 hero"', self.daemon, self.ops, ME, ME)

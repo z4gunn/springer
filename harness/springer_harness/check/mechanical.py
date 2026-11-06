@@ -64,12 +64,16 @@ def needs_gating(result):
     return result.outcome == "pr" or not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths)
 
 
-def run_gating(commands, out, cwd):
+def run_gating(commands, out, cwd, warnings=None):
     """Run each gating command at the worktree's head through receipt.py, writing the
     receipts under out, in order. None when every one passes, else the defect detail
     naming the first that did not, with the tail of its output. A product command is
     judged by its exit code, as a check is, because the receipt's test count only reads
-    a test runner's summary."""
+    a test runner's summary.
+
+    A test command that exits 0 with a count receipt.py cannot read is the plan's
+    command shape, not the session's work, so it costs no retry. It passes with a
+    line appended to warnings, and the caller holds the merge for a person."""
     script = Path(cwd) / SCRIPTS / "receipt.py"
     if not script.exists():
         return "receipt.py is missing from the worktree"
@@ -90,6 +94,11 @@ def run_gating(commands, out, cwd):
             body = json.loads(receipt.read_text())
         except (OSError, ValueError):
             return f"gating command {name} ({command['command']}) left no receipt"
+        if body.get("result") == "unknown-count" and body.get("exit_code") == 0:
+            if warnings is not None:
+                warnings.append(f"{name} ({command['command']}) exited 0 but printed no test count the harness "
+                                f"can read, so the merge waits on a person")
+                continue
         if body.get("result") != "pass":
             why = {"unknown-count": "printed no test count the harness can read. Use a runner that reports one, "
                                     "or give the command a count_regex",
@@ -126,6 +135,19 @@ def validate_artifacts(paths, project):
     return problems
 
 
+UNREADABLE_COUNT_LEVEL = "L2"
+
+
+def hold_for_person(result, warnings):
+    """A pass whose gating left warnings: raised so it cannot merge without a person,
+    with the warnings in its findings so the merge gate shows them."""
+    if not warnings or result.status != "pass":
+        return result
+    level = max(result.raised_level or "L0", UNREADABLE_COUNT_LEVEL)
+    return replace(result, raised_level=level, findings=tuple(result.findings) + tuple(
+        {"severity": "P2", "file": "", "detail": w} for w in warnings))
+
+
 def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch, require_receipts=True,
                      gating=None):
     """A CheckResult for one returned session. The order is the in-session loop's:
@@ -146,9 +168,11 @@ def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch,
     if gating and needs_gating(result):
         # Run in place, for a caller with no tick to protect. The daemon runs them off
         # the tick through GatingRuns and passes none here.
-        problem = run_gating(gating, session_dir / "check", cwd)
+        warnings = []
+        problem = run_gating(gating, session_dir / "check", cwd, warnings)
         if problem:
             return replace(result, status="fail", failure_class="defect", detail=problem)
+        result = hold_for_person(result, warnings)
     elif require_receipts and result.outcome == "pr" and code:
         problem = verify_receipts(session_dir, cwd)
         if problem:

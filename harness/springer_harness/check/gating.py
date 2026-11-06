@@ -45,17 +45,24 @@ class GatingRuns:
             thread.start()
         return None
 
+    @staticmethod
+    def warnings(session_dir):
+        """What a finished gating run passed with but a person should see."""
+        found = read_json(Path(session_dir) / "check" / VERDICT)
+        return list(found.get("warnings") or []) if isinstance(found, dict) else []
+
     def running(self, key):
         thread = self._threads.get(key)
         return bool(thread and thread.is_alive())
 
     def _run(self, commands, session_dir, cwd):
         partial = session_dir / f".check-{uuid.uuid4().hex}"
+        warnings = []
         try:
-            problem = run_gating(commands, partial, cwd)
+            problem = run_gating(commands, partial, cwd, warnings)
         except Exception as exc:  # noqa: BLE001, a crashed run is a verdict, never a hang
             problem = f"the gating run failed: {exc}"
-        write_json(partial / VERDICT, {"problem": problem, "at": time.time()})
+        write_json(partial / VERDICT, {"problem": problem, "warnings": warnings, "at": time.time()})
         final = session_dir / "check"
         shutil.rmtree(final, ignore_errors=True)
         os.replace(partial, final)
