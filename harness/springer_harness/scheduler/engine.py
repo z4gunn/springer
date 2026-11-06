@@ -352,7 +352,7 @@ class RunEngine:
         if not getattr(self.provider, "mechanical", False):
             return read_result(session_dir)
         record = self.sessions(unit_id).get(state["sessions"][-1])
-        gating = self._spec(unit_id).get("gating_commands")
+        gating = self._gating(unit_id)
         if gating:
             # The commands run on a thread, because the tick holds the daemon lock and a
             # product check can take minutes. None leaves the unit in checking.
@@ -366,7 +366,8 @@ class RunEngine:
                     return CheckResult(status="fail", failure_class="defect", detail=verdict)
         result = mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path,
                                   unit_id, parse_iso(record["started_at"]),
-                                  require_receipts=not gating and self.settings()["ci_signal"] in ("receipts", "both"))
+                                  require_receipts=not self._spec(unit_id).get("gating_commands")
+                                  and self.settings()["ci_signal"] in ("receipts", "both"))
         warnings = self.gating_runs.warnings(session_dir) if gating else []
         if warnings and result.status == "pass":
             self.ledger.append("check_warning", unit_id=unit_id, detail="; ".join(warnings))
@@ -903,12 +904,26 @@ class RunEngine:
         self.units.transition(unit_id, "running", "claimed")
         self._spawn(unit_id, self.units.state(unit_id))
 
+    def _gating(self, unit_id):
+        """The plan's gating commands for the unit, then the project's checks, which run on
+        every unit that changes code (lint and typecheck, say), whatever the plan named.
+        A review unit writes no code and gets none."""
+        spec = self._spec(unit_id)
+        planned = [dict(g) for g in spec.get("gating_commands") or []]
+        if spec.get("review_of"):
+            return planned
+        named = {g["command"].strip() for g in planned}
+        checks = [{"name": f"project-check-{i}", "command": command, "kind": "check"}
+                  for i, command in enumerate(self.settings().get("project_checks") or [], 1)
+                  if command.strip() not in named]
+        return planned + checks
+
     def _spawn(self, unit_id, state, handoff_from=None):
         spec = self._spec(unit_id)
         store = self.sessions(unit_id)
         tier = self._tier(unit_id, state)
         session_id = next_id("S", store.ids())
-        brief = spec["brief"] + gating_note(spec.get("gating_commands"))
+        brief = spec["brief"] + gating_note(self._gating(unit_id))
         notes = self._notes(unit_id)
         if notes:
             brief += "\n\n" + notes

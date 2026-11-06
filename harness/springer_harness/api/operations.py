@@ -104,6 +104,10 @@ class SetRelease(Args):
     confirm: str | None = Field(default=None, max_length=40, pattern=r"^[A-Za-z0-9_-]+$")  # the word its prompt wants
 
 
+class SetChecks(Args):
+    commands: list[str] = Field(max_length=5)  # each a project command judged by its exit code; empty clears
+
+
 class MarkViewed(Args):
     gate_ids: list[str]
 
@@ -339,6 +343,13 @@ def set_release(c):
                                                release_confirm=c.args.confirm)}
 
 
+def set_checks(c):
+    commands = [command.strip() for command in c.args.commands if command.strip()]
+    if any(len(command) > 300 for command in commands):
+        raise InvalidArgs("a check command is at most 300 characters")
+    return {"settings": c.daemon.save_settings(c.project, project_checks=commands)}
+
+
 def project_release(c):
     """A release a person asked for, outside a run's release gate. The confirm on this
     operation is the go."""
@@ -469,6 +480,10 @@ CATALOG = {op.type: op for op in [
     Operation("project.set_release", SetRelease, set_release,
               "Sets the command the daemon runs to deploy to production after a person says go, and the word "
               "it types when that command asks for one.", confirm=True, confirm_rule="yes", chat=False),
+    Operation("project.set_checks", SetChecks, set_checks,
+              "Sets the checks the harness runs on every unit that changes code, after the plan's own gating "
+              "commands. A failing check sends the unit back like a failing test.",
+              confirm=True, confirm_rule="yes", chat=False),
     Operation("project.release", NoArgs, project_release,
               "Deploys the project's default branch head to production with its release command, now.",
               confirm=True, confirm_rule="yes", chat=False, status="accepted"),

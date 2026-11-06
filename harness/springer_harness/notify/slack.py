@@ -40,7 +40,8 @@ TIERS = ("haiku", "sonnet", "opus")
 LOG_CHARS = 1800
 ONLY_YOU = "Only the person this app was set up for can do that."
 USAGE = ("status | gates | units [project] | polish <project> <issue> | build <project> | release <project> | "
-         "release-command <project> <command> [word] | pause <project> | resume <project> | "
+         "release-command <project> <command> [word] | checks <project> [command...] | pause <project> | "
+         "resume <project> | "
          "redispatch <unit> [tier] | cancel <unit> | log <unit> | ruling [project] <text> | "
          "unlock [project] <path> <reason> | restart")
 
@@ -461,7 +462,7 @@ def handle_command(text, daemon, operations, user, allowed_user):
         return _units(daemon, rest)
     if verb == "help":
         return f"/springer {USAGE}"
-    if verb not in ("polish", "build", "release", "release-command", "pause", "resume", "redispatch", "cancel",
+    if verb not in ("polish", "build", "release", "release-command", "checks", "pause", "resume", "redispatch", "cancel",
                     "log", "ruling", "unlock", "restart"):
         return f"Try /springer {USAGE}"
     if user != allowed_user:
@@ -471,6 +472,8 @@ def handle_command(text, daemon, operations, user, allowed_user):
             return _start(daemon, operations, verb, rest)
         if verb in ("release", "release-command"):
             return _release(daemon, operations, verb, rest)
+        if verb == "checks":
+            return _checks(daemon, operations, rest)
         if verb in ("pause", "resume"):
             return _pause(daemon, operations, verb, rest)
         if verb == "log":
@@ -566,6 +569,26 @@ def _release(daemon, operations, verb, rest):
         return f'{slug} has no release command. Set one: /springer release-command {slug} "npm run deploy" go'
     return _apply(operations, "project.release", slug, None, {},
                   lambda _: f"Deploying {slug} with {command}. The result posts in its run thread.")
+
+
+def _checks(daemon, operations, rest):
+    """checks <project>: show them. checks <project> <command>...: set them. checks <project> none: clear."""
+    if not rest:
+        return 'Which project? /springer checks <project> "npm run check"'
+    slug = rest[0]
+    with daemon.lock:
+        try:
+            daemon.home.project(slug)
+        except HarnessError:
+            return f"No project named {slug}."
+        current = daemon.settings(slug).get("project_checks") or []
+    if len(rest) == 1:
+        return (f"{slug} runs on every code change: " + "; ".join(current)) if current else \
+            f'{slug} has no project checks. Set one: /springer checks {slug} "npm run check"'
+    commands = [] if rest[1:] == ["none"] else rest[1:]
+    return _apply(operations, "project.set_checks", slug, None, {"commands": commands},
+                  lambda _: (f"{slug} runs on every code change: " + "; ".join(commands)) if commands
+                  else f"{slug} has no project checks now.")
 
 
 def _pause(daemon, operations, verb, rest):

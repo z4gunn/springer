@@ -184,6 +184,19 @@ class GateRequestTest(EngineCase):
         self.assertIn("The harness runs these itself at your branch head", brief)
         self.assertIn("- unit (test): npm test", brief)
 
+    def test_the_project_checks_follow_the_plan_on_every_code_unit(self):
+        """Lint was never in a plan's gating commands, so a lint error reached main. The
+        project's checks run on every unit whatever the plan named, once each."""
+        engine = self.engine([batch(unit("a", gating_commands=(
+            {"name": "unit", "command": "npm test", "kind": "test"},
+            {"name": "typecheck", "command": "npm run typecheck", "kind": "check"})))])
+        engine.settings = lambda: {"ci_signal": "receipts", "project_checks": ["npm run check", "npm run typecheck"]}
+        engine.tick()
+        self.assertEqual([g["name"] for g in engine._gating("U-0001")], ["unit", "typecheck", "project-check-1"])
+        self.assertIn("- project-check-1 (check): npm run check", self.provider.spawned[0].brief)
+        self.assertEqual(engine._spec("U-0001")["gating_commands"][-1]["command"], "npm run typecheck",
+                         "the plan's spec is unchanged")
+
     def test_a_session_learns_where_the_run_store_is(self):
         engine = self.engine([batch(unit("a"))])
         engine.tick()

@@ -716,6 +716,15 @@ class ControlPlaneTest(NotifyCase):
         posts = [t for k, t in self.channel.sent if k == "post"]
         self.assertTrue(any("released" in p and "to production" in p for p in posts), posts)
 
+    def test_checks_from_slack(self):
+        self.assertIn("has no project checks", handle_command("checks acme", self.daemon, self.ops, ME, ME))
+        reply = handle_command('checks acme "npm run check"', self.daemon, self.ops, ME, ME)
+        self.assertEqual(self.confirm(reply), "acme runs on every code change: npm run check")
+        self.assertIn("npm run check", handle_command("checks acme", self.daemon, self.ops, ME, ME))
+        self.assertIn("Only the person", handle_command("checks acme none", self.daemon, self.ops, SOMEONE, ME))
+        self.assertEqual(self.confirm(handle_command("checks acme none", self.daemon, self.ops, ME, ME)),
+                         "acme has no project checks now.")
+
     def test_a_ruling_pins_through_the_brief_and_opens_its_gate(self):
         reply = handle_command('ruling "R-2001: keep the 2:1 hero"', self.daemon, self.ops, ME, ME)
         done = self.confirm(reply)

@@ -662,6 +662,16 @@ class OperationCatalogTest(ApiCase):
         self.daemon.tick_all()
         self.assertEqual(git("log", "-1", "--format=%s"), f"chore(runs): record {run_id}", "recorded once")
 
+    def test_project_set_checks_sets_and_clears_the_project_checks(self):
+        self.confirmed("project.set_checks", {"commands": ["npm run check", "  "]})
+        self.assertEqual(self.daemon.settings("acme")["project_checks"], ["npm run check"])
+        self.confirmed("project.set_checks", {"commands": []})
+        self.assertEqual(self.daemon.settings("acme")["project_checks"], [])
+        self.op("project.set_checks", {"commands": ["a"] * 6}, expect=400)
+        with self.assertRaises(Exception):
+            self.app.state.operations.apply(op_id(), "project.set_checks", "acme", None, {"commands": []}, None,
+                                            "chat")
+
     def test_daemon_restart_pauses_the_runs_and_drains_before_it_restarts(self):
         run_id = self.run_started()
         engine = self.daemon.engine("acme", run_id)
@@ -817,6 +827,7 @@ COVERAGE = {
     "daemon.restart": "test_daemon_restart_pauses_the_runs_and_drains_before_it_restarts",
     "project.set_release": "test_project_release_needs_a_command_a_run_and_a_clean_checkout",
     "project.release": "test_project_release_needs_a_command_a_run_and_a_clean_checkout",
+    "project.set_checks": "test_project_set_checks_sets_and_clears_the_project_checks",
 }
 
 
