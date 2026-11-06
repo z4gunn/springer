@@ -176,12 +176,44 @@ class Worktrees:
             _git(self.project, "worktree", "remove", "--force", str(scratch))
 
     def release(self, unit_id):
-        """Returns None on success, or git's reason for refusing."""
+        """Returns None on success, or git's reason for refusing. The rulings copy the
+        harness carried in is its own, so it never keeps a worktree. Anything else left
+        uncommitted is a session's, and git keeps the worktree for a person."""
         path = self.path(unit_id)
         if not path.exists():
             return None
-        done = _git(self.project, "worktree", "remove", str(path))
+        loose = [line[3:] for line in _git(path, "status", "--porcelain", "-uall").stdout.splitlines()]
+        force = ["--force"] if loose and all(p == RULINGS for p in loose) else []
+        done = _git(self.project, "worktree", "remove", *force, str(path))
         return done.stderr.strip() or "git refused" if done.returncode else None
+
+    def delete_branch(self, branch):
+        """Delete a merged unit's branch here and on origin. Returns what was deleted."""
+        deleted = []
+        if _git(self.project, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}").returncode == 0:
+            if _git(self.project, "branch", "-D", branch).returncode == 0:
+                deleted.append(branch)
+        if _git(self.project, "remote", "get-url", "origin").returncode == 0 and \
+                _git(self.project, "ls-remote", "--exit-code", "--heads", "origin", branch).returncode == 0:
+            if _git(self.project, "push", "--quiet", "origin", "--delete", branch).returncode == 0:
+                deleted.append(f"origin/{branch}")
+        return deleted
+
+    def sync_default(self):
+        """Fast-forward the checkout's default branch from origin, so a run never starts
+        on a stale base. A checkout with changes outside the run store, or one that has
+        diverged, is left alone and the reason returned."""
+        if _git(self.project, "remote", "get-url", "origin").returncode:
+            return None
+        branch = self.default_branch()
+        if _git(self.project, "fetch", "--quiet", "origin", branch).returncode:
+            return f"could not fetch {branch} from origin"
+        dirty = [l for l in _git(self.project, "status", "--porcelain").stdout.splitlines()
+                 if not l[3:].startswith(("runs/", ".worktrees/"))]
+        if dirty:
+            return f"the checkout has uncommitted changes, so {branch} was not updated"
+        done = _git(self.project, "merge", "--ff-only", "--quiet", f"origin/{branch}")
+        return None if done.returncode == 0 else f"{branch} has diverged from origin, so it was not updated"
 
     def claimed(self):
         """Unit worktrees only. The shared .venv and a restack scratch tree live here too."""

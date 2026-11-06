@@ -91,6 +91,7 @@ def event(name, **fields):
 
 
 DAEMON_EVENTS = {
+    "cleaned_up": {"released": ["U-0412"], "kept": [], "branches": ["unit/U-0412", "origin/unit/U-0412"]},
     "check_warning": {"unit_id": "U-0412", "detail": "unit exited 0 but printed no test count"},
     "release_started": {"sha": "abc123", "by": "channel:slack", "reason": "G-0009", "command": "npm run deploy"},
     "release_finished": {"sha": "abc123", "by": "channel:slack", "exit_code": 0, "detail": "shipped"},

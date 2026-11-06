@@ -270,6 +270,9 @@ class Daemon:
                           "brief_version": front.get("brief_version", 1), "sections": sections,
                           "pinned_rulings": list(front.get("pinned_rulings") or [])}
         write_json(path / "runs" / run_id / "run-brief.json", doc)
+        stale = Worktrees(self.home.root, slug, path).sync_default()
+        if stale:
+            sys.stderr.write(f"{slug}: {stale}\n")
         if kind == "build":
             self._stamp_profile(path, derived["profile"])
             self.commit_brief(slug, path, run_id)
@@ -302,6 +305,15 @@ class Daemon:
         files = [".gitignore"] if ignore_run_store(path) else []
         files += [p for p in (f"runs/{run_id}", "runs/_config-unlock.json") if (path / p).exists()]
         return self._commit(slug, path, files, f"chore(runs): record {run_id}", f"the records of {run_id}")
+
+    def _clean_up(self, engine):
+        done = [e.line for e in engine.ledger.read() if e.line.get("event") == "cleaned_up"]
+        if done and not done[-1].get("kept"):
+            return
+        try:
+            engine.clean_up()
+        except Exception as exc:  # noqa: BLE001, a cleanup that fails is retried at the next start
+            sys.stderr.write(f"could not clean up {engine.run_id}: {exc}\n")
 
     def _commit(self, slug, path, files, message, what):
         """Commit files that changed, and publish. True when nothing is left uncommitted."""
@@ -362,6 +374,7 @@ class Daemon:
                         # cancelled through an operation or finished before this existed is
                         # recorded too.
                         if (slug, run_id) not in self._recorded and self.commit_run_records(slug, run_id):
+                            self._clean_up(engine)
                             self._recorded.add((slug, run_id))
                         continue
                     try:

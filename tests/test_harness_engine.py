@@ -5,6 +5,7 @@ window, and a stale lock takeover, plus one canned run from plan to complete."""
 
 import json
 import shutil
+import subprocess
 import time
 import unittest
 
@@ -944,6 +945,18 @@ class CannedRunTest(EngineCase):
         engine.release = lambda by, gate_id: (None, "the project checkout has uncommitted changes")
         self.assertEqual(engine.tick(), "complete")
         self.assertIn("uncommitted", self.events(engine, "release_failed")[0]["detail"])
+
+    def test_clean_up_deletes_merged_branches_and_releases_every_worktree(self):
+        engine = self.engine(canned_batches())
+        self.drive(engine)
+        branches = lambda: subprocess.run(["git", "-C", str(self.project), "branch", "--list", "unit/*"],
+                                          capture_output=True, text=True).stdout.split()
+        self.assertTrue(branches(), "the run left unit branches behind")
+        done = engine.clean_up()
+        self.assertEqual(engine.worktrees.claimed(), [])
+        self.assertEqual(branches(), [], done)
+        self.assertEqual(self.events(engine, "cleaned_up")[-1]["kept"], [])
+        self.assertEqual(engine.clean_up(), {"released": [], "kept": [], "branches": []}, "safe to repeat")
 
     def test_repeated_crashes_still_complete_with_no_retry_spent(self):
         """A crash every fourth tick, because a session needs a tick to spawn and a

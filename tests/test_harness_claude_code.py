@@ -434,6 +434,46 @@ class RestackTest(unittest.TestCase):
         tree, _ = self.trees.claim("U-0001", "main")
         self.assertFalse((tree / "runs" / "_config-unlock.json").exists())
 
+    def test_the_carried_rulings_never_keep_a_worktree_but_a_session_s_work_does(self):
+        """Every reference-run worktree was kept because the rulings copy sat untracked in it."""
+        self.commit(self.project, {"f.txt": "a\n"})
+        rulings = self.project / "runs" / "_config-unlock.json"
+        rulings.parent.mkdir(parents=True)
+        rulings.write_text('{"paths": []}')
+        tree, _ = self.trees.claim("U-0001", "main")
+        self.assertIsNone(self.trees.release("U-0001"))
+        self.assertFalse(tree.exists())
+        tree, _ = self.trees.claim("U-0002", "main")
+        (tree / "notes.txt").write_text("half done")
+        self.assertIsNotNone(self.trees.release("U-0002"), "a session's loose work keeps its worktree")
+        self.assertTrue(tree.exists())
+
+    def test_a_merged_branch_is_deleted_here_and_on_origin(self):
+        origin = Path(self.tmp.name) / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+        self.git(self.project, "remote", "add", "origin", str(origin))
+        self.git(self.project, "branch", "unit/U-0001")
+        self.git(self.project, "push", "-q", "origin", "main", "unit/U-0001")
+        self.assertEqual(self.trees.delete_branch("unit/U-0001"), ["unit/U-0001", "origin/unit/U-0001"])
+        self.assertEqual(self.git(self.project, "ls-remote", "--heads", "origin", "unit/U-0001").stdout, "")
+        self.assertEqual(self.trees.delete_branch("unit/U-0001"), [], "a second pass finds nothing")
+
+    def test_the_default_branch_fast_forwards_from_origin_when_clean(self):
+        origin = Path(self.tmp.name) / "origin.git"
+        subprocess.run(["git", "clone", "-q", "--bare", str(self.project), str(origin)], check=True)
+        self.git(self.project, "remote", "add", "origin", str(origin))
+        other = Path(self.tmp.name) / "other"
+        subprocess.run(["git", "clone", "-q", str(origin), str(other)], check=True)
+        self.commit(other, {"pushed.txt": "from another machine\n"})
+        self.git(other, "push", "-q", "origin", "main")
+        (self.project / "README.md").write_text("edited\n")
+        self.assertIn("uncommitted", self.trees.sync_default())
+        self.git(self.project, "checkout", "-q", "--", "README.md")
+        (self.project / "runs").mkdir(exist_ok=True)
+        (self.project / "runs" / "loose.json").write_text("{}")
+        self.assertIsNone(self.trees.sync_default(), "the run store does not block it")
+        self.assertTrue((self.project / "pushed.txt").exists())
+
     def test_a_stacked_branch_merges_cleanly_after_its_parent_was_squashed(self):
         self.commit(self.project, {"f.txt": "a\nb\n"})
         parent, _ = self.trees.claim("U-0001", "main")

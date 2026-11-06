@@ -149,6 +149,7 @@ events.jsonl keeps its current line format and its existing event names (agent_d
 | release_started | sha, by, reason, command. A person said go at the production-release gate or with /springer release |
 | release_finished, release_failed | sha, by, exit_code, detail (the output tail). A refusal before the command runs (a dirty checkout) is a release_failed with no exit code |
 | release_declined | gate_id, by. The run completes and nothing ships |
+| cleaned_up | released, kept, branches. After a run completes: worktrees removed, worktrees git kept, and the merged units' branches deleted here and on origin |
 | retrieval | unit_id, record ids supplied |
 | window_sample | provider, used fraction, resets at |
 | operation_applied | op_id, type, actor, args. A secret value is never in args |
@@ -188,7 +189,7 @@ Keeps every v1 field, changes open_gates from checkpoint ids to objects (id, lev
 
 The daemon allocates ~/.springer/worktrees/<project>/<unit_id> with git worktree add on the unit's branch, cut from the base the spec names (main, or the open PR branch of a dependency for a stacked unit). The claim is recorded as an event and in the unit state. The run store is never inside a worktree. A session writes artifacts to the project's runs/<run_id>/ by the absolute path in its brief, as today.
 
-A worktree is released at Act after the PR is open, with git worktree remove. A removal git refuses is logged and left for the human, never forced. A unit in retry or redispatch reuses its worktree when the branch is intact and rebuilds it otherwise.
+A worktree is released at Act after the PR is open, with git worktree remove. A removal git refuses is logged and left for the human, never forced, except that the rulings copy the harness carried in never holds a worktree. When the run completes, every remaining worktree is released the same way and the branch of every unit that merged is deleted, locally and on origin. A cancelled unit's branch is kept. A run starts by fast-forwarding the default branch from origin when the checkout is clean. A unit in retry or redispatch reuses its worktree when the branch is intact and rebuilds it otherwise.
 
 Disjointness: two units may be in flight at once only when their declared paths do not overlap and they are in different workstreams or the WIP limit allows both. The scheduler computes this from spec.json, which is what lets cycles overlap.
 

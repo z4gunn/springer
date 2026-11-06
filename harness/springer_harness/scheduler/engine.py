@@ -965,6 +965,26 @@ class RunEngine:
                 return
             self.cycles.complete_run()
 
+    # --- cleaning up ---
+
+    def clean_up(self):
+        """After the run: every unit's worktree released, and the branch of every unit
+        that merged deleted here and on origin. A stacked child replays its own commits
+        off its parent's branch, so branches go only once nothing is left to merge. A
+        cancelled unit's branch is its unmerged work and stays. Safe to repeat."""
+        released, kept, deleted = [], [], []
+        for unit_id in self.units.ids():
+            state = self.units.state(unit_id)
+            if self.worktrees.path(unit_id).exists():
+                reason = self.worktrees.release(unit_id)
+                (kept if reason else released).append(unit_id)
+            branch = (state.get("pr") or {}).get("branch") or f"unit/{unit_id}"
+            if state["state"] == "done":
+                deleted += self.worktrees.delete_branch(branch)
+        if released or kept or deleted:
+            self.ledger.append("cleaned_up", released=released, kept=kept, branches=deleted)
+        return {"released": released, "kept": kept, "branches": deleted}
+
     # --- the production release ---
 
     RELEASE_OPTIONS = [

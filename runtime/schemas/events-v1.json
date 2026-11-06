@@ -93,6 +93,9 @@
     },
     {
       "$ref": "#/$defs/release_declined"
+    },
+    {
+      "$ref": "#/$defs/cleaned_up"
     }
   ],
   "$defs": {
@@ -1437,6 +1440,60 @@
         "by": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "cleaned_up": {
+      "type": "object",
+      "required": [
+        "ts",
+        "event",
+        "seq",
+        "run_id",
+        "released",
+        "kept",
+        "branches"
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "const": "cleaned_up"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic per run."
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "released": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Units whose worktree was removed."
+        },
+        "kept": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Units whose worktree git kept, because a session left work in it."
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Branches deleted, origin/ prefixed when on the remote."
         }
       }
     }
