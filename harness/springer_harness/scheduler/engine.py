@@ -325,7 +325,7 @@ class RunEngine:
                 detail=f"the outcome was an artifact but the branch changes code ({', '.join(code[:5])}). Open a PR."))
             return
         if (result.outcome == "pr" and result.pr) or code:
-            pr = self._opened(unit_id, result.pr or {"branch": f"unit/{unit_id}"})
+            pr = self._opened(unit_id, result.pr or {"branch": self.worktrees.branch(unit_id)})
             self.units.transition(unit_id, "gated", f"PR open, risk {level}", pr=pr)
         else:
             self._integrate(unit_id)
@@ -340,7 +340,7 @@ class RunEngine:
         # The harness picks the base. A session reports the branch it started on, which is
         # stale once the parent it stacked on has merged, and a reused change keeps the base
         # it was opened with unless it is moved.
-        base, branch = self._base_for(unit_id), pr.get("branch") or f"unit/{unit_id}"
+        base, branch = self._base_for(unit_id), pr.get("branch") or self.worktrees.branch(unit_id)
         number = self.source_host.open(self.project_slug, branch, base, self._spec(unit_id)["expected_outcome"][:120])
         if hasattr(self.source_host, "retarget"):
             self.source_host.retarget(self.project_slug, number, base)
@@ -472,7 +472,7 @@ class RunEngine:
             return
         reason = self.worktrees.integrate(unit_id)
         if reason is None:
-            self.ledger.append("artifact_integrated", unit_id=unit_id, branch=f"unit/{unit_id}")
+            self.ledger.append("artifact_integrated", unit_id=unit_id, branch=self.worktrees.branch(unit_id))
             if hasattr(self.source_host, "publish"):
                 self.source_host.publish(self.project_slug, self.worktrees.default_branch())
         elif reason != "nothing to integrate":
@@ -585,7 +585,7 @@ class RunEngine:
         reason = self.worktrees.release(unit_id)
         path = str(self.worktrees.path(unit_id))
         if reason is None:
-            self.ledger.append("worktree_released", unit_id=unit_id, path=path, branch=f"unit/{unit_id}")
+            self.ledger.append("worktree_released", unit_id=unit_id, path=path, branch=self.worktrees.branch(unit_id))
         else:
             self.ledger.append("worktree_kept", unit_id=unit_id, path=path, reason=reason)
 
@@ -936,7 +936,7 @@ class RunEngine:
                                cwd=self.worktrees.path(unit_id), session_dir=store.dir(session_id),
                                env={"SPRINGER_PROJECT_DIR": str(self.project_path), "SPRINGER_RUN_ID": self.run_id,
                                     "SPRINGER_SESSION_DIR": str(store.dir(session_id)),
-                                    "SPRINGER_BRANCH": f"unit/{unit_id}", "SPRINGER_BASE": self._base_for(unit_id),
+                                    "SPRINGER_BRANCH": self.worktrees.branch(unit_id), "SPRINGER_BASE": self._base_for(unit_id),
                                     "SPRINGER_SOURCE_HOST": getattr(self.source_host, "name", "github")})
         handle = self.provider.spawn(request)
         self.handles[(unit_id, session_id)] = handle
@@ -978,7 +978,7 @@ class RunEngine:
             if self.worktrees.path(unit_id).exists():
                 reason = self.worktrees.release(unit_id)
                 (kept if reason else released).append(unit_id)
-            branch = (state.get("pr") or {}).get("branch") or f"unit/{unit_id}"
+            branch = (state.get("pr") or {}).get("branch") or self.worktrees.branch(unit_id)
             if state["state"] == "done":
                 deleted += self.worktrees.delete_branch(branch)
         if released or kept or deleted:

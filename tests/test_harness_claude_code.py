@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from harness_support import REPO, git_project
+from harness_support import HAVE_JSONSCHEMA, REPO, git_project
 
 sys.path.insert(0, str(REPO / "harness"))
 
@@ -473,6 +473,39 @@ class RestackTest(unittest.TestCase):
         (self.project / "runs" / "loose.json").write_text("{}")
         self.assertIsNone(self.trees.sync_default(), "the run store does not block it")
         self.assertTrue((self.project / "pushed.txt").exists())
+
+    def test_each_run_names_its_own_branches_and_worktrees(self):
+        """Unit ids restart at U-0001 in every run, and a later run's U-0001 shared the
+        earlier run's branch and worktree."""
+        from springer_harness.scheduler.worktrees import Worktrees
+        root = Path(self.tmp.name)
+        first = Worktrees(root / "home", "acme", self.project, "acme-1")
+        second = Worktrees(root / "home", "acme", self.project, "acme-2")
+        a, _ = first.claim("U-0001", "main")
+        self.commit(a, {"one.txt": "first run\n"})
+        b, _ = second.claim("U-0001", "main")
+        self.assertNotEqual(a, b)
+        self.assertEqual((first.branch("U-0001"), second.branch("U-0001")), ("unit/acme-1/U-0001", "unit/acme-2/U-0001"))
+        self.assertFalse((b / "one.txt").exists(), "the second run starts from main, not the first run's branch")
+        self.assertEqual(first.claimed(), ["U-0001"])
+
+    @unittest.skipUnless(HAVE_JSONSCHEMA, "jsonschema not installed in this interpreter")
+    def test_a_run_folder_links_the_project_venv(self):
+        """validate.py looks for .venv in a worktree's parent, which is now the run folder."""
+        from springer_harness.scheduler.worktrees import Worktrees
+        trees = Worktrees(Path(self.tmp.name) / "home", "acme", self.project, "acme-1")
+        (trees.base / ".venv" / "bin").mkdir(parents=True)
+        (trees.base / ".venv" / "bin" / "python").symlink_to(sys.executable)
+        self.assertIsNone(trees.ensure_venv())
+        self.assertEqual((trees.root / ".venv").resolve(), (trees.base / ".venv").resolve())
+
+    def test_a_run_begun_on_the_old_names_keeps_them(self):
+        from springer_harness.daemon import _legacy_names
+        units = self.project / "runs" / "acme-1" / "units" / "U-0001"
+        units.mkdir(parents=True)
+        (units / "state.json").write_text('{"pr": {"branch": "unit/U-0001"}}')
+        self.assertTrue(_legacy_names(self.project, "acme-1"))
+        self.assertFalse(_legacy_names(self.project, "acme-2"))
 
     def test_a_stacked_branch_merges_cleanly_after_its_parent_was_squashed(self):
         self.commit(self.project, {"f.txt": "a\nb\n"})

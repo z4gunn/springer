@@ -22,27 +22,38 @@ def _git(cwd, *args):
 
 
 class Worktrees:
-    def __init__(self, home, project_slug, project_path):
-        self.root = Path(home) / "worktrees" / project_slug
+    def __init__(self, home, project_slug, project_path, run_id=None):
+        # Unit ids restart at U-0001 in every run, so a run's branches and worktrees are
+        # named for the run. Without it a later run's U-0001 could pick up the branch an
+        # earlier run's U-0001 left behind.
+        self.base = Path(home) / "worktrees" / project_slug
+        self.root = self.base / run_id if run_id else self.base
         self.project = Path(project_path)
+        self.run_id = run_id
 
     def path(self, unit_id):
         return self.root / unit_id
+
+    def branch(self, unit_id):
+        return f"unit/{self.run_id}/{unit_id}" if self.run_id else f"unit/{unit_id}"
 
     def ensure_venv(self):
         """schemas/validate.py looks for a .venv in the repo root or its parent, and a
         worktree's parent is this folder, so one venv with jsonschema serves every unit
         of the project. None when ready, else why it could not be made."""
-        python = self.root / ".venv" / "bin" / "python"
-        if python.exists() and subprocess.run([str(python), "-c", "import jsonschema"],
-                                              capture_output=True).returncode == 0:
-            return None
-        self.root.mkdir(parents=True, exist_ok=True)
-        for step in ([sys.executable, "-m", "venv", str(self.root / ".venv")],
-                     [str(python), "-m", "pip", "install", "--quiet", "jsonschema"]):
-            done = subprocess.run(step, capture_output=True, text=True, timeout=600)
-            if done.returncode:
-                return (done.stderr or done.stdout).strip()[-300:]
+        python = self.base / ".venv" / "bin" / "python"
+        if not (python.exists() and subprocess.run([str(python), "-c", "import jsonschema"],
+                                                   capture_output=True).returncode == 0):
+            self.base.mkdir(parents=True, exist_ok=True)
+            for step in ([sys.executable, "-m", "venv", str(self.base / ".venv")],
+                         [str(python), "-m", "pip", "install", "--quiet", "jsonschema"]):
+                done = subprocess.run(step, capture_output=True, text=True, timeout=600)
+                if done.returncode:
+                    return (done.stderr or done.stdout).strip()[-300:]
+        if self.root != self.base and not (self.root / ".venv").exists():
+            # A run's worktrees sit one folder deeper, so the run folder links the one venv.
+            self.root.mkdir(parents=True, exist_ok=True)
+            (self.root / ".venv").symlink_to(self.base / ".venv")
         return None
 
     def default_branch(self):
@@ -53,7 +64,7 @@ class Worktrees:
 
     def claim(self, unit_id, base):
         """Reuse the unit's worktree when the branch is intact, otherwise rebuild it."""
-        path, branch = self.path(unit_id), f"unit/{unit_id}"
+        path, branch = self.path(unit_id), self.branch(unit_id)
         if self._intact(path):
             # A retry reuses the worktree. When the unit has committed nothing yet, it
             # moves up to the base, so it reads what landed since (e.g. the brief).
@@ -87,14 +98,14 @@ class Worktrees:
         """The paths the unit's branch changes against the default branch that are not
         artifacts. A branch stacked on an unmerged parent carries the parent's code too,
         so this is not empty for it either."""
-        changed = _git(self.project, "diff", "--name-only", f"{self.default_branch()}...unit/{unit_id}").stdout
+        changed = _git(self.project, "diff", "--name-only", f"{self.default_branch()}...{self.branch(unit_id)}").stdout
         return [p for p in changed.splitlines() if p and not p.startswith(ARTIFACT_PATHS)]
 
     def integrate(self, unit_id):
         """Merge the unit's branch into the default branch, off the person's checkout.
         Returns None, "nothing to integrate", or why it was refused. Their uncommitted
         work is kept, and the merge is refused only when it would overwrite it."""
-        branch, base = f"unit/{unit_id}", self.default_branch()
+        branch, base = self.branch(unit_id), self.default_branch()
         ahead = _git(self.project, "rev-list", "--count", f"{base}..{branch}").stdout.strip()
         if not ahead or ahead == "0":
             return "nothing to integrate"

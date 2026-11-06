@@ -56,7 +56,7 @@ This reference defines the durable state the Springer harness daemon reads and w
 | Escalation | E-nnnn | runs/<run_id>/artifacts/ as today | daemon |
 | Receipt | per gating command | runs/<run_id>/units/U-nnnn/sessions/S-nnnn/check/receipts/ for the commands the harness runs at Check, which are the evidence. A session may write its own while it works | receipt.py, run by the daemon at Check |
 | Event | monotonic seq | runs/<run_id>/events.jsonl | daemon and the session hooks |
-| Worktree | unit id | ~/.springer/worktrees/<project>/U-nnnn/ | daemon |
+| Worktree | run id, unit id | ~/.springer/worktrees/<project>/<run_id>/U-nnnn/ | daemon |
 | Usage window | provider account | ~/.springer/usage/<provider>.json | daemon |
 | Index | none | ~/.springer/index.sqlite | daemon, rebuildable |
 | Audit log | op_id | ~/.springer/audit.jsonl, every applied operation, including one with no run | daemon |
@@ -187,7 +187,7 @@ Keeps every v1 field, changes open_gates from checkpoint ids to objects (id, lev
 
 ## Worktree claim and lock
 
-The daemon allocates ~/.springer/worktrees/<project>/<unit_id> with git worktree add on the unit's branch, cut from the base the spec names (main, or the open PR branch of a dependency for a stacked unit). The claim is recorded as an event and in the unit state. The run store is never inside a worktree. A session writes artifacts to the project's runs/<run_id>/ by the absolute path in its brief, as today.
+The daemon allocates ~/.springer/worktrees/<project>/<run_id>/<unit_id> with git worktree add on the unit's branch, unit/<run_id>/<unit_id>, because unit ids restart at U-0001 in every run, cut from the base the spec names (main, or the open PR branch of a dependency for a stacked unit). The claim is recorded as an event and in the unit state. The run store is never inside a worktree. A session writes artifacts to the project's runs/<run_id>/ by the absolute path in its brief, as today.
 
 A worktree is released at Act after the PR is open, with git worktree remove. A removal git refuses is logged and left for the human, never forced, except that the rulings copy the harness carried in never holds a worktree. When the run completes, every remaining worktree is released the same way and the branch of every unit that merged is deleted, locally and on origin. A cancelled unit's branch is kept. A run starts by fast-forwarding the default branch from origin when the checkout is clean. A unit in retry or redispatch reuses its worktree when the branch is intact and rebuilds it otherwise.
 
@@ -222,7 +222,7 @@ On daemon start, for every registered project and every run under it that is not
 2. For every unit the projection shows in running: the daemon's child processes died with it, so every such session is dead. Write session_exited with outcome dead, move the unit to abandoned, then to redispatch. No retry is spent. If the session left handoff.md, the redispatch brief carries it.
 3. For every unit in checking: Check is idempotent and is run again from the files on disk.
 4. For every unit in gated: re-read the PR state from the source host. A merged PR moves the unit to done, an open PR stays gated, a closed unmerged PR moves to blocked with an escalation.
-5. For every worktree directory under ~/.springer/worktrees/<project>/ with no unit in running or retry: remove it if git allows, otherwise log it.
+5. For every worktree directory under ~/.springer/worktrees/<project>/<run_id>/ with no unit in running or retry: remove it if git allows, otherwise log it.
 6. Take over the run lock if it is stale or held by a previous daemon id. A live lock held by a non-daemon id (a Claude Code session) leaves the run alone and the TUI shows it as externally held.
 7. Resume the scheduler tick.
 

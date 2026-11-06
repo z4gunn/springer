@@ -73,6 +73,15 @@ def ignore_run_store(path):
     return True
 
 
+def _legacy_names(path, run_id):
+    """True for a run whose units already have branches named before branches carried
+    the run, so it finishes under the names it started with."""
+    for state in (Path(path) / "runs" / run_id / "units").glob("U-*/state.json"):
+        if '"unit/U-' in state.read_text():
+            return True
+    return False
+
+
 class ProjectHost:
     """The source host a project's settings name, looked up on every call, so a
     change in Settings takes effect on the next tick."""
@@ -160,7 +169,8 @@ class Daemon:
 
     def _new_engine(self, slug, path, run_id, kind):
         return RunEngine(slug, path, run_id, self.provider, self.planner_factory(slug, run_id, kind), ProjectHost(self, slug),
-                         Worktrees(self.home.root, slug, path), self.window, self.owner, self.now,
+                         Worktrees(self.home.root, slug, path, None if _legacy_names(path, run_id) else run_id),
+                         self.window, self.owner, self.now,
                          in_flight_total=self._in_flight_total, settings=lambda: self.settings(slug),
                          release=lambda by, gate_id: self.release(slug, by, run_id, reason=gate_id))
 

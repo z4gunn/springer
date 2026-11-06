@@ -73,7 +73,8 @@ class MockSession:
                     path.write_text(text)
             result = dict(self.attempt.result or {})
             if result.get("pr") and not result["pr"].get("branch"):
-                result["pr"] = {**result["pr"], "branch": f"unit/{self.request.unit_id}"}
+                result["pr"] = {**result["pr"], "branch": self.request.env.get(
+                    "SPRINGER_BRANCH", f"unit/{self.request.unit_id}")}
             if self.attempt.result is not None:
                 (out / "result.json").write_text(json.dumps(result))
             (out / "return.txt").write_text(result.get("detail", "done"))
