@@ -11,19 +11,23 @@ from textual.theme import Theme
 
 DARK = {"text": "#E4DED2", "dim": "#7D786E", "stone": "#B7AE9E", "you": "#E08A5A", "you_bar": "#C26A3C",
         "selected": "#1E2024", "card": "#25221E", "border": "#3A3833", "error": "#D9694F", "success": "#8FA876",
-        "background": "#16171A", "surface": "#1E2024"}
+        "background": "#16171A", "surface": "#1E2024",
+        "haiku": "#7FA7C9", "sonnet": "#6FAF9C", "opus": "#A894C4"}
 LIGHT = {"text": "#2A2620", "dim": "#6E675A", "stone": "#5F584C", "you": "#A8521F", "you_bar": "#C26A3C",
          "selected": "#EFEAE0", "card": "#F6EEE6", "border": "#D8D2C6", "error": "#B8432C", "success": "#4F7A3A",
-         "background": "#FBF9F5", "surface": "#F3F0EA"}
+         "background": "#FBF9F5", "surface": "#F3F0EA",
+         "haiku": "#3F6E96", "sonnet": "#2F7A68", "opus": "#6E54A0"}
 # macOS Terminal and others have 256 colors, and rounding the palette above to the nearest
 # one turns terracotta into rose pink. Every value here is an exact xterm color, so what
 # they show is what was chosen.
 DARK_256 = {"text": "#dadada", "dim": "#767676", "stone": "#afaf87", "you": "#d7875f", "you_bar": "#d75f00",
             "selected": "#1c1c1c", "card": "#262626", "border": "#3a3a3a", "error": "#d75f5f", "success": "#87af87",
-            "background": "#121212", "surface": "#1c1c1c"}
+            "background": "#121212", "surface": "#1c1c1c",
+            "haiku": "#87afd7", "sonnet": "#5faf87", "opus": "#af87d7"}
 LIGHT_256 = {"text": "#262626", "dim": "#6c6c6c", "stone": "#5f5f5f", "you": "#af5f00", "you_bar": "#d75f00",
              "selected": "#e4e4e4", "card": "#eeeeee", "border": "#d0d0d0", "error": "#af0000", "success": "#5f875f",
-             "background": "#ffffff", "surface": "#eeeeee"}
+             "background": "#ffffff", "surface": "#eeeeee",
+             "haiku": "#005f87", "sonnet": "#005f5f", "opus": "#5f5faf"}
 # The arch in pixels. S is a stone, K the keystone, P a pier, and T a springer: the two
 # orange stones where the curve leaves the piers, flaring as they do in the icon.
 MARK = ("....KKKK....",
@@ -99,6 +103,35 @@ def keys(*pairs):
             parts.append("   ")
         parts += [paint(key, "text", bold=True), paint(f" {label}", "dim")]
     return join(*parts)
+
+
+# A model tier has its own hue, cool and away from terracotta, so the color of a unit
+# says which tier runs it and never reads as needing you.
+TIERS = ("haiku", "sonnet", "opus")
+
+
+def tier_of(model):
+    """The tier a model id names, or None for one no tier matches."""
+    model = (model or "").lower()
+    return next((tier for tier in TIERS if tier in model), None)
+
+
+def legend():
+    parts = []
+    for tier in TIERS:
+        parts += [paint("■ ", tier), paint(f"{tier}   ", "dim")]
+    return join(*parts)
+
+
+def chip(label, value, color="text"):
+    """A status value: its name gray, the value bright inside gray brackets."""
+    return join(paint(f"{label} [", "dim"), paint(value, color), paint("]", "dim"))
+
+
+def bar(fraction, cells=12, color="stone"):
+    """A meter in block cells. An unknown fraction draws an empty track."""
+    filled = 0 if fraction is None else max(0, min(cells, round(fraction * cells)))
+    return join(paint("█" * filled, color), paint("░" * (cells - filled), "border"))
 
 
 def mark():

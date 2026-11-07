@@ -62,6 +62,7 @@ def free_port():
 @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
 class TuiCase(unittest.IsolatedAsyncioTestCase):
     SIZE = (120, 44)
+    NARROW = (90, 44)  # too narrow for unit cards, so in-flight units are a table
 
     async def asyncSetUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -737,7 +738,7 @@ class BacklogScreenTest(TuiCase):
 class RunScreenTest(TuiCase):
     async def test_phase_and_in_flight_rows(self):
         self.daemon.provider.default.ticks = 5
-        async with self.app.run_test(size=self.SIZE) as pilot:
+        async with self.app.run_test(size=self.NARROW) as pilot:
             run_id = await self.run_screen(pilot)
             await self.tick(3)
             await self.see(pilot, "requirements", run_id, "U-0001", "product-manager", "mock-sonnet", "TIME", "LAST")
@@ -746,10 +747,10 @@ class RunScreenTest(TuiCase):
 
     async def test_live_session_output(self):
         self.daemon.provider.default.ticks = 5
-        async with self.app.run_test(size=self.SIZE) as pilot:
+        async with self.app.run_test(size=self.NARROW) as pilot:
             await self.run_screen(pilot)
             await self.tick(3)
-            await self.see(pilot, "U-0001")
+            await self.until(pilot, lambda: self.app.query_one("#units", DataTable).row_count)  # the run log names U-0001 first
             self.app.query_one("#units", DataTable).focus()
             await pilot.press("enter")
             await self.dialog(pilot, TextDialog)
@@ -862,10 +863,10 @@ class RunScreenTest(TuiCase):
 
     async def test_cancel_redispatch_pause(self):
         self.daemon.provider.default.ticks = 50
-        async with self.app.run_test(size=self.SIZE) as pilot:
+        async with self.app.run_test(size=self.NARROW) as pilot:
             run_id = await self.run_screen(pilot)
             await self.tick(3)
-            await self.see(pilot, "U-0001")
+            await self.until(pilot, lambda: self.app.query_one("#units", DataTable).row_count)  # the run log names U-0001 first
             self.app.query_one("#units", DataTable).focus()
             await pilot.press("R")
             await self.dialog(pilot, ConfirmDialog)
@@ -900,10 +901,10 @@ class RunScreenTest(TuiCase):
 
     async def test_declining_a_confirmation_changes_nothing(self):
         self.daemon.provider.default.ticks = 50
-        async with self.app.run_test(size=self.SIZE) as pilot:
+        async with self.app.run_test(size=self.NARROW) as pilot:
             run_id = await self.run_screen(pilot)
             await self.tick(3)
-            await self.see(pilot, "U-0001")
+            await self.until(pilot, lambda: self.app.query_one("#units", DataTable).row_count)  # the run log names U-0001 first
             self.app.query_one("#units", DataTable).focus()
             await pilot.press("c")
             await self.dialog(pilot, ConfirmDialog)
@@ -916,7 +917,32 @@ class RunScreenTest(TuiCase):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.run_screen(pilot)
             await self.tick()
-            await self.see(pilot, "waiting on usage window", "at list price", "window 100%", "daemon parked")
+            await self.see(pilot, "waiting on usage window", "list price [$", "window [100%]", "running [", "done [",
+                           "daemon [parked]")
+
+    async def test_unit_cards_on_a_wide_terminal(self):
+        self.daemon.provider.default.ticks = 50
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            run_id = await self.run_screen(pilot)
+            await self.tick(3)
+            await self.see(pilot, "◐ running", "U-0001", "product-manager", "mock-sonnet", "■ haiku")
+            self.assertFalse(self.app.query_one("#units", DataTable).display, "cards replace the table")
+            self.assertTrue(self.app.query_one("#card-0").has_class("tier-sonnet"))
+            self.app.query_one("#unit-cards").focus()
+            await pilot.press("c")
+            await self.dialog(pilot, ConfirmDialog)
+            await pilot.press("y")
+            await self.until(pilot, lambda: self.engine(run_id).units.state("U-0001")["state"] == "cancelled")
+
+    async def test_run_log_worded_as_the_slack_feed(self):
+        self.daemon.provider.default.ticks = 50
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            run_id = await self.run_screen(pilot)
+            await self.see(pilot, "run log", "Nothing yet.")
+            await self.tick(3)
+            await self.until(pilot, lambda: re.search(r"\d\d:\d\d:\d\d  U-0001 started", self.text()))
+            self.engine(run_id).ledger.append("unit_state", unit_id="U-0001", to="blocked", reason="needs a key")
+            await self.see(pilot, "U-0001 blocked: needs a key")
 
     async def test_design_gate_opens_the_browser(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
@@ -1096,7 +1122,7 @@ class WholeRunTest(TuiCase):
                 self.fail(f"the run never completed on screen:\n{self.text()}")
             self.assertEqual(len(answered), 5, "a standard run: a direction review and a merge gate for each of four PRs")
             self.assertCountEqual(self.host.merged, [1, 2, 3, 4])
-            await self.see(pilot, "complete", "at list price")
+            await self.see(pilot, "complete", "list price [$")
 
 
 COVERAGE = {
@@ -1125,6 +1151,8 @@ COVERAGE = {
     ("Run", "Phase, in-flight rows with agent, model, elapsed, context, cost, last tool"):
         (RunScreenTest, "test_phase_and_in_flight_rows"),
     ("Run", "Live session output"): (RunScreenTest, "test_live_session_output"),
+    ("Run", "Unit cards with tier, context bar, elapsed, cost, last tool"): (RunScreenTest, "test_unit_cards_on_a_wide_terminal"),
+    ("Run", "Run log worded as the Slack feed"): (RunScreenTest, "test_run_log_worded_as_the_slack_feed"),
     ("Run", "Gate cards, recommended option first, consequences"):
         (RunScreenTest, "test_gate_cards_recommended_first_with_consequences"),
     ("Run", "Risky merge diff"): (RunScreenTest, "test_risky_merge_diff"),
@@ -1189,6 +1217,15 @@ class LookTest(unittest.TestCase):
                 self.assertIn(value, exact, name)
         self.assertEqual(theme.DARK_256.keys(), theme.DARK.keys())
         self.assertEqual(theme.LIGHT_256.keys(), theme.LIGHT.keys())
+
+    @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
+    def test_a_model_id_names_its_tier(self):
+        from springer_harness.tui.theme import bar, chip, tier_of
+        self.assertEqual([tier_of(m) for m in ("claude-haiku-5-5", "mock-sonnet", "claude-opus-5-5", "gpt", None)],
+                         ["haiku", "sonnet", "opus", None, None])
+        self.assertEqual(bar(0.5, 4).plain, "██░░")
+        self.assertEqual(bar(None, 3).plain, "░░░")
+        self.assertEqual(chip("daemon", "running").plain, "daemon [running]")
 
     @unittest.skipUnless(HAVE_TUI, "the TUI dependencies are not installed")
     def test_every_phase_the_stones_know_is_within_the_arch(self):

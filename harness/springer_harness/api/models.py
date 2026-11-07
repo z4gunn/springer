@@ -124,6 +124,14 @@ class Page(BaseModel):
     next_cursor: str | None
 
 
+class FeedLine(BaseModel):
+    at: str
+    unit_id: str
+    event: str
+    to: str | None
+    text: str
+
+
 class Metrics(BaseModel):
     product_checks_per_100_dispatches: float
     failure_class_mix: dict

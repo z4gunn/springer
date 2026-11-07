@@ -191,6 +191,7 @@ class ReadsTest(ApiCase):
             "/v1/projects/{slug}/runs/{run_id}/gates": run + "/gates",
             "/v1/projects/{slug}/runs/{run_id}/gates/{gate_id}": f"{run}/gates/{self.gate['checkpoint_id']}",
             "/v1/projects/{slug}/runs/{run_id}/metrics": run + "/metrics",
+            "/v1/projects/{slug}/runs/{run_id}/feed": run + "/feed",
         }
         streams = {"/v1/events", "/v1/projects/{slug}/runs/{run_id}/events",
                    "/v1/projects/{slug}/runs/{run_id}/units/{unit_id}/sessions/{session_id}/stream"}

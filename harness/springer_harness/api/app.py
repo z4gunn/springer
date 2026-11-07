@@ -15,6 +15,7 @@ from ..build import build_id
 from ..check.critique import critique
 from ..common import iso, parse_iso, read_json
 from ..errors import HarnessError, NotFound
+from ..notify.notifier import feed_line
 from ..state.backlog import BacklogStore
 from ..state.ledger import CursorInvalid
 from ..state.projection import rebuild
@@ -287,6 +288,18 @@ def create_app(daemon):
     def gate(slug: str, run_id: str, gate_id: str):
         engine = daemon.engine(slug, run_id)
         return gate_view(engine, engine.gates.get(gate_id))
+
+    @app.get(run_path + "/feed", response_model=list[m.FeedLine], dependencies=secured)
+    def feed(slug: str, run_id: str, limit: int = Query(20, ge=1, le=200)):
+        """The run's news, newest last, worded as the Slack feed words it."""
+        engine = daemon.engine(slug, run_id)
+        lines = []
+        for entry in engine.ledger.read():
+            line, text = entry.line, feed_line(entry.line)
+            if text:
+                lines.append({"at": line.get("ts", ""), "unit_id": line.get("unit_id") or "", "event": line.get("event", ""),
+                              "to": line.get("to"), "text": text})
+        return lines[-limit:]
 
     @app.get(run_path + "/metrics", response_model=m.Metrics, dependencies=secured)
     def metrics(slug: str, run_id: str):

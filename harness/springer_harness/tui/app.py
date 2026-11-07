@@ -15,7 +15,7 @@ from textual.widgets import ContentSwitcher, Input, Static
 from .client import ApiError, ConnectionLost, run_path
 from .dialogs import ConfirmDialog
 from .panes import BacklogPane, BriefPane, ProjectsPane, RunPane
-from .theme import C, STONES, THEME, join, mark, paint, stones_laid
+from .theme import C, STONES, THEME, chip, join, mark, paint, stones_laid
 
 REFRESH_SECONDS = 0.25
 IDLE_REFRESH_SECONDS = 5
@@ -64,6 +64,13 @@ class SpringerApp(App):
     #gates-box { height: auto; max-height: 50%%; background: %(card)s; border-left: thick %(you_bar)s; padding: 0 2; margin: 0 2; }
     #gates { height: auto; }
     #routine { height: auto; padding: 0 2; margin-top: 1; }
+    #unit-cards { height: 7; padding: 0 2; margin-top: 1; display: none; }
+    .unit-card { width: 1fr; max-width: 44; height: 7; border: round %(border)s; padding: 0 1; margin-right: 1; }
+    .unit-card.tier-haiku { border: round %(haiku)s; }
+    .unit-card.tier-sonnet { border: round %(sonnet)s; }
+    .unit-card.tier-opus { border: round %(opus)s; }
+    #unit-cards:focus .unit-card.picked { background: %(selected)s; }
+    #run-log { dock: bottom; height: 7; padding: 0 2; border-top: solid %(border)s; }
     #brief-main { height: 1fr; margin: 1 2 0 2; }
     #rail { width: 28; height: 100%%; border: none; padding: 0; background: $background; }
     #rail:focus { border: none; background-tint: transparent; }
@@ -205,6 +212,10 @@ class SpringerApp(App):
         if self._run_watch:
             self._run_watch.cancel()
             self._run_watch = None
+        try:
+            self._pane("run").reset_log()
+        except NoMatches:
+            pass  # not mounted yet
         if run_id:
             path = run_path(self.project, run_id) + "/events"
             self._run_watch = self.run_worker(self._watch(path, resume=True), name="run-stream")
@@ -295,29 +306,35 @@ class SpringerApp(App):
     async def _refresh_topbar(self):
         state = await self.client.get("/v1/daemon")
         usage = await self.client.get("/v1/usage")
-        window = ""
+        status = []
         if usage:
             used = usage[0]["used_fraction"]
             resets = calendar.timegm(time.strptime(usage[0]["resets_at"], "%Y-%m-%dT%H:%M:%SZ"))
-            window = f"window {'unknown' if used is None else f'{used:.0%}'}, resets {time.strftime('%H:%M', time.localtime(resets))}"
+            status += [chip("window", "unknown" if used is None else f"{used:.0%}"),
+                       chip("resets", time.strftime("%H:%M", time.localtime(resets)))]
         where = " · ".join(x for x in (self.project, self.run_id) if x)
         self.main.query_one("#where", Static).update(paint(where, "dim"))
         current = self.main.query_one("#panes", ContentSwitcher).current.removesuffix("-pane")
         tabs = []
         for key, name in (("p", "projects"), ("b", "brief"), ("k", "backlog"), ("r", "run"), ("q", "quit")):
             tabs += [paint(f"{key} ", "dim"), paint(f"{name}   ", "text" if name == current else "dim", bold=name == current)]
-        status = [window]
         progress = paint("")
         if self.run_id and self.project:
             path = run_path(self.project, self.run_id)
             run = await self.client.get(path)
             metrics = await self.client.get(path + "/metrics")
-            status.append(f"${metrics['list_price_spend_usd']:.2f} at list price")
+            total = sum(run["units"].values())
+            status += [chip("running", str(len(run["in_flight"]))), chip("done", f"{run['units'].get('done', 0)}/{total}"),
+                       chip("list price", f"${metrics['list_price_spend_usd']:.2f}")]
             progress = self._progress(run)
-        status.append(f"daemon {state['state']}")
+        status.append(chip("daemon", state["state"]))
         self.main.query_one("#nav", Static).update(join(*tabs))
         self.main.query_one("#progress", Static).update(progress)
-        self.main.query_one("#statusline", Static).update(paint("  ·  ".join(s for s in status if s), "dim"))
+        separated = []
+        for index, part in enumerate(status):
+            separated += [paint("  ·  ", "dim")] if index else []
+            separated.append(part)
+        self.main.query_one("#statusline", Static).update(join(*separated))
 
     def _progress(self, run):
         """Phase, stones, and any state that changes what the run is doing."""

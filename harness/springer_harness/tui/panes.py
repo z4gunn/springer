@@ -1,6 +1,7 @@
 """The four screens. Each pane fetches through the client and renders. Nothing here
 holds state a refetch would not rebuild, so a pane cannot drift from the daemon."""
 
+import calendar
 import os
 import time
 
@@ -15,7 +16,7 @@ from .client import ApiError, run_path
 from . import items
 from .dialogs import (AdoptDialog, ConfirmDialog, EditDialog, FactsDialog, FieldsDialog, FlowDialog, FormDialog,
                       RunsDialog, SettingsDialog, StartDialog, TextDialog, imported_text)
-from .theme import COLUMN, RISK, join, keys, lines, paint
+from .theme import COLUMN, RISK, TIERS, bar, join, keys, legend, lines, paint, tier_of
 
 # Shown in an empty section, and never saved: the format these sections must take. They
 # are the API's to enforce, and these copies only show the shape.
@@ -27,7 +28,6 @@ SECTION_TEMPLATES = {
 # The API's message for a rule, said the way this screen fixes it.
 SCREEN_MESSAGES = {"flows-not-structured": "Core flows has text but no flow yet. Open Core flows and press a to add each one."}
 COLUMNS = ("ready", "in_progress", "in_review", "blocked", "done")
-TIERS = ("haiku", "sonnet", "opus")
 VIEWS = ("tree", "board", "graph")
 
 
@@ -846,6 +846,85 @@ class BacklogPane(Pane):
 PROMPT_LINES = 3
 
 
+# Units shown as cards when this many or fewer run and the pane is at least CARDS_WIDTH
+# wide. More, or a narrow terminal, falls back to the table.
+MAX_CARDS = 4
+CARDS_WIDTH = 100
+# The run log shows the newest LOG_ROWS lines of the run's feed. It hides on a
+# terminal too short to keep the gate options and the units on screen with it.
+LOG_ROWS = 6
+LOG_MIN_HEIGHT = 30
+LOG_ERRORS = {"merge_failed", "restack_failed", "release_failed", "tick_failed"}
+LOG_GOOD = {"merge", "release_finished"}
+
+
+def log_entry(line):
+    """A feed line from the daemon as (time, unit, message, tone). The daemon words it
+    as the Slack feed does, so the two never drift."""
+    try:
+        at = time.strftime("%H:%M:%S", time.localtime(calendar.timegm(time.strptime(line["at"], "%Y-%m-%dT%H:%M:%SZ"))))
+    except ValueError:
+        at = "--:--:--"
+    name, to = line["event"], line.get("to")
+    if name in LOG_ERRORS or to in ("retry", "blocked"):
+        tone = "error"
+    elif to == "gated" or name == "check_warning":
+        tone = "you"  # waiting on you
+    elif name in LOG_GOOD:
+        tone = "success"
+    else:
+        tone = "text"
+    return at, line["unit_id"], line["text"], tone
+
+
+class UnitCards(Horizontal, can_focus=True):
+    """In-flight units side by side. left and right pick one, enter follows its output,
+    and the Run pane's c and R act on the picked card as they do on a table row."""
+
+    BINDINGS = [Binding("left", "pick(-1)", show=False), Binding("right", "pick(1)", show=False),
+                Binding("enter", "follow", "live output", show=False)]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.unit_keys = []
+        self.picked = 0
+
+    def compose(self) -> ComposeResult:
+        for index in range(MAX_CARDS):
+            yield Static("", id=f"card-{index}", classes="unit-card", markup=False)
+
+    def render_cards(self, rows):
+        """rows are (key, card Text, tier). The pick stays on the same unit when it can."""
+        current = self.unit_keys[self.picked] if self.unit_keys else None
+        self.unit_keys = [key for key, _, _ in rows]
+        self.picked = self.unit_keys.index(current) if current in self.unit_keys else min(self.picked, max(0, len(rows) - 1))
+        for index in range(MAX_CARDS):
+            card = self.query_one(f"#card-{index}", Static)
+            card.display = index < len(rows)
+            if index >= len(rows):
+                continue
+            _, text, tier = rows[index]
+            card.update(text)
+            for name in TIERS:
+                card.set_class(name == tier, f"tier-{name}")
+            card.set_class(index == self.picked, "picked")
+
+    def picked_key(self):
+        return self.unit_keys[self.picked] if self.unit_keys else None
+
+    def action_pick(self, step):
+        if self.unit_keys:
+            self.picked = (self.picked + step) % len(self.unit_keys)
+            for index in range(len(self.unit_keys)):
+                self.query_one(f"#card-{index}", Static).set_class(index == self.picked, "picked")
+
+    def action_follow(self):
+        if self.unit_keys:
+            unit_id, session_id = self.picked_key().split("/")
+            pane = next(a for a in self.ancestors if isinstance(a, RunPane))
+            self.app.spawn(pane._live(unit_id, session_id))
+
+
 class RunPane(Pane):
     focus_id = "#units"
     BINDINGS = [*(Binding(str(n), f"answer({n})", show=False) for n in range(1, 10)),
@@ -862,14 +941,56 @@ class RunPane(Pane):
         self.open_gates = []
         self.digest = []
         self.selected_gate = 0
+        self.run_log = []
+        self.models = {}
+        self.cards = False
 
     def compose(self) -> ComposeResult:
         yield VerticalScroll(Static("", id="gates", markup=False), id="gates-box")
         yield Static("", id="run-title", classes="section", markup=False)
+        yield UnitCards(id="unit-cards")
         yield DataTable(id="units", cursor_type="row")
         yield Static(keys(("c", "cancel"), ("R", "one tier up"), ("enter", "live output"), ("P", "pause run"), ("X", "cancel run")),
                      classes="hint")
         yield Static("", id="routine", markup=False)
+        yield Static("", id="run-log", markup=False)
+
+    def focus_main(self):
+        self.query_one("#unit-cards" if self.cards else "#units").focus()
+
+    def reset_log(self):
+        self.run_log = []
+        self.models.clear()
+        self._render_log()
+
+    def _render_log(self):
+        view = self.query_one("#run-log", Static)
+        view.display = self.size.height >= LOG_MIN_HEIGHT or not self.size.height
+        rows = [paint("run log", "dim", bold=True)]
+        for at, unit, message, tone in self.run_log:
+            parts = [paint(f"{at}  ", "dim")]
+            tier = tier_of(self.models.get(unit))
+            if unit and tier and message.startswith(unit):
+                parts += [paint(unit, tier, bold=True), paint(message[len(unit):], tone)]
+            else:
+                parts.append(paint(message, tone))
+            rows.append(join(*parts))
+        if len(rows) == 1:
+            rows.append(paint("Nothing yet.", "dim"))
+        view.update(lines(rows))
+
+    def _card(self, row):
+        tier = tier_of(row["model"])
+        percent = row.get("context_percent")
+        width = min(38, max(16, (self.size.width - 4) // MAX_CARDS - 4))
+        return lines([
+            join(paint(row["unit_id"], "text", bold=True), paint(f"  {row['agent'].removeprefix('spgr-agent-')}", "dim")),
+            paint(row["model"], tier or "stone"),
+            join(bar(None if percent is None else percent / 100, color=tier or "stone"),
+                 paint("" if percent is None else f" {percent:.0f}%", "dim")),
+            join(paint("◐ running", "stone"), paint(f"  {age(row['started_at'])}  ${row.get('cost') or 0:.2f}", "dim")),
+            paint(_clip(row.get("last_tool_call") or "", width), "dim"),
+        ]), tier
 
     def on_mount(self):
         self.query_one("#units", DataTable).add_columns("UNIT", "AGENT", "MODEL", "TIME", "CTX", "COST", "LAST")
@@ -885,22 +1006,34 @@ class RunPane(Pane):
         self.run = await self.client.get(path)
         self.open_gates = (await self.client.get(path + "/gates", state="open", digest="false"))["items"]
         self.digest = (await self.client.get(path + "/gates", state="open", digest="true"))["items"]
+        self.run_log = [log_entry(line) for line in await self.client.get(path + "/feed", limit=LOG_ROWS)]
         self.selected_gate = min(self.selected_gate, max(0, len(self.open_gates) - 1))
         self._render_run()
 
     def _render_run(self):
         run = self.run
         counts = ", ".join(f"{count} {state}" for state, count in sorted(run["units"].items()))
-        self.query_one("#run-title", Static).update(join(paint("in flight", "dim", bold=True), paint(f"   {counts}", "dim")))
+        in_flight = run["in_flight"]
+        title = [paint("in flight", "dim", bold=True), paint(f"   {counts}", "dim")]
+        if in_flight:
+            title += ["      ", legend()]
+        self.query_one("#run-title", Static).update(join(*title))
         self.query_one("#gates-box").display = bool(self.open_gates)
         self.query_one("#gates", Static).update(self._gates_text())
+        self.models.update({row["unit_id"]: row["model"] for row in in_flight})
         rows = []
-        for row in run["in_flight"]:
+        for row in in_flight:
             context = "" if row.get("context_percent") is None else f"{row['context_percent']:.0f}%"
             rows.append((f"{row['unit_id']}/{row['session_id']}",
-                         (row["unit_id"], row["agent"].removeprefix("spgr-agent-"), row["model"], age(row["started_at"]),
+                         (row["unit_id"], row["agent"].removeprefix("spgr-agent-"),
+                          paint(row["model"], tier_of(row["model"]) or "text"), age(row["started_at"]),
                           context, f"${row.get('cost') or 0:.2f}", row.get("last_tool_call") or "")))
         self.fill(self.query_one("#units", DataTable), rows)
+        self._show_cards(0 < len(in_flight) <= MAX_CARDS and self.size.width >= CARDS_WIDTH)
+        if self.cards:
+            self.query_one("#unit-cards", UnitCards).render_cards(
+                [(f"{row['unit_id']}/{row['session_id']}", *self._card(row)) for row in in_flight])
+        self._render_log()
         rows = [join(paint("routine, since you looked", "dim", bold=True), "   ", keys(("v", "clear")))]
         rows += [join(paint("· ", "success"), paint(g["decision_prompt"], "dim")) for g in self.digest] or [paint("Nothing new.", "dim")]
         self.query_one("#routine", Static).update(lines(rows))
@@ -1023,8 +1156,19 @@ class RunPane(Pane):
         if self.app.run_id:
             self.app.spawn(self.app.apply(kind, args, project=self.app.project, run_id=self.app.run_id))
 
+    def _show_cards(self, cards):
+        """Cards or the table, never both. Focus follows to the one shown."""
+        table, deck = self.query_one("#units", DataTable), self.query_one("#unit-cards", UnitCards)
+        if table.display == (not cards) and deck.display == cards:
+            return  # refocusing on every refresh would eat a key pressed mid-refresh
+        had_focus = table.has_focus or deck.has_focus
+        self.cards = cards
+        table.display, deck.display = not cards, cards
+        if had_focus:
+            self.focus_main()
+
     def _unit_row(self):
-        key = self.table_key(self.query_one("#units", DataTable))
+        key = self.query_one("#unit-cards", UnitCards).picked_key() if self.cards else self.table_key(self.query_one("#units", DataTable))
         return key.split("/") if key else (None, None)
 
     def action_cancel_run(self):

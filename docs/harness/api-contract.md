@@ -131,6 +131,7 @@ Reads are grouped by the resource they return. Paths under a run are abbreviated
 | GET {run}/units/{unit_id}/diff | The unit's PR diff as `text/x-diff` |
 | GET {run}/gates | Gates, filterable by `state` (open, answered) and `digest` |
 | GET {run}/gates/{gate_id} | The gate view |
+| GET {run}/feed?limit= | The last `limit` (default 20, at most 200) ledger lines that are news, oldest first, each `at`, `unit_id`, `event`, `to`, and `text` worded as the Slack feed words it |
 | GET {run}/metrics | `product_checks_per_100_dispatches`, `failure_class_mix`, `dispatches`, `list_price_spend_usd`, `daily_cap_usd` |
 | GET /v1/projects/{slug}/design-session | `url`, `expires_at`. See Design review surface |
 
@@ -333,6 +334,8 @@ This section is used to check the contract against what the target README promis
 | Backlog | Open the PR | `pr.url` in the backlog view |
 | Run | Phase, in-flight rows with agent, model, elapsed, context, cost, last tool | GET {run}, run stream |
 | Run | Live session output | Session stream |
+| Run | Unit cards with tier, context bar, elapsed, cost, last tool | GET {run} |
+| Run | Run log worded as the Slack feed | GET {run}/feed |
 | Run | Gate cards, recommended option first, consequences | GET {run}/gates, GET gate view, gate.answer |
 | Run | Risky merge diff | GET units/{unit_id}/diff |
 | Run | Feed of routine decisions | GET {run}/gates with `digest=true`, digest.mark_viewed |

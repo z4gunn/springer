@@ -363,6 +363,46 @@
         "title": "DesignSession",
         "type": "object"
       },
+      "FeedLine": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "unit_id": {
+            "title": "Unit Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "unit_id",
+          "event",
+          "to",
+          "text"
+        ],
+        "title": "FeedLine",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1949,6 +1989,87 @@
           }
         },
         "summary": "Run Events"
+      }
+    },
+    "/v1/projects/{slug}/runs/{run_id}/feed": {
+      "get": {
+        "description": "The run's news, newest last, worded as the Slack feed words it.",
+        "operationId": "feed_v1_projects__slug__runs__run_id__feed_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FeedLine"
+                  },
+                  "title": "Response Feed V1 Projects  Slug  Runs  Run Id  Feed Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Feed"
       }
     },
     "/v1/projects/{slug}/runs/{run_id}/gates": {
