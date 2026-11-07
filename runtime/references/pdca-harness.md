@@ -9,6 +9,7 @@ scripts. The skill body holds the loop. This file holds the rules behind it.
 - Roles and the single delegation hop
 - Run profiles
 - Lanes
+- Modes
 - Reference implementation
 - Walking skeleton
 - The PDCA tick
@@ -130,7 +131,7 @@ choice is a defaults-ledger line like an inferred profile.
 | Lane | Fits | Intake | Unit of work | Ceremony |
 |------|------|--------|--------------|----------|
 | build | a product that does not exist yet | the problem statement | the profile's phase set and stories | the profile's |
-| polish | a product that exists and is deployed: a gap a human saw, a port from a reference, a fix, a visible improvement | one issue in the human's own words, from `/springer polish` or the statement | one PR per issue, or per batch of file-disjoint issues | code review, the verticals the diff touches under the vertical budget, and the product check |
+| polish | a product that exists and is deployed: a gap a human saw, a port from a reference, a fix, a visible improvement | one issue in the human's own words, from `/springer polish` in Slack, `springer polish` in a terminal, or the statement | one PR per issue, or per batch of file-disjoint issues | code review, the verticals the diff touches under the vertical budget, and the product check |
 
 Under polish there is no PRD, story, criteria, test-plan, or ADR artifact.
 The dispatch brief carries the human's words, the files the implementer
@@ -146,6 +147,56 @@ acceptance criteria, and "show the candidate's name" became a compliance
 flag, an architecture checkpoint, and a three-version ADR for a regex rule
 that never ran on a real PDF. Under polish each is one PR checked by a real
 upload.
+
+## Modes
+
+A person reaches a project three ways, and the same product comes out of
+all three. Autopilot is the build lane: the brief, the architecture and
+design gates, and the daemon drives to the MVP. Claude Code is the polish
+lane from a terminal: `springer polish "<issue>"` starts one run on one
+issue in the person's words, and `springer tail <run>` follows it in the
+wording Slack and the TUI use, stopping at a gate with the gate's Slack
+link. Manual is the person's own editor, with or without an agent they
+invoke by hand, and the daemon sees the change only when it lands. Two
+rules keep the three in step.
+
+Git's default branch is the code truth. Every mode lands through a PR, or
+a commit the person makes themselves, and the daemon never shares a working
+tree with a person. On a GitHub-hosted project the daemon owns a clone in
+its home, and that clone is the run store root: records are committed and
+pushed from it, a session writes there by the absolute path in its brief,
+and the person's checkout holds committed records only. The daemon reads
+the brief from the person's checkout when it is newer there, read-only, and
+commits it as the first run record. A local-host project shares the
+checkout, because it is the single-machine mode. The run-harness skill
+never writes under `runs/` and never answers a gate. A hand-invoked agent
+is manual mode: no ledger, no review, no product check.
+
+The daemon is the record truth, and it reconciles. Once a minute it
+compares the default branch tip to the last line of `runs/_reconcile.jsonl`.
+A commit that is not its own, by identity or by a PR number in a run
+ledger, is an external change, grouped by PR. For each one it records the
+paths and the author, closes a story a `Closes` trailer names with source
+external and the PR number, attaches a hint to a not-done story whose
+units' declared paths the change overlaps, runs the product checks those
+paths touch once per batch and marks the close verified or unverified,
+restacks an in-flight unit the paths overlap, validates a hand-edited
+artifact and notes the doc it renders as stale, and posts one Slack line
+per batch. A change in a gate-list area (auth, data, money, infra, a vendor
+manifest, a destructive migration) asks in Slack at once: record a
+decision-log line on the ADR, not an architecture change, or open a polish
+run to review it. Reconcile never runs code review or a vertical on a
+person's change.
+
+The backlog is a project fact at `runs/_backlog.json`, committed with run
+records and shown for every run. A build run's PM artifact merges into it
+by id: new items append, a done item stays done, and a not-done item the
+artifact leaves out becomes deferred with a note. A polish issue is one
+TASK or BUG item under a Polish feature with a daemon-allocated id, which
+the run names so its unit carries the story. A story closes by its units,
+by a trailer, or by a person on the board, and the column rule is the
+closed record first, then the units, then ready. A polish asked while a run
+is active is offered as a bug on the board instead of refused.
 
 ## Reference implementation
 
@@ -354,16 +405,15 @@ unit's commit carries the other's half-written files. spgr-create-branch in
 worktree mode gives each unit `.worktrees/<branch>/`, a linked worktree on its
 own branch cut from the protected base, and the dispatch prompt names that
 path as the unit's working directory. Every command in the unit runs there.
-The run store stays in the main worktree. A unit writes its artifacts to the
-main worktree's `runs/<run-id>/` by the absolute path the prompt carries,
-never to the copy under its own worktree, so there is still one store and one
-writer. A linked worktree carries no ignored files (`node_modules`, `.venv`,
+The run store stays in the daemon's checkout (see Modes). A unit writes its
+artifacts to that checkout's `runs/<run-id>/` by the absolute path the prompt
+carries, never to the copy under its own worktree, so there is still one
+store and one writer. A linked worktree carries no ignored files (`node_modules`, `.venv`,
 build output), so the unit installs dependencies the way CI does and runs its
 scoped baseline tests before it writes code. At Act, after spgr-create-pr has
 opened the unit's PR, the harness removes the worktree with `git worktree
 remove .worktrees/<branch>` and keeps the branch. A removal git refuses is
-left in place and reported, never forced. A batch with a single build unit
-may still work in the main checkout.
+left in place and reported, never forced.
 
 The run is single-writer. The daemon holds `runs/<run-id>/.lock` with a `daemon:` id and
 refreshes it at every tick. A session that finds a live lock it does not hold leaves the
