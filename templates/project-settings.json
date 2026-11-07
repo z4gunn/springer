@@ -21,7 +21,6 @@
       "Bash(impeccable detect:*)",
       "Bash(python3 verification/:*)",
       "Bash(bash verification/:*)",
-      "Bash(npx tsx .claude/skills/spgr-run-harness/scripts/linear-sync.ts:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",

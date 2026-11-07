@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://springer.local/schemas/prioritized-backlog-v1.json",
   "title": "SPGR Prioritized Backlog v1",
-  "description": "The ordered story rollup produced by spgr-prioritize-backlog. Distinct from user-story, which describes exactly one story: this type describes the ORDER over many. Registering it closes the gap the skill itself records ('the prioritized-backlog artifact type is not yet in the schema registry'), and it is the artifact the Linear board projection reads. Entries reference stories by story_id; the per-story user-story artifacts remain the source of truth for story content.",
+  "description": "The ordered story rollup produced by spgr-prioritize-backlog. Distinct from user-story, which describes exactly one story: this type describes the ORDER over many. Registering it closes the gap the skill itself records ('the prioritized-backlog artifact type is not yet in the schema registry'). Entries reference stories by story_id; the per-story user-story artifacts remain the source of truth for story content.",
   "allOf": [
     { "$ref": "https://springer.local/schemas/_envelope-v1.json" }
   ],

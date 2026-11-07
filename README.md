@@ -250,12 +250,6 @@ python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py --once   # one 
 
 Token and timing figures cover activity recorded since the event hook was installed. Runs that predate it show run state and gates but no agent metrics.
 
-### Project the backlog onto a Linear board
-
-Optionally, a project can use a Linear board as the human-facing backlog and kanban. The typed artifacts under `runs/` stay the source of truth, and the harness projects them onto the board: confirmed stories become issues, each story's position on the WIP board moves its issue through the Linear states, and the pull request opened at a pr-merge gate is attached to the issue. A human dragging cards is never fought, and a sync failure never blocks the run.
-
-It is off unless `runs/_linear/config.json` exists. To turn it on, copy the template at `.claude/skills/spgr-run-harness/assets/linear-config.template.json` to that path, fill in the workspace ids, set `LINEAR_API_KEY` in your environment or the project's `.env`, and run `npx tsx .claude/skills/spgr-run-harness/scripts/linear-sync.ts ensure-labels`. It needs Node. The projection rules and the intake path are in the Linear section of `.claude/references/pdca-harness.md`.
-
 ### Quickstart: start a new project
 
 Springer builds each application inside its own copy of the runtime, which becomes that application's git repository. The file-writing tooling is bound to the project root, and the schema registry and shared references are cited by repo-relative path, so the runtime travels with the project rather than installing globally. To build a new app or SaaS app, instantiate a fresh copy:

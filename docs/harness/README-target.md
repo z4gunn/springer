@@ -120,7 +120,7 @@ Springer's agents and skills are fixed. What they run on is yours.
 |------|---------|
 | Coding agent | Claude Code on your subscription. Other agents can be added as reviewers |
 | Source host | Local merges (the default), GitHub (free tier works, Actions optional), GitLab, Forgejo |
-| Backlog | Files plus the TUI board, or a one-way projection to Linear, GitHub Projects, or Jira |
+| Backlog | Files in the repo, shown on the TUI board and in Slack. Work starts from `/springer polish` or `/springer build` |
 | Notifications | Desktop, Slack, Telegram, Discord, email. Reply with a number to answer a gate |
 | Deploy target | Cloud (Vercel, Supabase) or self-hosted (one VPS, Compose, Coolify or Dokploy) |
 | Design tools | Playwright, impeccable, ui-ux-pro-max, Claude Design, Figma |
