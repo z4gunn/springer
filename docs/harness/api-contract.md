@@ -122,8 +122,8 @@ Reads are grouped by the resource they return. Paths under a run are abbreviated
 | GET /v1/projects/{slug}/brief/critique | The critique, computed on request from the file on disk. See below |
 | GET /v1/projects/{slug}/provisioning | Checklist items with `item_id`, `secret_name`, `needed_by`, `present`. Never a secret value |
 | GET /v1/adopt/preview?path= | What adopting the repository at `path` would read, derive, and write: `instance`, `runtime` (add, replace, remove, unchanged, edited, instance_only), `templates`, `facts` with `fact_sources`, `sections` with `section_sources`, `brief`, `design_md`, `history`, `project_owned`. Writes nothing |
-| GET /v1/projects/{slug}/history | Runs from before the daemon, imported at adoption: each with its cycles (a v1 cycle has agents and no unit ids), its defaults ledger, and `complete`, plus the last retrospective's `learnings` |
-| GET /v1/projects/{slug}/runs | Run summaries, newest first. Only runs the daemon made: an imported run is in history |
+| GET /v1/projects/{slug}/history?include_archived= | Runs from before the daemon, imported at adoption: each with its cycles (a v1 cycle has agents and no unit ids), its defaults ledger, `complete`, `archived`, and `pruned`, plus the last retrospective's `learnings`. An archived run is left out unless `include_archived` is true |
+| GET /v1/projects/{slug}/runs?include_archived= | Run summaries, newest first, each with `archived`. Only runs the daemon made: an imported run is in history. An archived run is left out unless `include_archived` is true, which also lists each pruned run with phase `pruned` |
 | GET {run} | The run view |
 | GET {run}/backlog | The backlog view |
 | GET {run}/units | Unit summaries, filterable by `state` |
@@ -181,10 +181,11 @@ The backlog view is used by the Backlog screen for the tree, the board, and the 
      "stories": [{"story_id": "S-12", "title": "Save a draft", "column": "in_review", "risk": "L1",
                   "wave": 2, "unit_ids": ["U-0412"], "pr": {"number": 7, "url": "..."},
                   "depends_on": ["S-9"]}]}]}],
- "unknowns": [{"unknown_id": "UK-1", "question": "...", "answer": null}]}
+ "unknowns": [{"unknown_id": "UK-1", "question": "...", "answer": null}],
+ "lane": "build"}
 ```
 
-`state` is `not_generated` with empty lists until the PM unit writes a `prioritized-backlog` artifact. The daemon builds the view from the newest one that is not a reference inventory, nests its flat epics, features, and items into the tree, and puts items with no known feature under one Stories feature and its deferrals under a Deferred feature below the MVP line. A revised artifact rebuilds the view and keeps what a person changed with the backlog operations. A story's `unit_ids` are the units whose spec names it in `story_ids`, which the Plan step fills, or whose expected outcome names its id. `column` is one of ready, in_progress, in_review, blocked, done. The dependency graph is carried by `depends_on`, and the MVP line by each feature's `mvp` flag, so the view has one source for each fact.
+`lane` is the run's lane from its run brief. A `polish` run takes one issue and never has a backlog, so the screen says so rather than waiting for one. `state` is `not_generated` with empty lists until the PM unit writes a `prioritized-backlog` artifact. The daemon builds the view from the newest one that is not a reference inventory, nests its flat epics, features, and items into the tree, and puts items with no known feature under one Stories feature and its deferrals under a Deferred feature below the MVP line. A revised artifact rebuilds the view and keeps what a person changed with the backlog operations. A story's `unit_ids` are the units whose spec names it in `story_ids`, which the Plan step fills, or whose expected outcome names its id. `column` is one of ready, in_progress, in_review, blocked, done. The dependency graph is carried by `depends_on`, and the MVP line by each feature's `mvp` flag, so the view has one source for each fact.
 
 ### Gate view
 
@@ -269,6 +270,9 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 | project.create | `name`, `path` (absolute or starting with `~`), `mode` (new, adopt) | Yes | Scaffolds or adopts the repository and registers it. A client resolves a relative path against its own directory before sending it |
 | project.configure | `source_host` (local, github), `ci_signal` (receipts, self-hosted-actions, both) | Yes | Sets the project's source host and CI signal. A project is local until it opts in: the harness opens a numbered change for each unit, merges it into the project checkout with a merge commit, and pushes the default branch when the project has an origin. The github host opens a pull request per unit and squash-merges it through gh. An Actions signal requires the github host, and the host cannot change while a run is in progress. Check requires receipts only when the signal includes them, and a merge waits for green Actions checks only when it includes them. Staging is the project's own, so the harness registers no host and runs no deploy |
 | project.archive | none | Yes | Hides the project and refuses a new run. Deletes nothing |
+| project.archive_run | `run_id` | No | Hides a finished run, the daemon's or an imported one, from the runs list and the history. Deletes nothing. A run in progress returns illegal_transition |
+| project.restore_run | `run_id` | No | Shows an archived run again. A pruned run returns illegal_transition |
+| project.prune_run | `run_id` | Once archived | Removes an archived run's folder. Its tracked files leave in one change, a pull request on the github host or a commit on a local project, except a file another tracked file cites by path. The working state git ignores moves to `pruned/<slug>/<run_id>/` in the daemon's home. The result names the counts, the kept files, and the change. A pruned run keeps its number, so a later run never reuses its branch names. Refused for the chat line |
 | brief.update_section | `section`, `body`, `base_version` | After start | Writes the section and marks it confirmed. After `run.start` it opens a scope-change gate |
 | brief.update_facts | `facts`, `base_version` | After start | Writes the frontmatter and recomputes `derived`. After `run.start` it opens a scope-change gate |
 | brief.confirm_section | `section`, `base_version` | No | Marks a proposed section confirmed unchanged |
@@ -322,6 +326,7 @@ This section is used to check the contract against what the target README promis
 | Projects | Start on an adopted project: polish with an issue, or build a delta | run.start with lane and issue |
 | Projects | Design page serves an existing docs/design/index.html | GET design-session |
 | Projects | Runs list with imported history | GET runs, GET history |
+| Projects | Archive, restore, and prune old runs from the runs list | project.archive_run, project.restore_run, project.prune_run |
 | Brief | Editor, facts panel, derived profile | GET brief, brief.update_section, brief.update_facts |
 | Brief | Critique | GET brief/critique |
 | Brief | Every section as fields | GET brief, brief.update_section |

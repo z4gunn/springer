@@ -31,6 +31,11 @@ class GitHubSourceHost:
         state = json.loads(self._gh(project, "pr", "view", str(number), "--json", "state"))["state"]
         return {"OPEN": "open", "MERGED": "merged", "CLOSED": "closed"}.get(state, "open")
 
+    def open_pr(self, project, branch, base, title, body):
+        """Open a pull request the daemon made itself (e.g. a run prune). Returns its URL."""
+        return self._gh(project, "pr", "create", "--base", base, "--head", branch, "--title", title,
+                        "--body", body).strip().splitlines()[-1]
+
     def merge(self, project, number):
         self._gh(project, "pr", "merge", str(number), "--squash")
         sha = json.loads(self._gh(project, "pr", "view", str(number), "--json", "mergeCommit"))["mergeCommit"]["oid"]

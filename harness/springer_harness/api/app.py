@@ -212,19 +212,29 @@ def create_app(daemon):
         return public(plan(target))
 
     @app.get("/v1/projects/{slug}/history", response_model=m.Open, dependencies=secured)
-    def project_history(slug: str):
+    def project_history(slug: str, include_archived: bool = False):
         daemon.home.project(slug)
-        return daemon.history(slug)
+        history = daemon.history(slug)
+        hidden, pruned = set(daemon.archived_runs(slug)), daemon.pruned_runs(slug)
+        runs = [{**r, "archived": r["run_id"] in hidden, "pruned": r["run_id"] in pruned}
+                for r in history.get("runs") or []]
+        return {**history, "runs": [r for r in runs if include_archived or not r["archived"]]}
 
     @app.get("/v1/projects/{slug}/runs", response_model=list[m.RunSummary], dependencies=secured)
-    def runs(slug: str):
-        out = []
+    def runs(slug: str, include_archived: bool = False):
+        out, hidden = [], set(daemon.archived_runs(slug))
         for run_id in reversed(daemon.run_ids(slug)):
+            if run_id in hidden and not include_archived:
+                continue
             engine = daemon.engine(slug, run_id)
             _, content = run_doc(engine)
             out.append({"run_id": run_id, "kind": daemon.run_brief(slug, run_id).get("content", {}).get("kind", "build"),
                         "phase": content["active_phase"], "complete": engine.cycles.is_complete(),
-                        "paused": content["paused"]})
+                        "paused": content["paused"], "archived": run_id in hidden})
+        if include_archived:
+            out += [{"run_id": run_id, "kind": "build", "phase": "pruned", "complete": True, "paused": False,
+                     "archived": True, "pruned": True}
+                    for run_id, record in daemon.pruned_runs(slug).items() if record.get("daemon_run")]
         return out
 
     run_path = "/v1/projects/{slug}/runs/{run_id}"
@@ -238,7 +248,9 @@ def create_app(daemon):
     @app.get(run_path + "/backlog", response_model=m.BacklogView, dependencies=secured)
     def backlog(slug: str, run_id: str):
         engine = daemon.engine(slug, run_id)
-        return BacklogStore(engine.run_dir).view(engine.units, engine.ledger.head())
+        brief = read_json(engine.run_dir / "run-brief.json") or {}
+        return {**BacklogStore(engine.run_dir).view(engine.units, engine.ledger.head()),
+                "lane": (brief.get("content") or {}).get("lane")}
 
     @app.get(run_path + "/units", response_model=m.Page, dependencies=secured)
     def units(slug: str, run_id: str, state: str | None = None, cursor: str | None = None,

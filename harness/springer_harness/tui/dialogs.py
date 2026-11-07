@@ -498,26 +498,67 @@ class StartDialog(Dialog):
 
 
 class RunsDialog(Dialog):
-    """Every run of a project: the daemon's, then those imported at adoption.
-    Returns ("run", run_id) or ("imported", run) or None."""
+    """Every run of a project: the daemon's, then those imported at adoption. x archives
+    or restores the highlighted run, a shows the archived ones, P prunes an archived one.
+    Returns ("run", run_id), ("imported", run), (action, run_id) for archive, restore,
+    and prune, ("archived", None) to flip the archived view, or None."""
 
-    def __init__(self, runs, history):
+    BINDINGS = [Binding("x", "archive", "archive"), Binding("a", "show_archived", "archived"),
+                Binding("P", "prune", "prune")]
+
+    def __init__(self, runs, history, showing_archived=False):
         super().__init__()
-        self.runs, self.history = runs, history
+        self.runs, self.history, self.showing_archived = runs, history, showing_archived
+
+    def _label(self, run, text):
+        if run.get("pruned"):
+            return join(text, paint("  pruned", "dim"))
+        return join(text, paint("  archived", "dim")) if run.get("archived") else text
 
     def compose(self) -> ComposeResult:
         from textual.widgets import OptionList
         from textual.widgets.option_list import Option
-        options = [Option(join(paint(r["run_id"], "text", bold=True), paint(f"  {r['phase']}", "stone"),
-                               paint("  complete" if r["complete"] else "", "dim")), id=f"run:{r['run_id']}")
-                   for r in self.runs]
-        options += [Option(join(paint(r["run_id"], "text"), paint(f"  imported, {len(r['cycles'])} cycles", "dim"),
-                                paint("  complete" if r["complete"] else "  ended open", "dim")),
+        options = [Option(self._label(r, join(paint(r["run_id"], "text", bold=True), paint(f"  {r['phase']}", "stone"),
+                                              paint("  complete" if r["complete"] else "", "dim"))),
+                          id=f"run:{r['run_id']}") for r in self.runs]
+        options += [Option(self._label(r, join(paint(r["run_id"], "text"),
+                                               paint(f"  imported, {len(r['cycles'])} cycles", "dim"),
+                                               paint("  complete" if r["complete"] else "  ended open", "dim"))),
                            id=f"imported:{r['run_id']}") for r in reversed(self.history.get("runs") or [])]
         with Vertical(classes="dialog wide"):
-            yield Static("Runs", classes="dialog-title", markup=False)
+            yield Static("Runs, archived included" if self.showing_archived else "Runs", classes="dialog-title",
+                         markup=False)
             yield OptionList(*options, id="runs-list") if options else Static("No runs yet.", markup=False)
-            yield Static(keys(("enter", "open"), ("esc", "close")), classes="hint")
+            yield Static(keys(("enter", "open"), ("x", "archive/restore"),
+                              ("a", "hide archived" if self.showing_archived else "show archived"),
+                              ("P", "prune archived"), ("esc", "close")), classes="hint")
+
+    def _highlighted(self):
+        from textual.widgets import OptionList
+        try:
+            listing = self.query_one("#runs-list", OptionList)
+        except Exception:  # noqa: BLE001, no runs means no list
+            return None
+        if listing.highlighted is None:
+            return None
+        kind, run_id = listing.get_option_at_index(listing.highlighted).id.split(":", 1)
+        found = [r for r in (self.runs if kind == "run" else self.history.get("runs") or []) if r["run_id"] == run_id]
+        return found[0] if found else None
+
+    def action_archive(self):
+        run = self._highlighted()
+        if run and not run.get("pruned"):
+            self.dismiss(("restore" if run.get("archived") else "archive", run["run_id"]))
+
+    def action_show_archived(self):
+        self.dismiss(("archived", None))
+
+    def action_prune(self):
+        run = self._highlighted()
+        if run and run.get("archived") and not run.get("pruned"):
+            self.dismiss(("prune", run["run_id"]))
+        elif run:
+            self.app.notify("Archive the run with x first. Only an archived run can be pruned.")
 
     def on_option_list_option_selected(self, event):
         kind, run_id = event.option.id.split(":", 1)

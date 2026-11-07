@@ -366,6 +366,20 @@ class OperationCatalogTest(ApiCase):
         self.with_backlog(run_id)
         return run_id
 
+    def test_run_archive_restore_and_prune(self):
+        old = self.project_path / "runs" / "old"
+        old.mkdir(parents=True)
+        (old / "notes.json").write_text("{}\n")
+        env = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+        subprocess.run(["git", "-C", str(self.project_path), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.project_path), *env, "commit", "-q", "-m", "old"], check=True)
+        self.op("project.archive_run", {"run_id": "old"})
+        self.op("project.restore_run", {"run_id": "old"})
+        self.assertEqual(self.daemon.archived_runs("acme"), [])
+        self.op("project.archive_run", {"run_id": "old"})
+        self.assertEqual(self.confirmed("project.prune_run", {"run_id": "old"})["result"]["removed"], 1)
+        self.assertFalse(old.exists())
+
     def test_project_create_and_archive(self):
         target = self.root / "fresh"
         body = self.confirmed("project.create", {"name": "Fresh App", "path": str(target), "mode": "new"}, project=None)
@@ -804,7 +818,8 @@ class OperationCatalogTest(ApiCase):
 
 
 COVERAGE = {
-    "project.create": "test_project_create_and_archive", "project.archive": "test_project_create_and_archive",
+    "project.create": "test_project_create_and_archive", "project.archive": "test_project_create_and_archive", "project.archive_run": "test_run_archive_restore_and_prune",
+    "project.restore_run": "test_run_archive_restore_and_prune", "project.prune_run": "test_run_archive_restore_and_prune",
     "project.configure": "test_project_configure_sets_the_ci_signal",
     "brief.update_section": "test_brief_update_section_before_start_needs_no_confirmation",
     "brief.update_facts": "test_brief_update_facts_recomputes_the_derived_profile",
@@ -1135,3 +1150,93 @@ class StreamTest(ApiCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(HAVE_API, "the harness API dependencies are not installed")
+class RunCleanupTest(ApiCase):
+    """Archive hides a finished run and deletes nothing. Prune removes an archived run's
+    folder, keeping what the repository cites and moving the ignored working state."""
+
+    GIT = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+
+    def setUp(self):
+        super().setUp()
+        old = self.project_path / "runs" / "old"
+        (old / "artifacts").mkdir(parents=True)
+        (old / "artifacts" / "prd-old.json").write_text("{}\n")
+        (old / "artifacts" / "notes-old.json").write_text("{}\n")
+        (self.project_path / "docs").mkdir(exist_ok=True)
+        (self.project_path / "docs" / "decisions.md").write_text("See runs/old/artifacts/prd-old.json.\n")
+        (self.project_path / ".gitignore").write_text("runs/*/events.jsonl\n")
+        self.git("add", "-A")
+        self.git(*self.GIT, "commit", "-q", "-m", "an old run")
+        (old / "events.jsonl").write_text('{"event": "x"}\n')
+
+    def git(self, *args, cwd=None):
+        return subprocess.run(["git", "-C", str(cwd or self.project_path), *args], capture_output=True, text=True,
+                              check=True).stdout
+
+    def finish(self, run_id):
+        first = self.op("run.cancel", run_id=run_id)
+        if first["status"] == "needs_confirmation":
+            self.op("run.cancel", run_id=run_id, token=first["confirm_token"])
+
+    def history_ids(self, **params):
+        return [r["run_id"] for r in self.get("/v1/projects/acme/history", **params)["runs"]]
+
+    def test_archive_hides_a_finished_run_and_restore_brings_it_back(self):
+        run_id = self.start()
+        self.op("project.archive_run", {"run_id": run_id}, expect=409)  # still in progress
+        self.finish(run_id)
+        self.op("project.archive_run", {"run_id": run_id})
+        self.assertNotIn(run_id, [r["run_id"] for r in self.get("/v1/projects/acme/runs")])
+        archived = self.get("/v1/projects/acme/runs", include_archived="true")
+        self.assertEqual([(r["run_id"], r["archived"]) for r in archived], [(run_id, True)])
+        self.op("project.restore_run", {"run_id": run_id})
+        self.assertEqual([r["run_id"] for r in self.get("/v1/projects/acme/runs")], [run_id])
+        self.assertTrue((self.project_path / "runs" / run_id).is_dir(), "archive deletes nothing")
+
+    def test_an_imported_run_is_archived_by_its_folder(self):
+        self.op("project.archive_run", {"run_id": "old"})
+        self.assertIn("old", self.daemon.archived_runs("acme"))
+        self.op("project.archive_run", {"run_id": "nope"}, expect=404)
+
+    def test_prune_needs_an_archived_run(self):
+        self.op("project.prune_run", {"run_id": "old"}, expect=409)
+
+    def test_prune_on_a_local_project_commits_the_removal_and_keeps_what_is_cited(self):
+        self.op("project.archive_run", {"run_id": "old"})
+        result = self.confirmed("project.prune_run", {"run_id": "old"})["result"]
+        self.assertEqual((result["removed"], result["kept"], result["moved"]),
+                         (1, ["runs/old/artifacts/prd-old.json"], 1))
+        self.assertEqual(self.git("log", "-1", "--format=%s"), "chore(runs): prune old\n")
+        self.assertEqual(self.git("ls-files", "runs/old").split(), ["runs/old/artifacts/prd-old.json"])
+        moved = Path(result["moved_to"]) / "events.jsonl"
+        self.assertEqual(moved.read_text(), '{"event": "x"}\n')
+        self.assertFalse((self.project_path / "runs/old/events.jsonl").exists())
+        self.op("project.restore_run", {"run_id": "old"}, expect=409)
+        self.assertEqual(self.history_ids(include_archived="true"), [])  # no index for this project
+
+    def test_a_pruned_run_keeps_its_number(self):
+        first = self.start()
+        self.finish(first)
+        self.op("project.archive_run", {"run_id": first})
+        self.confirmed("project.prune_run", {"run_id": first})
+        self.assertNotIn(first, self.daemon.run_ids("acme"))
+        self.assertNotEqual(self.start(), first)
+
+    def test_prune_on_a_github_project_opens_a_pull_request_and_leaves_the_checkout(self):
+        origin = self.root / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+        self.git("remote", "add", "origin", str(origin))
+        self.git("push", "-q", "origin", "main")
+        self.daemon.save_settings("acme", source_host="github")
+        self.op("project.archive_run", {"run_id": "old"})
+        result = self.confirmed("project.prune_run", {"run_id": "old"})["result"]
+        self.assertEqual(result["change"], "https://example.invalid/pull/1")
+        self.assertEqual(self.host.opened, [("springer/prune-old", "main", "chore(runs): prune old")])
+        on_branch = self.git("ls-tree", "-r", "--name-only", "springer/prune-old", "runs/old", cwd=origin).split()
+        self.assertEqual(on_branch, ["runs/old/artifacts/prd-old.json"])
+        self.assertTrue((self.project_path / "runs/old/artifacts/notes-old.json").exists(),
+                        "the checkout keeps the files until the pull request merges")
+        self.assertFalse(any(p.name.startswith("_prune") for p in (self.daemon.home.root / "worktrees" / "acme").iterdir()))

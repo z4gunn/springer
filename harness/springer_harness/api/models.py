@@ -110,6 +110,8 @@ class RunSummary(BaseModel):
     phase: str
     complete: bool
     paused: bool
+    archived: bool = False
+    pruned: bool = False
 
 
 class BacklogView(Open):
@@ -117,6 +119,7 @@ class BacklogView(Open):
     state: Literal["generated", "not_generated"]
     epics: list[dict]
     unknowns: list[dict]
+    lane: str | None = None  # a polish run takes one issue and has no backlog
 
 
 class Page(BaseModel):

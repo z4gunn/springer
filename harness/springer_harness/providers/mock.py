@@ -154,5 +154,9 @@ class MockSourceHost:
     def retarget(self, project, number, base):
         self.retargeted.append((number, base))
 
+    def open_pr(self, project, branch, base, title, body):
+        self.opened = [*getattr(self, "opened", []), (branch, base, title)]
+        return f"https://example.invalid/pull/{len(self.opened)}"
+
     def diff(self, project, number):
         return f"diff --git a/file b/file\n# mock diff of PR {number}\n"

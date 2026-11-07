@@ -12,6 +12,7 @@ import traceback
 import uuid
 from pathlib import Path
 
+from . import cleanup
 from .common import artifact_header, iso, read_json, write_json
 from .errors import IllegalTransition, InvalidArgs, NotFound
 from .providers.local import LocalSourceHost
@@ -141,9 +142,76 @@ class Daemon:
             return []
         # A run the daemon made carries kind in its run brief. A run written before the
         # daemon (an adopted instance's history) is the project's, read from the index.
+        # A pruned run is gone even while its removal waits in a pull request.
+        pruned = self.pruned_runs(slug)
         return sorted((p.name for p in root.iterdir() if (p / "run-brief.json").exists()
-                       and _content_of(p / "run-brief.json").get("kind")),
+                       and p.name not in pruned and _content_of(p / "run-brief.json").get("kind")),
                       key=lambda r: (root / r / "run-brief.json").stat().st_mtime_ns)
+
+    def archived_runs(self, slug):
+        return list(self.home.project(slug).get("archived_runs") or [])
+
+    def pruned_runs(self, slug):
+        return dict(self.home.project(slug).get("pruned_runs") or {})
+
+    def _known_run(self, slug, run_id):
+        path = self.project_path(slug)
+        if run_id in self.run_ids(slug) or any(r.get("run_id") == run_id for r in self.history(slug).get("runs") or []):
+            return path
+        cleanup.run_folder(path, run_id)
+        return path
+
+    def archive_run(self, slug, run_id):
+        """Hide a finished run from the runs list. Deletes nothing."""
+        self._known_run(slug, run_id)
+        if run_id in self.run_ids(slug) and not self.engine(slug, run_id).cycles.is_complete():
+            raise IllegalTransition(f"{run_id} is still in progress. Cancel it or let it finish first.")
+        record = self.home.project(slug)
+        archived = list(record.get("archived_runs") or [])
+        if run_id not in archived:
+            self.home.save_project(slug, {**record, "archived_runs": archived + [run_id]})
+
+    def restore_run(self, slug, run_id):
+        if run_id in self.pruned_runs(slug):
+            raise IllegalTransition(f"{run_id} was pruned. Its working state is under "
+                                    f"{self.pruned_runs(slug)[run_id]['moved_to']}.")
+        record = self.home.project(slug)
+        self.home.save_project(slug, {**record, "archived_runs": [r for r in record.get("archived_runs") or []
+                                                                  if r != run_id]})
+
+    def prune_run(self, slug, run_id):
+        """Remove an archived run's folder. See cleanup for what goes where."""
+        if run_id not in self.archived_runs(slug):
+            raise IllegalTransition(f"Archive {run_id} before pruning it.")
+        if run_id in self.pruned_runs(slug):
+            raise IllegalTransition(f"{run_id} is already pruned.")
+        path = self.project_path(slug)
+        cleanup.run_folder(path, run_id)
+        daemon_run = run_id in self.run_ids(slug)
+        remove, keep = cleanup.plan(path, run_id)
+        message = f"chore(runs): prune {run_id}"
+        change = None
+        if self.settings(slug)["source_host"] == "github":
+            scratch = self.home.root / "worktrees" / slug / f"_prune-{run_id}"
+            branch, base = cleanup.branch_removal(path, remove, f"springer/prune-{run_id}", message, scratch)
+            if branch:
+                body = (f"Removes the records of archived run {run_id}: {len(remove)} files. "
+                        f"{len(keep)} files stay because the repository cites them by path.")
+                change = self.source_host.open_pr(slug, branch, base, message, body)
+        else:
+            change = cleanup.commit_removal(path, remove, message)
+            if change and hasattr(self.host_for(slug), "publish"):
+                self.host_for(slug).publish(slug, "HEAD")
+        target = self.home.root / "pruned" / slug / run_id
+        moved = cleanup.move_ignored(path, run_id, remove + keep, target)
+        self.engines.pop((slug, run_id), None)
+        # No run_id key: the operation log reads that as the run to write to, and this
+        # run's ledger has just moved.
+        result = {"pruned": run_id, "removed": len(remove), "kept": keep, "moved": moved,
+                  "moved_to": str(target), "change": change, "daemon_run": daemon_run, "at": iso(self.now())}
+        record = self.home.project(slug)
+        self.home.save_project(slug, {**record, "pruned_runs": {**(record.get("pruned_runs") or {}), run_id: result}})
+        return result
 
     def run_brief(self, slug, run_id):
         return read_json(self.project_path(slug) / "runs" / run_id / "run-brief.json") or {}
@@ -270,7 +338,8 @@ class Daemon:
 
     def start_run(self, slug, kind, sections=None, lane=None, issue=None):
         front, _ = self.brief(slug).load()
-        count = len(self.run_ids(slug)) + 1
+        # A pruned run keeps its number, so a new run never reuses its branch names.
+        count = len(self.run_ids(slug)) + sum(1 for r in self.pruned_runs(slug).values() if r.get("daemon_run")) + 1
         run_id = f"{slug}-{kind}-{count}" if kind != "build" else f"{slug}-{count}"
         path = self.project_path(slug)
         derived = derive(front)

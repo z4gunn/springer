@@ -77,14 +77,39 @@ def _put(found, original, item, first="name"):
     return found + [item]
 
 
+RUN_ACTIONS = {"archive": "project.archive_run", "restore": "project.restore_run", "prune": "project.prune_run"}
+
+
 async def show_runs(app, slug):
-    """The runs list: the daemon's runs, then history imported at adoption."""
-    runs = await app.client.get(f"/v1/projects/{slug}/runs")
-    history = await app.client.get(f"/v1/projects/{slug}/history")
-    picked = await app.push_screen_wait(RunsDialog(runs, history))
-    if not picked:
-        return
-    kind, value = picked
+    """The runs list: the daemon's runs, then history imported at adoption. Archiving,
+    restoring, and pruning come back to the list, so several runs are cleaned in one go."""
+    showing = False
+    while True:
+        query = {"include_archived": "true"} if showing else {}
+        runs = await app.client.get(f"/v1/projects/{slug}/runs", **query)
+        history = await app.client.get(f"/v1/projects/{slug}/history", **query)
+        picked = await app.push_screen_wait(RunsDialog(runs, history, showing))
+        if not picked:
+            return
+        kind, value = picked
+        if kind == "archived":
+            showing = not showing
+            continue
+        if kind in RUN_ACTIONS:
+            outcome = await app.apply(RUN_ACTIONS[kind], {"run_id": value}, project=slug,
+                                      busy=f"Pruning {value}" if kind == "prune" else None)
+            if outcome and kind == "prune":
+                result = outcome["result"]
+                app.notify(f"{value}: {result['removed']} files removed"
+                           + (f" in {result['change']}" if result["change"] else "")
+                           + f", {len(result['kept'])} kept because they are cited, "
+                           f"{result['moved']} working files moved to {result['moved_to']}.")
+            if outcome and kind == "archive" and slug == app.project and value == app.run_id:
+                # The open run is hidden now, so the newest one left takes its place.
+                remaining = await app.client.get(f"/v1/projects/{slug}/runs")
+                app.select_run(remaining[0]["run_id"] if remaining else None)
+            continue
+        break
     if kind == "run":
         if app.project != slug:
             await app.open_project(slug)
@@ -657,7 +682,7 @@ class BacklogPane(Pane):
     BINDINGS = [Binding("v", "view", "view"), Binding("m", "move_line", "move line"), Binding("d", "defer", "defer"),
                 Binding("J", "down", "later"), Binding("K", "up", "earlier"), Binding("plus", "add_bug", "add bug"),
                 Binding("u", "unknown", "unknowns"), Binding("o", "open_pr", "open PR"),
-                Binding("space", "toggle", "fold")]
+                Binding("space", "toggle", "fold"), Binding("l", "runs", "runs")]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -670,7 +695,12 @@ class BacklogPane(Pane):
         yield DataTable(id="backlog", cursor_type="row", show_header=False)
         yield Static("", id="board", markup=False)
         yield Static(keys(("v", "view"), ("space", "fold"), ("m", "move line here"), ("d", "defer/restore"),
-                          ("J/K", "reorder"), ("+", "add bug"), ("u", "unknowns"), ("o", "open PR")), classes="hint")
+                          ("J/K", "reorder"), ("+", "add bug"), ("u", "unknowns"), ("o", "open PR"),
+                          ("l", "runs")), classes="hint")
+
+    def action_runs(self):
+        if self.app.project:
+            self.app.spawn(show_runs(self.app, self.app.project))
 
     def on_mount(self):
         self.query_one("#backlog", DataTable).add_columns("ITEM", "COLUMN", "RISK", "WAVE", "NOTE")
@@ -689,8 +719,11 @@ class BacklogPane(Pane):
         table.display = self.view_name == "tree"
         board.display = self.view_name != "tree"
         if self.data["state"] == "not_generated":
-            self.fill(table, [("empty", ("The backlog is not generated yet.", "", "", "", ""))])
-            board.update("The backlog is not generated yet.")
+            empty = (f"{self.app.run_id} is a polish run, which fixes one issue and has no backlog. "
+                     "l opens another run." if self.data.get("lane") == "polish"
+                     else "The backlog is not generated yet.")
+            self.fill(table, [("empty", (empty, "", "", "", ""))])
+            board.update(empty)
         elif self.view_name == "tree":
             self.fill(table, self._tree_rows())
         elif self.view_name == "board":
@@ -850,9 +883,10 @@ PROMPT_LINES = 3
 # wide. More, or a narrow terminal, falls back to the table.
 MAX_CARDS = 4
 CARDS_WIDTH = 100
-# The run log shows the newest LOG_ROWS lines of the run's feed. It hides on a
-# terminal too short to keep the gate options and the units on screen with it.
-LOG_ROWS = 6
+# The run log shows the newest LOG_ROWS lines of the run's feed, one row each, under
+# its title in a strip of LOG_ROWS + 1 rows. It hides on a terminal too short to keep
+# the gate options and the units on screen with it.
+LOG_ROWS = 5
 LOG_MIN_HEIGHT = 30
 LOG_ERRORS = {"merge_failed", "restack_failed", "release_failed", "tick_failed"}
 LOG_GOOD = {"merge", "release_finished"}
@@ -950,7 +984,8 @@ class RunPane(Pane):
         yield Static("", id="run-title", classes="section", markup=False)
         yield UnitCards(id="unit-cards")
         yield DataTable(id="units", cursor_type="row")
-        yield Static(keys(("c", "cancel"), ("R", "one tier up"), ("enter", "live output"), ("P", "pause run"), ("X", "cancel run")),
+        yield Static(keys(("c", "cancel"), ("R", "one tier up"), ("enter", "live output"), ("P", "pause run"), ("X", "cancel run"),
+                          ("l", "runs")),
                      classes="hint")
         yield Static("", id="routine", markup=False)
         yield Static("", id="run-log", markup=False)
@@ -967,7 +1002,10 @@ class RunPane(Pane):
         view = self.query_one("#run-log", Static)
         view.display = self.size.height >= LOG_MIN_HEIGHT or not self.size.height
         rows = [paint("run log", "dim", bold=True)]
-        for at, unit, message, tone in self.run_log:
+        width = max(20, self.size.width - 4 - len("00:00:00  "))
+        for at, unit, message, tone in self.run_log[-LOG_ROWS:]:
+            # A wrapped line would push the newest ones out of the strip.
+            message = _clip(message, width)
             parts = [paint(f"{at}  ", "dim")]
             tier = tier_of(self.models.get(unit))
             if unit and tier and message.startswith(unit):

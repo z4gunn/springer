@@ -362,6 +362,42 @@ class AdoptedProjectTest(TuiCase):
             await self.see(pilot, "CYCLE-0001  development  pass -> complete  frontend-developer",
                            "DEF-1 | the heading | accepted", "L-1 (process): Frozen lists help.")
 
+    async def test_old_runs_are_archived_restored_and_pruned_from_the_runs_list(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.adopted(pilot)
+            rows = [r.value for r in self.app.query_one("#projects", DataTable).rows]
+            self.app.query_one("#projects", DataTable).move_cursor(row=rows.index("shop"))
+            await pilot.press("l")
+            await self.dialog(pilot, RunsDialog)
+            await self.see(pilot, "x archive/restore", "a show archived", "P prune archived")
+            await pilot.press("P")  # not archived yet, so nothing is pruned
+            await self.see(pilot, "Archive the run with x first")
+            await pilot.press("x")
+            await self.until(pilot, lambda: "second" in self.daemon.archived_runs("shop"))
+            await self.dialog(pilot, RunsDialog)
+            await self.until(pilot, lambda: "second  imported" not in self.text())
+            await pilot.press("a")
+            await self.see(pilot, "Runs, archived included", "second  imported, 1 cycles  complete  archived")
+            await pilot.press("P")
+            await self.dialog(pilot, ConfirmDialog)
+            await pilot.press("y")
+            await self.until(pilot, lambda: "second" in self.daemon.pruned_runs("shop"))
+            await self.see(pilot, "complete  pruned")
+            self.assertFalse((self.shop / "runs" / "second").exists())
+
+    async def test_restore_brings_an_archived_run_back(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.adopted(pilot)
+            self.daemon.archive_run("shop", "second")
+            rows = [r.value for r in self.app.query_one("#projects", DataTable).rows]
+            self.app.query_one("#projects", DataTable).move_cursor(row=rows.index("shop"))
+            await pilot.press("l")
+            await self.dialog(pilot, RunsDialog)
+            await pilot.press("a")
+            await self.see(pilot, "complete  archived")
+            await pilot.press("x")
+            await self.until(pilot, lambda: not self.daemon.archived_runs("shop"))
+
 
 class BriefScreenTest(TuiCase):
     async def test_editor_facts_panel_and_derived_profile(self):
@@ -679,6 +715,18 @@ class BacklogScreenTest(TuiCase):
             await pilot.press("k")
             await self.see(pilot, "The backlog is not generated yet.")
 
+    async def test_a_polish_run_says_it_has_no_backlog(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            run_id = await self.run_screen(pilot)
+            path = self.engine(run_id).run_dir / "run-brief.json"
+            brief = json.loads(path.read_text())
+            brief["content"]["lane"] = "polish"
+            path.write_text(json.dumps(brief))
+            await pilot.press("k")
+            await self.see(pilot, "is a polish run, which fixes one issue and has no backlog", "l runs")
+            await pilot.press("l")
+            await self.dialog(pilot, RunsDialog)
+
     async def select(self, pilot, key):
         pane = self.app.query_one("#backlog-pane")
         table = self.app.query_one("#backlog", DataTable)
@@ -943,6 +991,11 @@ class RunScreenTest(TuiCase):
             await self.until(pilot, lambda: re.search(r"\d\d:\d\d:\d\d  U-0001 started", self.text()))
             self.engine(run_id).ledger.append("unit_state", unit_id="U-0001", to="blocked", reason="needs a key")
             await self.see(pilot, "U-0001 blocked: needs a key")
+            # A line too long for one row is clipped, so the newest stay in the strip.
+            self.engine(run_id).ledger.append("unit_state", unit_id="U-0001", to="retry", reason="word " * 80)
+            self.engine(run_id).ledger.append("unit_state", unit_id="U-0001", to="cancelled", reason="by you")
+            await self.see(pilot, "U-0001 cancelled")
+            self.assertIn("…", self.text())
 
     async def test_design_gate_opens_the_browser(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
@@ -1135,6 +1188,8 @@ COVERAGE = {
     ("Projects", "Design page serves an existing docs/design/index.html"):
         (AdoptedProjectTest, "test_the_design_page_serves_the_existing_mockups"),
     ("Projects", "Runs list with imported history"): (AdoptedProjectTest, "test_the_runs_list_shows_imported_history"),
+    ("Projects", "Archive, restore, and prune old runs from the runs list"):
+        (AdoptedProjectTest, "test_old_runs_are_archived_restored_and_pruned_from_the_runs_list"),
     ("Projects", "Source host and CI signal per project"):
         (ProjectsScreenTest, "test_settings_set_the_ci_signal"),
     ("Brief", "Editor, facts panel, derived profile"): (BriefScreenTest, "test_editor_facts_panel_and_derived_profile"),

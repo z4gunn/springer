@@ -71,6 +71,17 @@
             "title": "Epics",
             "type": "array"
           },
+          "lane": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lane"
+          },
           "state": {
             "enum": [
               "generated",
@@ -804,6 +815,11 @@
       },
       "RunSummary": {
         "properties": {
+          "archived": {
+            "default": false,
+            "title": "Archived",
+            "type": "boolean"
+          },
           "complete": {
             "title": "Complete",
             "type": "boolean"
@@ -819,6 +835,11 @@
           "phase": {
             "title": "Phase",
             "type": "string"
+          },
+          "pruned": {
+            "default": false,
+            "title": "Pruned",
+            "type": "boolean"
           },
           "run_id": {
             "title": "Run Id",
@@ -1610,6 +1631,16 @@
             }
           },
           {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -1721,6 +1752,16 @@
             "schema": {
               "title": "Slug",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
             }
           },
           {

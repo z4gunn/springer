@@ -155,6 +155,10 @@ class NoArgs(Args):
     pass
 
 
+class RunRef(Args):
+    run_id: str = Field(min_length=1, max_length=200)
+
+
 @dataclass
 class Context:
     daemon: object
@@ -237,6 +241,20 @@ def project_archive(c):
         raise IllegalTransition(f"{c.project} has a run in progress")
     c.daemon.home.save_project(c.project, {**record, "archived": True})
     return {}
+
+
+def archive_run(c):
+    c.daemon.archive_run(c.project, c.args.run_id)
+    return {}
+
+
+def restore_run(c):
+    c.daemon.restore_run(c.project, c.args.run_id)
+    return {}
+
+
+def prune_run(c):
+    return c.daemon.prune_run(c.project, c.args.run_id)
 
 
 def update_section(c):
@@ -447,6 +465,16 @@ CATALOG = {op.type: op for op in [
               confirm=True, confirm_rule="yes"),
     Operation("project.archive", NoArgs, project_archive, "Hides the project and refuses a new run. Deletes nothing.",
               confirm=True, confirm_rule="yes"),
+    Operation("project.archive_run", RunRef, archive_run,
+              "Hides a finished run from the runs list. Deletes nothing, and restore brings it back."),
+    Operation("project.restore_run", RunRef, restore_run, "Shows an archived run in the runs list again."),
+    Operation("project.prune_run", RunRef, prune_run,
+              "Removes an archived run's folder. Its tracked files leave in one pull request (one commit on a "
+              "local project), except files the repository cites by path, and its ignored working state moves "
+              "to the daemon's home under pruned/.",
+              # A prune that will be refused is refused at once rather than after a confirmation.
+              confirm=lambda c: c.args.run_id in c.daemon.archived_runs(c.project),
+              confirm_rule="yes, once archived", chat=False),
     Operation("brief.update_section", UpdateSection, update_section,
               "Writes the section and marks it confirmed. After run.start it opens a scope-change gate.",
               confirm=_after_start, confirm_rule="after start"),
