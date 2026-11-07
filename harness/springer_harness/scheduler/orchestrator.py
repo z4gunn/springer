@@ -54,7 +54,8 @@ SCHEMA = {
                 "depends_on": {"type": "array", "items": {"type": "string"}},
                 "risk_baseline": {"enum": list(LEVELS)}, "model_tier": {"enum": list(TIERS)},
                 "executable_check": {"type": ["string", "null"]},
-                "gating_commands": {"type": "array", "items": GATING}}}},
+                "gating_commands": {"type": "array", "items": GATING},
+                "story_ids": {"type": "array", "items": {"type": "string"}}}}},
         "gates": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
             "required": ["checkpoint_type", "prompt", "holds", "options"],
@@ -102,6 +103,9 @@ Rules for the schema:
   for the product check. A unit of {build_agents} names at least one test command. The
   walking-skeleton or scaffold story sets up the test runner and names its test command,
   so every later story has one to extend. A docs or artifact unit names none.
+- story_ids: the backlog items the unit builds (e.g. STORY-2026-046), from the
+  prioritized-backlog artifact, so the board shows each story where its unit is. Empty
+  for work outside the backlog (the PRD, a design unit, a vertical consult).
 - risk_baseline: L0 for docs and artifacts, L2 for code that touches auth, data model,
   billing, infra, or CI, L3 for a unit that must not start before a person decides.
 - gates: only the gates the autonomy level fires (under standard, one direction-review
@@ -291,7 +295,8 @@ class OrchestratorPlanner:
                            declared_paths=tuple(u["declared_paths"]), depends_on=tuple(u["depends_on"]),
                            risk_baseline=u["risk_baseline"], model_tier=u["model_tier"],
                            executable_check=u.get("executable_check"),
-                           gating_commands=tuple(dict(g) for g in u.get("gating_commands") or ()))
+                           gating_commands=tuple(dict(g) for g in u.get("gating_commands") or ()),
+                           story_ids=tuple(u.get("story_ids") or ()))
                  for u in output["units"]]
         # A gate may name work not planned yet (the direction review comes before the
         # units that need its answer). It holds what exists, and nothing new is

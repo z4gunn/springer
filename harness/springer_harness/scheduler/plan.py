@@ -19,6 +19,7 @@ class UnitDraft:
     executable_check: str | None = None
     wall_clock_seconds: int = 3600
     gating_commands: tuple = ()  # {name, command, kind, count_regex?} the harness runs at Check
+    story_ids: tuple = ()  # the backlog items the unit builds, so the board follows it
 
 
 @dataclass

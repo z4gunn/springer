@@ -184,7 +184,7 @@ The backlog view is used by the Backlog screen for the tree, the board, and the 
  "unknowns": [{"unknown_id": "UK-1", "question": "...", "answer": null}]}
 ```
 
-`state` is `not_generated` with empty lists until the backlog exists. `column` is one of ready, in_progress, in_review, blocked, done. The dependency graph is carried by `depends_on`, and the MVP line by each feature's `mvp` flag, so the view has one source for each fact.
+`state` is `not_generated` with empty lists until the PM unit writes a `prioritized-backlog` artifact. The daemon builds the view from the newest one that is not a reference inventory, nests its flat epics, features, and items into the tree, and puts items with no known feature under one Stories feature and its deferrals under a Deferred feature below the MVP line. A revised artifact rebuilds the view and keeps what a person changed with the backlog operations. A story's `unit_ids` are the units whose spec names it in `story_ids`, which the Plan step fills, or whose expected outcome names its id. `column` is one of ready, in_progress, in_review, blocked, done. The dependency graph is carried by `depends_on`, and the MVP line by each feature's `mvp` flag, so the view has one source for each fact.
 
 ### Gate view
 

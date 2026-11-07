@@ -867,7 +867,8 @@ class RunEngine:
                     "mcp_config_ref": None, "budget": {"tokens": 200000, "wall_clock_seconds": draft.wall_clock_seconds},
                     "risk_baseline": draft.risk_baseline, "dependencies": [self.keys[k] for k in draft.depends_on],
                     "executable_check": draft.executable_check,
-                    "gating_commands": [dict(g) for g in draft.gating_commands]}
+                    "gating_commands": [dict(g) for g in draft.gating_commands],
+                    "story_ids": list(draft.story_ids)}
             self.units.create(spec)
             routed.append({"agent": draft.agent, "unit_id": unit_id, "expected_outcome": draft.expected_outcome,
                            "workstream": draft.workstream, "input_artifact_refs": []})

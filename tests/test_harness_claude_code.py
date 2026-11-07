@@ -323,6 +323,12 @@ class OrchestratorTest(FakeBinCase):
         self.assertTrue((self.project / "runs/acme-1/plan/plan-001.json").exists())
         self.assertFalse(self.planner.finished())
 
+    def test_a_unit_names_the_stories_it_builds(self):
+        unit = {**self.PLAN["units"][0], "story_ids": ["STORY-2026-001"]}
+        self.plan_file.write_text(json.dumps({**self.PLAN, "units": [unit]}))
+        self.assertEqual(self.ask().units[0].story_ids, ("STORY-2026-001",))
+        self.plan_file.write_text(json.dumps(self.PLAN))
+
     def test_the_prompt_lets_work_stack_on_an_open_pr(self):
         from springer_harness.scheduler.orchestrator import PROMPT
         self.assertIn("depends_on its key", PROMPT)

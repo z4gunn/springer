@@ -1,6 +1,11 @@
-"""The backlog as a file in the run store. Files plus the TUI board are the default,
-and a tracker is only ever a one-way projection of this."""
+"""The backlog as a file in the run store, shown on the TUI board.
 
+The PM unit writes the backlog as a prioritized-backlog artifact. backlog.json is built
+from the latest one and rebuilt when the PM revises it, keeping what a person changed
+on the board (the MVP line, deferrals, story order, bugs, answers)."""
+
+import hashlib
+import re
 from pathlib import Path
 
 from ..common import read_json, write_json
@@ -8,6 +13,11 @@ from ..errors import IllegalTransition, NotFound
 
 BUG_EPIC = "E-BUGS"
 BUG_FEATURE = "F-BUGS"
+LOOSE_EPIC = "E-BACKLOG"
+LOOSE_FEATURE = "F-STORIES"
+DEFERRED_FEATURE = "F-DEFERRED"
+# A unit that names no story_ids still counts for a story its expected outcome names.
+STORY_ID = re.compile(r"\b(?:STORY|TASK|BUG)-[0-9]{4}-[0-9]+\b")
 COLUMNS = {"planned": "ready", "ready": "ready", "retry": "in_progress", "redispatch": "in_progress",
            "running": "in_progress", "abandoned": "in_progress", "returned": "in_review", "checking": "in_review",
            "gated": "in_review", "blocked": "blocked", "done": "done", "cancelled": "done"}
@@ -21,13 +31,46 @@ class BacklogStore:
         return read_json(self.path)
 
     def require(self):
-        backlog = self.load()
+        backlog = self.sync()
         if backlog is None:
             raise IllegalTransition("the backlog is not generated yet")
         return backlog
 
     def save(self, backlog):
         write_json(self.path, backlog)
+
+    def source(self):
+        """The newest prioritized-backlog artifact that is not a reference inventory, as
+        (file name, digest, document), or None."""
+        found = []
+        for path in Path(self.path.parent, "artifacts").glob("prioritized-backlog*.json"):
+            doc = read_json(path)
+            if not isinstance(doc, dict) or doc.get("artifact_type") != "prioritized-backlog" \
+                    or not isinstance(doc.get("content"), dict) or _inventory(path, doc):
+                continue
+            found.append((path.stat().st_mtime_ns, path.name, path))
+        if not found:
+            return None
+        _, name, path = max(found)
+        raw = path.read_bytes()
+        return name, hashlib.sha256(raw).hexdigest(), read_json(path)
+
+    def sync(self):
+        """backlog.json, built from the PM's artifact when that is newer than it. A
+        backlog with no artifact behind it is left as it is."""
+        backlog = self.load()
+        found = self.source()
+        if found is None:
+            return backlog
+        name, digest, doc = found
+        if backlog and (backlog.get("source") or {}).get("digest") == digest:
+            return backlog
+        fresh = from_artifact(doc["content"])
+        fresh["source"] = {"artifact": name, "digest": digest}
+        if backlog:
+            carry(backlog, fresh)
+        self.save(fresh)
+        return fresh
 
     def features(self, backlog):
         return [f for epic in backlog["epics"] for f in epic["features"]]
@@ -102,11 +145,13 @@ class BacklogStore:
         raise NotFound(f"no unknown {unknown_id}")
 
     def view(self, units, as_of):
-        backlog = self.load()
+        backlog = self.sync()
         if backlog is None:
             return {"as_of": as_of, "state": "not_generated", "epics": [], "unknowns": []}
+        links = story_units(units)
         for feature in self.features(backlog):
             for story in feature["stories"]:
+                story["unit_ids"] = sorted(set(story.get("unit_ids") or ()) | links.get(story["story_id"], set()))
                 self._annotate(story, units)
         return {"as_of": as_of, "state": "generated", "epics": backlog["epics"],
                 "unknowns": backlog.get("unknowns", [])}
@@ -127,3 +172,95 @@ class BacklogStore:
         else:
             story["column"] = "done" if columns else "ready"
         story["risk"] = max(risks) if risks else story.get("risk")
+
+
+def _inventory(path, doc):
+    """The PM writes a reference's feature inventory as a prioritized-backlog tagged
+    inventory. It is the source the backlog is transcribed from, not the backlog."""
+    content = doc["content"]
+    tags = [*(doc.get("tags") or ()), *(content.get("tags") or ())]
+    return "inventory" in path.name or "inventory" in tags or content.get("status") == "inventory"
+
+
+def from_artifact(content):
+    """The board's epic, feature, story tree from a prioritized-backlog's flat lists.
+    Items with no known feature, and backlogs with no hierarchy at all, sit under one
+    Stories feature. Every feature starts above the MVP line."""
+    items = list(content.get("backlog") or ())
+    order = content.get("backlog_order")
+    if order:
+        rank = {story_id: index for index, story_id in enumerate(order)}
+        items.sort(key=lambda item: rank.get(item.get("story_id"), len(rank)))
+    else:
+        items.sort(key=lambda item: item.get("position") or len(items) + 1)
+    epics, by_epic, features = [], {}, {}
+
+    def epic(epic_id, title):
+        if epic_id not in by_epic:
+            by_epic[epic_id] = {"epic_id": epic_id, "title": title, "critical": False, "features": []}
+            epics.append(by_epic[epic_id])
+        return by_epic[epic_id]
+
+    def feature(epic_id, feature_id, title, outcome=None, mvp=True, deferred=False):
+        record = {"feature_id": feature_id, "title": title, "mvp": mvp, "deferred": deferred, "stories": []}
+        if outcome:
+            record["outcome"] = outcome
+        epic(epic_id, "Backlog" if epic_id == LOOSE_EPIC else epic_id)["features"].append(record)
+        features[feature_id] = record
+        return record
+
+    for item in content.get("epics") or ():
+        epic(item["epic_id"], item.get("name") or item["epic_id"])
+    for item in content.get("features") or ():
+        feature(item["epic_id"], item["feature_id"], item.get("name") or item["feature_id"], item.get("outcome"))
+    for item in items:
+        home = features.get(item.get("feature_id"))
+        if home is None:
+            home = features.get(LOOSE_FEATURE) or feature(LOOSE_EPIC, LOOSE_FEATURE, "Stories")
+        home["stories"].append({"story_id": item["story_id"], "title": item.get("title") or item["story_id"],
+                                "work_type": item.get("work_type") or "story", "wave": None, "unit_ids": [],
+                                "pr": None, "depends_on": list(item.get("dependencies") or ())})
+    deferred = [d for d in content.get("deferred_stories") or () if isinstance(d, dict)]
+    if deferred:
+        home = feature(LOOSE_EPIC, DEFERRED_FEATURE, "Deferred", mvp=False, deferred=True)
+        for number, item in enumerate(deferred, 1):
+            home["stories"].append({
+                "story_id": item.get("story_id") or f"DEFERRED-{number}",
+                "title": item.get("title") or item.get("item") or "Deferred item",
+                "note": item.get("reason") or item.get("deferral_reason"),
+                "work_type": "story", "wave": None, "unit_ids": [], "pr": None, "depends_on": []})
+    return {"epics": epics, "unknowns": []}
+
+
+def carry(old, fresh):
+    """What a person changed on the old board survives the PM's revision: the MVP line
+    and deferral per feature, story order within a feature, the bugs they added, and
+    the unknowns they answered."""
+    old_features = {f["feature_id"]: f for e in old.get("epics") or () for f in e["features"]}
+    for epic in fresh["epics"]:
+        for feature in epic["features"]:
+            before = old_features.get(feature["feature_id"])
+            if before is None:
+                continue
+            feature["mvp"], feature["deferred"] = before["mvp"], before["deferred"]
+            rank = {s["story_id"]: index for index, s in enumerate(before["stories"])}
+            feature["stories"].sort(key=lambda s: rank.get(s["story_id"], len(rank)))
+    bugs = next((e for e in old.get("epics") or () if e["epic_id"] == BUG_EPIC), None)
+    if bugs is not None:
+        fresh["epics"].append(bugs)
+    answered = {u["unknown_id"]: u for u in old.get("unknowns") or ()}
+    fresh["unknowns"] = [answered.get(u["unknown_id"], u) for u in fresh["unknowns"]]
+
+
+def story_units(units):
+    """story_id to the units that build it: the story_ids the Plan step named, else the
+    story ids in the unit's expected outcome. A review unit is left out, because the
+    PR it reviews already puts the story in review."""
+    links = {}
+    for unit_id in units.ids():
+        spec = units.spec(unit_id)
+        if spec.get("review_of"):
+            continue
+        for story_id in spec.get("story_ids") or STORY_ID.findall(spec.get("expected_outcome") or ""):
+            links.setdefault(story_id, set()).add(unit_id)
+    return links

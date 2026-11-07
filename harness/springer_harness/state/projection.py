@@ -4,6 +4,7 @@ ledger. Any process can rebuild it, and nothing reads it as a source of truth.""
 from pathlib import Path
 
 from ..common import artifact_header, parse_iso, read_json, write_json
+from .backlog import BacklogStore
 
 BOARD = {"backlog": ("planned", "ready", "retry", "redispatch", "blocked", "abandoned"),
          "development": ("running",), "review": ("returned", "checking", "gated"), "validation": (),
@@ -60,7 +61,7 @@ def rebuild(run_dir, run_id, ledger, units, gates, cycles, now, sessions_for, wi
     elif open_gates and not in_flight:
         waiting = "gate"
     escalations = [read_json(p) for p in sorted(Path(run_dir, "artifacts").glob("E-*.json"))]
-    backlog = read_json(Path(run_dir, "backlog.json")) or {"epics": []}
+    backlog = BacklogStore(run_dir).sync() or {"epics": []}
     features = [f for epic in backlog["epics"] for f in epic["features"]]
     doc = artifact_header(f"run-state-{run_id}", "run-state", "run_state", "v2", now())
     doc["content"] = {

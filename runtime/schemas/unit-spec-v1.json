@@ -181,6 +181,14 @@
         }
       }
     },
+    "story_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "The backlog items (story_id) the unit builds, named by the Plan step. The Backlog screen places each story by the state of its units."
+    },
     "review_of": {
       "type": [
         "string",
