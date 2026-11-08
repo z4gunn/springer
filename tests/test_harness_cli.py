@@ -119,5 +119,68 @@ class DaemonLifecycleTest(unittest.TestCase):
         self.assertEqual(cli.default_home(), Path("/tmp/spgr-elsewhere"))
 
 
+@unittest.skipUnless(HAVE_DEPS, "the harness dependencies are not installed")
+class PolishCommandTest(unittest.TestCase):
+    """springer polish and springer tail: one fix from a terminal, which the daemon drives."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self.tmp.name) / "home"
+        self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(lambda: cli.stop_daemon(self.home))
+        self.project = git_project(Path(self.tmp.name) / "acme")
+        BriefStore(self.project).create("Acme")
+        (self.home).mkdir(parents=True)
+        (self.home / "projects.json").write_text(json.dumps({"acme": {
+            "slug": "acme", "name": "Acme", "path": str(self.project), "archived": False}}))
+
+    def run_cli(self, *args):
+        import contextlib
+        import io
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), mock.patch.object(cli, "_interactive", return_value=False):
+            code = cli.main(["--home", str(self.home), *args])
+        return code, out.getvalue()
+
+    def test_polish_starts_a_run_then_offers_a_bug_when_the_project_is_busy(self):
+        code, text = self.run_cli("polish", "The footer link is wrong", "--project", "acme", "--no-follow")
+        self.assertEqual((code, "Started acme-1 on acme: The footer link is wrong" in text), (0, True), text)
+        brief = json.loads((self.project / "runs" / "acme-1" / "run-brief.json").read_text())["content"]
+        self.assertEqual((brief["lane"], brief["issue"]), ("polish", "The footer link is wrong"))
+        self.assertEqual(len(brief["story_ids"]), 1)
+        code, text = self.run_cli("polish", "Also the hero", "--project", "acme", "--no-follow")
+        self.assertEqual(code, 1)
+        self.assertIn("acme has acme-1 in progress", text)
+        self.assertIn("--as-bug", text)
+        code, text = self.run_cli("polish", "Also the hero", "--project", "acme", "--as-bug")
+        self.assertEqual(code, 0, text)
+        self.assertRegex(text, r"Filed BUG-\d{4}-\d+ on acme's backlog")
+        self.assertIn("Also the hero", (self.project / "runs" / "_backlog.json").read_text())
+
+    def test_polish_finds_the_project_from_a_directory_inside_it(self):
+        inside = self.project / "src" / "deep"
+        inside.mkdir(parents=True)
+        self.assertEqual(cli.project_for(self.home, inside), "acme")
+        with self.assertRaises(RuntimeError):
+            cli.project_for(self.home, Path(self.tmp.name))
+        self.assertEqual(cli.project_of_run(self.home, "acme-discovery-2"), "acme")
+
+    def test_tail_follows_a_run_in_the_feeds_wording_and_stops_at_a_gate(self):
+        self.assertEqual(cli.tail_line({"ts": "2026-11-07T10:11:12Z", "event": "unit_state", "to": "running",
+                                        "unit_id": "U-0001"}), "10:11:12  U-0001 started")
+        gate = {"ts": "2026-11-07T10:12:00Z", "event": "gate_opened", "gate_id": "G-0001"}
+        self.assertIn("gate G-0001 is open. Answer it in Slack", cli.tail_line(gate))
+        self.assertTrue(cli.tail_stops(gate) and cli.tail_stops({"event": "cleaned_up"}))
+        self.assertFalse(cli.tail_stops({"event": "unit_state", "to": "running"}))
+        self.assertIsNone(cli.tail_line({"event": "heartbeat"}))
+        code, text = self.run_cli("polish", "Tidy the footer", "--project", "acme", "--no-follow")
+        self.assertEqual(code, 0, text)
+        code, text = self.run_cli("tail", "acme-1", "--timeout", "4")
+        self.assertEqual(code, 0)
+        self.assertIn("following acme-1. Ctrl-C leaves it running.", text)
+        code, text = self.run_cli("tail", "nowhere-1")
+        self.assertEqual(code, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -15,6 +15,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 from pathlib import Path
 
 from .build import build_id
@@ -252,6 +253,169 @@ def leave(home):
     return f"Springer closed. Still running in the background: {names}{note}. Run springer to come back."
 
 
+# --- polish and tail: one fix from a terminal, which the daemon drives (Modes in pdca-harness) ---
+
+
+def project_for(home, cwd, slug=None):
+    """The registered project a directory is in, or the one named."""
+    from .registry import Home
+
+    projects = Home(home).projects()
+    if slug:
+        if slug not in projects:
+            raise RuntimeError(f"no project named {slug}")
+        return slug
+    here = Path(cwd).resolve()
+    for name, record in projects.items():
+        root = Path(record["path"]).resolve()
+        if here == root or root in here.parents:
+            return name
+    raise RuntimeError("this directory is not a registered project. Run springer and add it under Projects, "
+                       "or name one with --project.")
+
+
+def project_of_run(home, run_id):
+    """Run ids start with their project's slug, so the longest slug that fits names it."""
+    from .registry import Home
+
+    slugs = [s for s in Home(home).projects() if run_id.startswith(s + "-")]
+    if not slugs:
+        raise RuntimeError(f"no project has a run named {run_id}")
+    return max(slugs, key=len)
+
+
+class Api:
+    """The commands' client: plain urllib against the daemon the home's files name."""
+
+    def __init__(self, home):
+        record = running(home) or ensure_daemon(home)
+        self.base = f"http://127.0.0.1:{record['port']}"
+        self.headers = {"Authorization": f"Bearer {(Path(home) / 'api-token').read_text().strip()}"}
+
+    def _call(self, method, path, body=None):
+        data = json.dumps(body).encode() if body is not None else None
+        headers = {**self.headers, **({"Content-Type": "application/json"} if data else {})}
+        request = urllib.request.Request(self.base + path, data=data, method=method, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.loads(response.read() or b"null")
+        except urllib.error.HTTPError as exc:
+            try:
+                detail = json.loads(exc.read() or b"{}").get("error") or {}
+            except ValueError:
+                detail = {}
+            raise RuntimeError(detail.get("message") or f"the daemon answered {exc.code}") from exc
+
+    def get(self, path):
+        return self._call("GET", path)
+
+    def op(self, kind, args, project, run_id=None):
+        """One operation, confirmed when the daemon asks, because the person typed it."""
+        body = {"op_id": str(uuid.uuid4()), "type": kind, "project": project, "run_id": run_id, "args": args}
+        outcome = self._call("POST", "/v1/operations", body)
+        if outcome.get("status") == "needs_confirmation":
+            outcome = self._call("POST", "/v1/operations",
+                                 {**body, "op_id": str(uuid.uuid4()), "confirm_token": outcome["confirm_token"]})
+        return outcome
+
+    def frames(self, path, timeout=None):
+        """(event, data) from an event stream until the server closes it, the timeout
+        passes, or the reader stops."""
+        request = urllib.request.Request(self.base + path, headers=self.headers)
+        deadline = time.monotonic() + timeout if timeout else None
+        event, data = None, None
+        try:
+            with urllib.request.urlopen(request, timeout=min(timeout, 30) if timeout else 60) as response:
+                for raw in response:
+                    line = raw.decode("utf-8", "replace").rstrip("\n")
+                    if line.startswith("event: "):
+                        event = line[7:]
+                    elif line.startswith("data: "):
+                        data = json.loads(line[6:])
+                    elif not line and event:
+                        yield event, data
+                        event, data = None, None
+                    if deadline and time.monotonic() > deadline:
+                        return
+        except (TimeoutError, socket.timeout, urllib.error.URLError, ConnectionError):
+            return
+
+
+def tail_line(data):
+    """One line of the tail: the time, then the words Slack and the TUI use for the event."""
+    from .notify.notifier import feed_line
+
+    if data.get("event") == "gate_opened":
+        text = f"gate {data.get('gate_id')} is open. Answer it in Slack, or in the TUI (springer)."
+    else:
+        text = feed_line(data)
+    if not text:
+        return None
+    return f"{(data.get('ts') or '')[11:19]}  {text}".strip()
+
+
+def tail_stops(data):
+    """The tail ends when the run completes or a gate waits on the person."""
+    return data.get("event") in ("gate_opened", "cleaned_up")
+
+
+def tail(home, run_id, slug=None, timeout=None, out=print):
+    """Follow a run's events, in the wording Slack and the TUI use, until it completes or
+    a gate opens. Ctrl-C leaves the run going, because the daemon drives it."""
+    api = Api(home)
+    slug = slug or project_of_run(home, run_id)
+    out(f"following {run_id}. Ctrl-C leaves it running.")
+    for event, data in api.frames(f"/v1/projects/{slug}/runs/{run_id}/events", timeout):
+        if event == "heartbeat":
+            if api.get(f"/v1/projects/{slug}/runs/{run_id}").get("complete"):
+                out(f"{run_id} is complete.")
+                return 0
+            continue
+        if event == "resync" or not isinstance(data, dict):
+            continue
+        line = tail_line(data)
+        if line:
+            out(line)
+        if tail_stops(data):
+            return 0
+    return 0
+
+
+def _interactive():
+    return sys.stdin.isatty()
+
+
+def polish(home, issue, slug=None, as_bug=False, follow=True, timeout=None, cwd=None, out=print):
+    """Start a polish run on one issue in the person's words, for the project in this
+    directory. With a run in progress, the issue can go on the backlog as a bug instead,
+    which the person decides."""
+    issue = issue.strip()
+    if not issue:
+        raise RuntimeError("say what is wrong, in your own words")
+    slug = project_for(home, cwd or os.getcwd(), slug)
+    api = Api(home)
+    active = (api.get(f"/v1/projects/{slug}").get("active_run") or {}).get("run_id")
+    title = issue.splitlines()[0][:120]
+    if active:
+        if not as_bug and _interactive():
+            answer = input(f"{slug} has {active} in progress. File the issue as a bug on the backlog instead? [y/N] ")
+            as_bug = answer.strip().lower().startswith("y")
+        if not as_bug:
+            out(f"{slug} has {active} in progress. springer polish --as-bug \"{title}\" files the issue as a bug "
+                f"on the backlog for it, or wait for the run to finish.")
+            return 1
+        outcome = api.op("backlog.add_bug", {"title": title, "description": issue, "severity": "medium"}, slug,
+                         run_id=active)
+        out(f"Filed {outcome['result']['story_id']} on {slug}'s backlog. {active} or the next polish run picks it up.")
+        return 0
+    version = api.get(f"/v1/projects/{slug}/brief")["version"]
+    outcome = api.op("run.start", {"base_version": version, "lane": "polish", "issue": issue}, slug)
+    run_id = outcome["result"]["run_id"]
+    out(f"Started {run_id} on {slug}: {title}")
+    out("Its progress thread opens in your Slack direct message, and springer shows it under Run.")
+    return tail(home, run_id, slug, timeout, out) if follow else 0
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     parser = argparse.ArgumentParser(prog="springer", description="Open the Springer TUI, starting the daemon if needed.")
@@ -270,6 +434,16 @@ def main(argv=None):
     run_daemon = sub.add_parser("daemon", help="run the daemon in the foreground")
     run_daemon.add_argument("--home", dest="daemon_home", default=None)
     run_daemon.add_argument("--port", type=int, default=DEFAULT_PORT)
+    polish_cmd = sub.add_parser("polish", help="start a polish run on one issue, in your words, for the project here")
+    polish_cmd.add_argument("issue", nargs="+", help="what is wrong, in your own words")
+    polish_cmd.add_argument("--project", default=None, help="the project, when not run from inside it")
+    polish_cmd.add_argument("--as-bug", action="store_true", help="with a run in progress, file the issue as a bug")
+    polish_cmd.add_argument("--no-follow", action="store_true", help="print the run id and return")
+    polish_cmd.add_argument("--timeout", type=float, default=None, help="stop following after this many seconds")
+    tail_cmd = sub.add_parser("tail", help="follow a run's lines until it completes or a gate opens")
+    tail_cmd.add_argument("run_id")
+    tail_cmd.add_argument("--project", default=None)
+    tail_cmd.add_argument("--timeout", type=float, default=None, help="stop following after this many seconds")
     args = parser.parse_args(argv)
     home = args.home or getattr(args, "daemon_home", None) or default_home()
     if args.command == "daemon":
@@ -288,6 +462,15 @@ def main(argv=None):
         return service(home, args.action)
     if args.command == "respawn":
         return respawn(home, args.after)
+    if args.command in ("polish", "tail"):
+        try:
+            if args.command == "polish":
+                return polish(home, " ".join(args.issue), slug=args.project, as_bug=args.as_bug,
+                              follow=not args.no_follow, timeout=args.timeout)
+            return tail(home, args.run_id, slug=args.project, timeout=args.timeout)
+        except (RuntimeError, OSError, KeyError, ValueError) as exc:
+            sys.stderr.write(f"springer: {exc}\n")
+            return 1
     if args.command == "stop":
         stopped = stop_daemon(home)
         print("springer: daemon stopped." if stopped else "springer: no daemon is running.")
