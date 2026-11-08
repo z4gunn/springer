@@ -497,6 +497,11 @@ class Daemon:
         if risk_rules.apply(path, rule):
             self._commit(slug, path, [risk_rules.FILE], f"chore(runs): risk rule from {gate_id}", "the risk rules")
 
+    def commit_backlog(self, slug, action):
+        """A person's edit to the project backlog, committed on its own."""
+        path = self.project_path(slug)
+        return self._commit(slug, path, ["runs/_backlog.json"], f"chore(runs): backlog {action}", "the backlog")
+
     def commit_reconcile(self, slug):
         """Reconcile's ledger, its product check results, and the backlog closes it made
         go in as one commit whose subject reconcile knows as its own."""

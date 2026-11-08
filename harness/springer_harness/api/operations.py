@@ -653,6 +653,10 @@ class Operations:
                                         [f"{k}: {v}" for k, v in self._redact(op, raw_args).items()]}}
                 self._spend_token(confirm_token, bound)
             result = op.handler(ctx)
+            if kind.startswith("backlog."):
+                # A person's backlog edit is a tracked file, and left uncommitted it sits as a
+                # change in the project checkout until a run's records happen to take it.
+                self.daemon.commit_backlog(project, kind.split(".", 1)[1].replace("_", " "))
             return self._record(op, op_id, project, run_id, raw_args, actor, result)
 
     def _redact(self, op, raw_args):

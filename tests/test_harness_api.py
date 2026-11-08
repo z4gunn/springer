@@ -825,6 +825,18 @@ class OperationCatalogTest(ApiCase):
         self.assertEqual((story["column"], story.get("closed")), ("ready", None))
         self.op("backlog.close_story", {"story_id": "S-9"}, run_id=run_id, expect=404)
 
+    def test_a_backlog_edit_is_committed_so_the_checkout_stays_clean(self):
+        """Closing shipped stories by hand left runs/_backlog.json modified in the project
+        checkout until a later run's records took it."""
+        run_id = self.run_started()
+        project = self.daemon.project_path("acme")
+        git = lambda *a: subprocess.run(["git", "-C", str(project), *a], capture_output=True, text=True).stdout.strip()
+        self.op("backlog.close_story", {"story_id": "S-2", "note": "shipped by hand"}, run_id=run_id)
+        self.assertEqual(git("log", "-1", "--format=%s %ae"), "chore(runs): backlog close story springer@local")
+        self.assertEqual(git("status", "--porcelain", "--", "runs/_backlog.json"), "")
+        self.op("backlog.reopen_story", {"story_id": "S-2"}, run_id=run_id)
+        self.assertEqual(git("log", "-1", "--format=%s"), "chore(runs): backlog reopen story")
+
     def test_project_reconcile_answer_records_the_answer_to_a_question(self):
         """The full reconcile flow is in test_harness_reconcile. This covers the operation."""
         self.start()
