@@ -145,6 +145,8 @@ def feed_line(line):
         return f"no-go at {line.get('gate_id')}: nothing shipped"
     if name == "check_warning":
         return f"{unit} passed Check, but its merge waits on you: {trim(line.get('detail'), LINE_CHARS)}"
+    if name == "run_completed_with_no_work":
+        return f"nothing to build. {trim(line.get('detail'), LINE_CHARS)}"
     if name == "tick_failed":
         return f"the daemon could not advance the run: {trim(line.get('detail'), LINE_CHARS)}"
     if name == "operation_applied" and line.get("type") == "run.pause":

@@ -997,12 +997,27 @@ class RunEngine:
     def finish_if_done(self):
         states = self.open_units()
         open_gates = [g for g in self.gates.open_gates() if not g["content"]["digest"]]
+        if not states and not open_gates and not self.cycles.ids() and self.planner.finished():
+            # The first plan found nothing to route. With no unit and no cycle there was
+            # nothing to finish, so the run sat silent and held the project.
+            self._complete_with_no_work()
+            return
         if states and self.planner.finished() and not open_gates and all(is_terminal(s) for s in states) \
                 and all(c["content"].get("closed") for c in self.cycles.all()):
             self.close_stories()
             if self._held_for_release():
                 return
             self.cycles.complete_run()
+
+    def _complete_with_no_work(self):
+        latest = getattr(self.planner, "latest_rationale", lambda: None)()
+        why = f"The plan found nothing to route: {latest}" if latest else "The plan found nothing to route."
+        cycle_id = self.cycles.next_id()
+        no_work = {"agent": "spgr-agent-orchestrator", "expected_outcome": "no work, the plan found nothing to route"}
+        self.cycles.plan(cycle_id, "complete", [no_work], why)
+        self.cycles.close(cycle_id, {})
+        self.cycles.complete_run()
+        self.ledger.append("run_completed_with_no_work", detail=why[:600])
 
     def close_stories(self):
         """Close the backlog stories whose units in this run are all done. The board's read

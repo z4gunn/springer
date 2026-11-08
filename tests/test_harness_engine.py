@@ -969,6 +969,18 @@ class CannedRunTest(EngineCase):
         self.assertTrue(engine.cycles.is_complete())
         self.assertTrue(all(c["content"]["closed"] for c in engine.cycles.all()))
 
+    def test_a_first_plan_with_nothing_to_route_completes_the_run(self):
+        """A build run whose stories had shipped in an earlier run planned done with no
+        units, and sat silent for two hours, holding the project."""
+        engine = self.engine([])
+        engine.planner.latest_rationale = lambda: "run 1 shipped the stories"
+        engine.tick()
+        self.assertTrue(engine.cycles.is_complete())
+        line = [e.line for e in engine.ledger.read() if e.line.get("event") == "run_completed_with_no_work"]
+        self.assertIn("run 1 shipped the stories", line[0]["detail"])
+        if HAVE_JSONSCHEMA:
+            self.assertEqual(schema_errors("pdca-cycle-v1", engine.cycles.all()[0]), [])
+
     def release_run(self, answer):
         """Drive to the release gate, answering every other gate with its first option."""
         started = []

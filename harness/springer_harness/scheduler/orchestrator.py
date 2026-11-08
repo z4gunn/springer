@@ -176,6 +176,10 @@ class OrchestratorPlanner:
         latest = self._latest()
         return bool(latest and latest.get("output", {}).get("done") and not latest["output"].get("units"))
 
+    def latest_rationale(self):
+        latest = self._latest()
+        return (latest or {}).get("output", {}).get("rationale") or None
+
     def next_batch(self, snapshot):
         if getattr(snapshot, "active", snapshot.nonterminal):
             return None  # something can still move on its own
