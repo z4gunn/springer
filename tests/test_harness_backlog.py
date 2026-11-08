@@ -183,6 +183,22 @@ class BacklogFromArtifactTest(unittest.TestCase):
         running = Units({"U-0002": {"story_ids": ["STORY-2026-002"]}}, {"U-0002": "running"})
         self.assertEqual(self.store.view(running, "0")["epics"][0]["features"][0]["stories"][1]["column"], "done")
 
+    def test_an_older_nested_artifact_builds_a_tree_and_a_broken_one_is_skipped(self):
+        self.write("prioritized-backlog-old.json", artifact([], epics=[
+            {"title": "Log an order", "goal": "The order shows in the list.",
+             "stories": [{"title": "Order form"}, {"title": "Order list"}]}]), tick=1)
+        self.write("prioritized-backlog-bad.json", {"artifact_type": "prioritized-backlog", "content": {"epics": [7]}},
+                   tick=2, run="acme-0")
+        (self.project / "runs" / "acme-0" / "artifacts" / "prioritized-backlog-bad.json").write_text(
+            json.dumps({"artifact_type": "prioritized-backlog", "content": {"backlog": [{"story_id": None, "x": 1}],
+                                                                             "features": [None]}}))
+        view = self.store.view(Units(), "0")
+        self.assertEqual([(e["epic_id"], e["title"]) for e in view["epics"]], [("E-1", "Log an order")])
+        self.assertEqual(self.stories(view), [("F-E-1", "STORY-1"), ("F-E-1", "STORY-2")])
+        self.assertEqual(self.feature(view, "F-E-1")["outcome"], "The order shows in the list.")
+        sources = json.loads(self.file.read_text())["sources"]
+        self.assertEqual([(s["run_id"], "skipped" in s) for s in sources], [("acme-1", False), ("acme-0", True)])
+
     def test_the_first_build_carries_the_boards_older_runs_kept(self):
         self.write("prioritized-backlog-x.json", artifact(
             [item(1, feature_id="FEAT-1"), item(2, feature_id="FEAT-1")],

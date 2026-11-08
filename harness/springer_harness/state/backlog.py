@@ -76,8 +76,12 @@ class BacklogStore:
         first = backlog is None
         backlog = backlog or _empty()
         for run_id, name, digest, doc in new:
-            merge(backlog, from_artifact(doc["content"]), run_id)
-            backlog["sources"].append({"run_id": run_id, "artifact": name, "digest": digest})
+            source = {"run_id": run_id, "artifact": name, "digest": digest}
+            try:
+                merge(backlog, from_artifact(doc["content"]), run_id)
+            except Exception as exc:  # noqa: BLE001, one unreadable artifact must not take the board down
+                source["skipped"] = f"{type(exc).__name__}: {exc}"[:200]
+            backlog["sources"].append(source)
         if first:
             for old in self._legacy_boards():
                 carry(old, backlog)
@@ -296,7 +300,9 @@ def _inventory(path, doc):
 def from_artifact(content):
     """The board's epic, feature, story tree from a prioritized-backlog's flat lists.
     Items with no known feature, and backlogs with no hierarchy at all, sit under one
-    Stories feature. Every feature starts above the MVP line."""
+    Stories feature. Every feature starts above the MVP line. An older artifact that
+    nests stories under its epics, or names nothing by id, gets ids by position."""
+    content = _flatten(content)
     items = list(content.get("backlog") or ())
     order = content.get("backlog_order")
     if order:
@@ -341,6 +347,30 @@ def from_artifact(content):
                 "note": item.get("reason") or item.get("deferral_reason"),
                 "work_type": "story", "wave": None, "unit_ids": [], "pr": None, "depends_on": []})
     return {"epics": epics, "unknowns": []}
+
+
+def _flatten(content):
+    """The flat lists the tree is built from, with ids filled in by position where an
+    artifact has none, and the stories an epic nests lifted into the backlog list under
+    a feature of their own."""
+    epics, features, items = [], list(content.get("features") or ()), list(content.get("backlog") or ())
+    for number, epic in enumerate(content.get("epics") or (), 1):
+        if not isinstance(epic, dict):
+            continue
+        epic_id = epic.get("epic_id") or f"E-{number}"
+        epics.append({**epic, "epic_id": epic_id, "name": epic.get("name") or epic.get("title") or epic_id})
+        nested = [s for s in epic.get("stories") or () if isinstance(s, dict)]
+        if nested:
+            feature_id = f"F-{epic_id}"
+            features.append({"feature_id": feature_id, "epic_id": epic_id,
+                             "name": epic.get("name") or epic.get("title") or epic_id, "outcome": epic.get("goal")})
+            items += [{**s, "feature_id": feature_id} for s in nested]
+    for number, feature in enumerate(features, 1):
+        feature.setdefault("feature_id", f"F-{number}")
+        feature.setdefault("epic_id", epics[0]["epic_id"] if epics else LOOSE_EPIC)
+    for number, item in enumerate(items, 1):
+        item.setdefault("story_id", f"STORY-{number}")
+    return {**content, "epics": epics, "features": features, "backlog": items}
 
 
 def merge(backlog, fresh, run_id):
