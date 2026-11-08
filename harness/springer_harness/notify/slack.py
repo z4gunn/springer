@@ -539,7 +539,8 @@ def _start(daemon, operations, lane, rest):
     if lane == "polish":
         issue = " ".join(rest[1:]).strip()
         if not issue:
-            return f'What is the issue? /springer polish {slug} "the footer link is the wrong color"'
+            return (f'What is the issue? /springer polish {slug} "the footer link is the wrong color". '
+                    f'To build an open backlog item, start with its id: "DEFERRED-2: the issue"')
         args["issue"] = issue
     elif record.get("adopted") and front.get("brief_version") == record.get("adopted_brief_version"):
         return (f"{slug}'s brief has not changed since it was adopted, so a build has nothing to add. Describe the "

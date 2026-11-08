@@ -172,6 +172,19 @@ class BacklogFromArtifactTest(unittest.TestCase):
                          [(task, "task", False), (bug, "bug", True)])
         self.assertEqual(polish["stories"][1]["title"], "The footer link is broken")
 
+    def test_a_polish_issue_that_names_an_open_story_carries_it(self):
+        """Building a deferred item as a polish run made a new TASK, and the deferred item
+        stayed open after the merge."""
+        self.write("prioritized-backlog-x.json", artifact([item(1), item(2)]))
+        self.store.close_story("STORY-2026-002", "human", "2026-11-08T00:00:00Z")
+        self.assertEqual(self.store.add_issue("acme-2", "STORY-2026-001: split the stylesheet"), "STORY-2026-001")
+        self.assertEqual(self.store.story(self.store.load(), "STORY-2026-001")["run_id"], "acme-2")
+        self.assertEqual(self.store.add_issue("acme-3", "STORY-2026-002: again"), f"TASK-{YEAR}-1",
+                         "a closed story is not reopened by naming it")
+        self.assertEqual(self.store.add_issue("acme-4", "STORY-2026-999 does not exist"), f"TASK-{YEAR}-2")
+        self.assertEqual(self.store.add_issue("acme-5", "Tidy up after STORY-2026-001"), f"TASK-{YEAR}-3",
+                         "only an id the issue opens with counts")
+
     def test_a_story_takes_its_column_from_the_unit_that_builds_it(self):
         self.write("prioritized-backlog-x.json", artifact([item(1), item(2), item(3)]))
         units = Units({"U-0001": {"story_ids": ["STORY-2026-001"], "expected_outcome": "x"},

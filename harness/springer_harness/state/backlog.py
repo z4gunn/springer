@@ -25,6 +25,8 @@ POLISH_FEATURE = "F-POLISH"
 OWN_FEATURES = (BUG_FEATURE, DEFERRED_FEATURE, POLISH_FEATURE)  # items no artifact owns
 # A unit that names no story_ids still counts for a story its expected outcome names.
 STORY_ID = re.compile(r"\b(?:STORY|TASK|BUG)-[0-9]{4}-[0-9]+\b")
+# An issue that opens with a backlog id, e.g. "DEFERRED-2:" or "STORY-2026-046 -".
+NAMED_STORY = re.compile(r"\s*([A-Z][A-Z0-9]*(?:-\d+)+)\b")
 BUG_WORDS = re.compile(r"\b(bug|broken|breaks|fix|wrong|error|crash|fails?|404)\b", re.I)
 COLUMNS = {"planned": "ready", "ready": "ready", "retry": "in_progress", "redispatch": "in_progress",
            "running": "in_progress", "abandoned": "in_progress", "returned": "in_review", "checking": "in_review",
@@ -173,8 +175,20 @@ class BacklogStore:
 
     def add_issue(self, run_id, issue):
         """A polish run's one issue, in the person's words, as a TASK or a BUG the run's
-        unit carries. The id comes from the project counter, so it never collides."""
+        unit carries. The id comes from the project counter, so it never collides. An
+        issue that opens with the id of an open story ("DEFERRED-2: ...") carries that
+        story instead, so its merge closes it."""
         backlog = self.sync() or _empty()
+        named = NAMED_STORY.match(issue or "")
+        if named:
+            try:
+                story = self.story(backlog, named.group(1))
+            except NotFound:
+                story = None
+            if story is not None and not story.get("closed"):
+                story["run_id"] = run_id
+                self.save(backlog)
+                return story["story_id"]
         feature = _own_feature(backlog, LOOSE_EPIC, "Backlog", POLISH_FEATURE, "Polish")
         kind = "BUG" if BUG_WORDS.search(issue) else "TASK"
         story_id = _allocate(backlog, kind)
