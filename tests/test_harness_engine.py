@@ -12,6 +12,7 @@ import unittest
 from harness_support import HAVE_JSONSCHEMA, OWNER, EngineCase, registry, schema_errors
 
 from springer_harness.check.risk import level_for
+from springer_harness.check.verdict import normalize_findings
 from springer_harness.common import iso
 from springer_harness.errors import IllegalTransition
 from springer_harness.providers.mock import Attempt, MockProvider, fail_result, pr_result
@@ -1040,3 +1041,15 @@ class CannedRunTest(EngineCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FindingsShapeTest(unittest.TestCase):
+    def test_counts_by_severity_become_records_and_zero_counts_drop(self):
+        found = normalize_findings({"P0": 0, "P1": 0, "P2": 1, "P3": 2})
+        self.assertEqual([f["severity"] for f in found], ["P2", "P3"])
+        self.assertTrue(all("code-review artifact" in f["detail"] for f in found))
+
+    def test_strings_become_records_and_records_pass_through(self):
+        record = {"severity": "P2", "file": "a.ts", "detail": "x"}
+        self.assertEqual(normalize_findings(["loose", record]), ({"detail": "loose"}, record))
+        self.assertEqual(normalize_findings(None), ())

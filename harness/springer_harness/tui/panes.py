@@ -1112,7 +1112,7 @@ class RunPane(Pane):
             prompt, clipped = self._clip_prompt(gate["decision_prompt"])
             rows.append(paint(prompt, "text", bold=True))
             rows += [paint(f"{f.get('vertical', '').removeprefix('spgr-agent-')}  {f.get('detail', '')} ({f.get('rule', '')})",
-                           "error") for f in context.get("findings", [])]
+                           "error") for f in context.get("findings", []) if isinstance(f, dict)]
             width = max(len(o["option"]) for o in gate["options"]) + 2
             for number, option in enumerate(gate["options"], 1):
                 rows.append(join(paint(f"{number} ", "you", bold=True),

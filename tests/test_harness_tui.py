@@ -27,6 +27,7 @@ except ImportError:
 
 if HAVE_TUI:
     from springer_harness.api.app import create_app
+    from springer_harness.common import write_json
     from springer_harness.daemon import Daemon
     from springer_harness.providers.mock import MockProvider, MockSourceHost
     from springer_harness.providers.mock_scenario import demo_planner_factory, demo_script
@@ -846,6 +847,16 @@ class RunScreenTest(TuiCase):
             screen = await self.see(pilot, "in flight")
             self.assertNotIn("needs you", screen)
             self.assertFalse(self.app.query_one("#gates-box").display)
+
+    async def test_a_gate_whose_findings_are_not_records_still_renders(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            run_id = await self.run_screen(pilot)
+            engine = self.engine(run_id)
+            gate_id = self.merge_gate(run_id)
+            gate = engine.gates.get(gate_id)
+            gate["content"]["context"]["findings"] = ["P0", "P1", "P2", "P3"]  # as an older daemon stored them
+            write_json(engine.gates.path(gate_id), gate)
+            await self.see(pilot, "1 approve")
 
     async def test_a_number_key_answers_the_gate(self):
         async with self.app.run_test(size=self.SIZE) as pilot:

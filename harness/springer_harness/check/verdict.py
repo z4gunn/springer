@@ -23,6 +23,18 @@ ADDENDA = {
 }
 
 
+def normalize_findings(raw):
+    """Findings as a tuple of records. A review brief asks for a list of {severity, file,
+    detail}, and a session that writes counts by severity or bare strings instead still
+    gets its findings through, rather than a gate that shows the severity names alone."""
+    if isinstance(raw, dict):
+        return tuple({"severity": str(severity), "detail": f"{count} finding(s), listed in the code-review artifact"}
+                     for severity, count in raw.items() if isinstance(count, int) and count > 0)
+    if not isinstance(raw, (list, tuple)):
+        return ()
+    return tuple(f if isinstance(f, dict) else {"detail": str(f)} for f in raw)
+
+
 def read_result(session_dir):
     data = read_json(Path(session_dir) / "result.json")
     if data is None:
@@ -30,7 +42,7 @@ def read_result(session_dir):
     return CheckResult(status=data.get("status", "fail"), outcome=data.get("outcome", "artifact"), pr=data.get("pr"),
                        touched_paths=tuple(data.get("touched_paths", ())), failure_class=data.get("failure_class"),
                        detail=data.get("detail", ""), raised_level=data.get("raised_level"),
-                       findings=tuple(data.get("findings", ())), verdict=data.get("verdict"),
+                       findings=normalize_findings(data.get("findings")), verdict=data.get("verdict"),
                        code_review=data.get("code_review"))
 
 
