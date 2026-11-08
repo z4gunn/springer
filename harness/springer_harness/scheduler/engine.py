@@ -19,6 +19,7 @@ from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_
 from ..errors import IllegalTransition, RunExternallyHeld
 from ..providers.coding_agent import CheckResult, SpawnRequest
 from ..state.cycles import CycleStore
+from ..state.backlog import BacklogStore
 from ..state.brief import BriefStore
 from ..state.gates import GateStore
 from ..state.ledger import Ledger
@@ -664,6 +665,7 @@ class RunEngine:
             return
         self.ledger.append("merge", unit_id=unit_id, pr=number, sha=sha)
         self.units.transition(unit_id, "done", f"merged at {level}", merge={"sha": sha, "at": iso(self.now())})
+        self.close_stories()
         if level == "L1":
             self.gates.open("routine-decision", "L1", [], f"{unit_id} merged at L1", [
                 {"option": "viewed", "consequence": "Closes this entry."}], artifact_ref=f"PR-{number}", digest=True)
@@ -997,9 +999,18 @@ class RunEngine:
         open_gates = [g for g in self.gates.open_gates() if not g["content"]["digest"]]
         if states and self.planner.finished() and not open_gates and all(is_terminal(s) for s in states) \
                 and all(c["content"].get("closed") for c in self.cycles.all()):
+            self.close_stories()
             if self._held_for_release():
                 return
             self.cycles.complete_run()
+
+    def close_stories(self):
+        """Close the backlog stories whose units in this run are all done. The board's read
+        once did this alone, so a run driven only from Slack left its stories open."""
+        try:
+            BacklogStore(self.project_path).view(self.units, self.ledger.head(), self.run_id, now=iso(self.now()))
+        except Exception as exc:  # noqa: BLE001, the backlog must never stop a merge or a run's end
+            self.ledger.append("backlog_close_failed", detail=f"{type(exc).__name__}: {exc}"[:300])
 
     # --- cleaning up ---
 

@@ -228,10 +228,10 @@ class BacklogStore:
                 return
         raise NotFound(f"no unknown {unknown_id}")
 
-    def view(self, units, as_of, run_id=None):
+    def view(self, units, as_of, run_id=None, now=None):
         """The project backlog seen from one run: each story's units in that run, its
         column, and in_run for the items the run builds. A story whose units in the run
-        are all done is closed by them, once."""
+        are all done is closed by them, once, stamped now (as_of when no time is given)."""
         backlog = self.sync()
         if backlog is None:
             return {"as_of": as_of, "state": "not_generated", "epics": [], "unknowns": [], "run_id": run_id}
@@ -247,7 +247,7 @@ class BacklogStore:
                 self._annotate(story, units)
                 if mine and story["column"] == "done" and not story.get("closed"):
                     numbers = [(units.state(u).get("pr") or {}).get("number") for u in mine]
-                    closed_now[story["story_id"]] = {"source": "unit", "at": as_of, "run_id": run_id, "unit_ids": mine,
+                    closed_now[story["story_id"]] = {"source": "unit", "at": now or as_of, "run_id": run_id, "unit_ids": mine,
                                                      "pr": next((n for n in numbers if n), None)}
                     story["closed"] = closed_now[story["story_id"]]
         if closed_now:

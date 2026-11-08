@@ -482,6 +482,18 @@ class MergePolicyTest(EngineCase):
         self.assertEqual(self.host.merged, [1])
         self.assertEqual(engine.gates.all(), [])
 
+    def test_a_merge_closes_its_story_with_no_one_reading_the_board(self):
+        """A polish run driven only from Slack merged its task, and the task stayed open,
+        because only the board's read closed stories."""
+        from springer_harness.state.backlog import BacklogStore
+        store = BacklogStore(self.project)
+        task = store.add_issue("demo", "the light palette reads as beige")
+        engine = self.engine([batch(unit("a", agent="routine", story_ids=(task,)))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        closed = store.story(store.load(), task)["closed"]
+        self.assertEqual((closed["source"], closed["unit_ids"], closed["pr"]), ("unit", ["U-0001"], 1))
+        self.assertRegex(closed["at"], r"^\d{4}-\d\d-\d\dT", "a time, not a ledger cursor")
+
     def actions_engine(self):
         engine = self.engine([batch(unit("a", agent="routine"))])
         engine.settings = lambda: {"ci_signal": "self-hosted-actions"}
