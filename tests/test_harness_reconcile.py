@@ -53,13 +53,31 @@ class ReconcileTest(ApiCase):
         return next(s for e in view["epics"] for f in e["features"] for s in f["stories"] if s["story_id"] == story_id)
 
     def test_the_first_look_seeds_and_the_daemons_own_commits_are_not_changes(self):
+        tip = self.git("rev-parse", "HEAD")
         record = self.look()
         self.assertTrue(record["seed"])
-        self.assertEqual(record["to"], self.git("rev-parse", "HEAD"))
+        self.assertEqual(record["to"], tip)
         self.start()  # the brief commit, by the Springer identity
-        self.assertEqual(self.look()["changes"], [])
+        self.assertIsNone(self.look(), "only the daemon's own commits write nothing")
         self.assertIsNone(self.look(), "a tip that did not move writes nothing")
+        self.assertEqual(len(self.daemon.reconciler.records("acme")), 1)
         self.assertEqual(self.daemon.announcements, [])
+
+    def test_the_ledger_is_committed_and_its_own_commit_is_not_looked_at_again(self):
+        def tracked_changes():
+            return self.git("status", "--porcelain", "--untracked-files=no")
+
+        self.look()
+        self.assertEqual(self.git("log", "-1", "--format=%s"), "chore(runs): reconcile")
+        self.assertEqual(tracked_changes(), "")
+        self.person_commit({"notes.txt": "hello"}, "docs: a note")
+        record = self.look()
+        self.assertEqual(len(record["changes"]), 1)
+        self.assertEqual(tracked_changes(), "", "the change record is committed, not left in the checkout")
+        head = self.git("rev-parse", "HEAD")
+        self.assertIsNone(self.look(), "the reconcile commit is the daemon's own")
+        self.assertIsNone(self.look())
+        self.assertEqual(self.git("rev-parse", "HEAD"), head, "no commit loop")
 
     def test_the_tick_looks_once_a_minute_per_project(self):
         self.daemon.tick_all()

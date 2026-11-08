@@ -486,6 +486,13 @@ class Daemon:
                               "runs/_reconcile.jsonl", "runs/_reconcile") if (path / p).exists()]
         return self._commit(slug, path, files, f"chore(runs): record {run_id}", f"the records of {run_id}")
 
+    def commit_reconcile(self, slug):
+        """Reconcile's ledger, its product check results, and the backlog closes it made
+        go in as one commit whose subject reconcile knows as its own."""
+        path = self.project_path(slug)
+        files = [p for p in ("runs/_reconcile.jsonl", "runs/_reconcile", "runs/_backlog.json") if (path / p).exists()]
+        return self._commit(slug, path, files, "chore(runs): reconcile", "the reconcile records")
+
     def _clean_up(self, engine):
         done = [e.line for e in engine.ledger.read() if e.line.get("event") == "cleaned_up"]
         if done and not done[-1].get("kept"):
@@ -496,10 +503,12 @@ class Daemon:
             sys.stderr.write(f"could not clean up {engine.run_id}: {exc}\n")
 
     def _commit(self, slug, path, files, message, what):
-        """Commit files that changed, and publish. True when nothing is left uncommitted."""
-        changed = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "-uall", "--", *files],
-                                 capture_output=True, text=True).stdout.strip() if files else ""
-        if not changed:
+        """Commit files that changed, and publish. True when nothing is left uncommitted.
+        Only the paths with a change are named to git, because a path git does not know,
+        such as an empty folder, fails the whole commit."""
+        files = [f for f in files if subprocess.run(["git", "-C", str(path), "status", "--porcelain", "-uall", "--", f],
+                                                    capture_output=True, text=True).stdout.strip()]
+        if not files:
             return True
         subprocess.run(["git", "-C", str(path), "add", "--", *files], capture_output=True)
         done = subprocess.run(["git", "-C", str(path), "-c", "user.name=Springer", "-c", "user.email=springer@local",

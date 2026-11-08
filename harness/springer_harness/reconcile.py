@@ -70,6 +70,7 @@ class Reconciler:
     def __init__(self, daemon):
         self.daemon = daemon
         self.last = {}
+        self.tips = {}
 
     def due(self, slug, now):
         return now - self.last.get(slug, 0) >= INTERVAL
@@ -85,6 +86,13 @@ class Reconciler:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a") as fh:
             fh.write(json.dumps(record) + "\n")
+
+    def _record(self, slug, record):
+        """Write one record and commit it, so the person's checkout and a release never
+        see the ledger as an uncommitted change. The commit is the daemon's own, so the
+        next look skips it and writes nothing."""
+        self._append(slug, record)
+        self.daemon.commit_reconcile(slug)
 
     # --- the look ---
 
@@ -109,13 +117,13 @@ class Reconciler:
         at = iso(now)
         if seen is None:
             record = {"at": at, "to": tip, "seed": True}
-            self._append(slug, record)
+            self._record(slug, record)
             return record
-        if seen == tip:
+        if tip in (seen, self.tips.get(slug)):
             return None
         if _git(project, "merge-base", "--is-ancestor", seen, tip).returncode:
             record = {"at": at, "from": seen, "to": tip, "rewritten": True}
-            self._append(slug, record)
+            self._record(slug, record)
             self.daemon.announce(f"{slug}: {branch} was rewritten, so reconcile starts again from {tip[:7]}.")
             return record
         own_prs = self._own_prs(slug)
@@ -126,13 +134,17 @@ class Reconciler:
                 continue
             number += 1
             changes.append(self._handle(slug, project, branch, commit, f"R-{number}", at))
+        if not changes:
+            # Only the daemon's own commits: remembered, not written, because a written
+            # line is a commit that moves the tip and would be looked at again.
+            self.tips[slug] = tip
+            return None
         record = {"at": at, "from": seen, "to": tip, "changes": changes}
-        self._append(slug, record)
-        if changes:
-            self.daemon.announce(self._digest(slug, branch, changes))
-            for change in changes:
-                if change["question"]:
-                    self.daemon.announce(self._question(slug, change))
+        self._record(slug, record)
+        self.daemon.announce(self._digest(slug, branch, changes))
+        for change in changes:
+            if change["question"]:
+                self.daemon.announce(self._question(slug, change))
         return record
 
     def _commits(self, project, seen, tip):
@@ -314,5 +326,5 @@ class Reconciler:
             answer["run_id"] = self.daemon.start_run(
                 slug, "build", lane="polish",
                 issue=f"Review the external change {who} by {change['author']}: {change['subject']}")
-        self._append(slug, {"at": iso(now), "answer": answer})
+        self._record(slug, {"at": iso(now), "answer": answer})
         return answer
