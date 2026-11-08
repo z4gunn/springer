@@ -315,8 +315,7 @@ class RunEngine:
         level = risk_for(result, self._spec(unit_id)["risk_baseline"])
         write_json(self.units.unit_dir(unit_id) / "risk.json",
                    {"level": level, "triggers": triggers(result.touched_paths), "findings": list(result.findings)})
-        if result.outcome != "pr" and self.worktrees.path(unit_id).exists() \
-                and not self.worktrees.own_commits(unit_id, self._base_for(unit_id)):
+        if self._lands_nothing(unit_id, result):
             # Nothing of its own to land. Its findings are in the run store, and a stacked
             # parent's code is that parent's change, never a second one.
             self.units.transition(unit_id, "done", "no change of its own")
@@ -359,16 +358,17 @@ class RunEngine:
         if not getattr(self.provider, "mechanical", False):
             return read_result(session_dir)
         record = self.sessions(unit_id).get(state["sessions"][-1])
-        gating = self._gating(unit_id)
+        said = read_result(session_dir)
+        gating = self._gating(unit_id, said)
         if gating:
             # The commands run on a thread, because the tick holds the daemon lock and a
             # product check can take minutes. None leaves the unit in checking.
-            said = read_result(session_dir)
             if said.status == "pass" and needs_gating(said):
                 verdict = self.gating_runs.poll((unit_id, state["sessions"][-1]), gating, session_dir,
                                                 self.worktrees.path(unit_id))
                 if verdict is None:
                     return None
+                self._record_product_checks(unit_id, gating, session_dir)
                 if verdict:
                     return CheckResult(status="fail", failure_class="defect", detail=verdict)
         result = mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path,
@@ -912,19 +912,47 @@ class RunEngine:
         self.units.transition(unit_id, "running", "claimed")
         self._spawn(unit_id, self.units.state(unit_id))
 
-    def _gating(self, unit_id):
+    def _gating(self, unit_id, result=None):
         """The plan's gating commands for the unit, then the project's checks, which run on
         every unit that changes code (lint and typecheck, say), whatever the plan named.
-        A review unit writes no code and gets none."""
+        A review unit writes no code and gets none, and neither does a unit whose result
+        shows it lands nothing of its own, such as an audit stacked on an open change."""
         spec = self._spec(unit_id)
         planned = [dict(g) for g in spec.get("gating_commands") or []]
-        if spec.get("review_of"):
+        if spec.get("review_of") or (result is not None and self._lands_nothing(unit_id, result)):
             return planned
         named = {g["command"].strip() for g in planned}
         checks = [{"name": f"project-check-{i}", "command": command, "kind": "check"}
                   for i, command in enumerate(self.settings().get("project_checks") or [], 1)
                   if command.strip() not in named]
         return planned + checks
+
+    def _lands_nothing(self, unit_id, result):
+        """True for a unit that is not a pull request and has no commits past its base."""
+        return result.outcome != "pr" and self.worktrees.path(unit_id).exists() \
+            and not self.worktrees.own_commits(unit_id, self._base_for(unit_id))
+
+    PRODUCT_RECORDED = ".product-recorded"
+
+    def _record_product_checks(self, unit_id, gating, session_dir):
+        """One product_check line per product command the gating run reached, so the
+        outcome figure counts the checks the harness runs, not only product-check.py.
+        A command after the first failure never ran and has no line. Once per run."""
+        check = Path(session_dir) / "check"
+        marker = check / self.PRODUCT_RECORDED
+        if marker.exists():
+            return
+        for command in gating:
+            if command.get("kind") != "product":
+                continue
+            receipt = read_json(check / "receipts" / f"{command['name']}.json")
+            if not isinstance(receipt, dict):
+                continue
+            self.ledger.append("product_check", unit_id=unit_id, cycle_id=self._spec(unit_id).get("cycle_id"),
+                               check_id=command["name"], result="pass" if receipt.get("result") == "pass" else "fail",
+                               duration_s=receipt.get("duration_s"), source="gating")
+        if check.is_dir():
+            marker.write_text("")
 
     def _spawn(self, unit_id, state, handoff_from=None):
         spec = self._spec(unit_id)

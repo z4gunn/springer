@@ -274,6 +274,32 @@ class GatingOffTheTickTest(EngineCase):
         history = [h["reason"] for h in restarted.units.state("U-0001")["history"] if h["state"] == "retry"]
         self.assertIn("failed with exit 4", history[0], "the half-written pass receipt was not taken")
 
+    def test_a_product_gating_command_counts_as_a_product_check(self):
+        """The reference run's product checks ran as gating commands, and the outcome
+        figure counted none of them, because only product-check.py wrote the line."""
+        engine = self.gated("python3 -c \"print('page ok')\"", kind="product")
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "checking")
+        self.wait_out(engine)
+        engine.tick()
+        lines = [e.line for e in engine.ledger.read() if e.line.get("event") == "product_check"]
+        self.assertEqual([(l["unit_id"], l["check_id"], l["result"], l["source"]) for l in lines],
+                         [("U-0001", "unit", "pass", "gating")], "one line, however many ticks read the verdict")
+
+    def test_a_unit_that_lands_nothing_skips_the_project_checks(self):
+        """An audit stacked on an open change ran the project's lint and typecheck on its
+        parent's code. It lands no commits, so only the plan's own commands apply."""
+        engine = self.gated("python3 -c \"print('Ran 1 test')\"")
+        engine.settings = lambda: {"ci_signal": "receipts", "project_checks": ["npm run check"]}
+        engine.tick()
+        audit = type("Said", (), {"outcome": "review"})()
+        engine.worktrees.own_commits = lambda unit_id, base: 0
+        self.assertEqual([g["name"] for g in engine._gating("U-0001", audit)], ["unit"])
+        engine.worktrees.own_commits = lambda unit_id, base: 2
+        self.assertEqual([g["name"] for g in engine._gating("U-0001", audit)], ["unit", "project-check-1"])
+        pr = type("Said", (), {"outcome": "pr"})()
+        engine.worktrees.own_commits = lambda unit_id, base: 0
+        self.assertEqual([g["name"] for g in engine._gating("U-0001", pr)], ["unit", "project-check-1"])
+
 
 class FailureTest(EngineCase):
     def test_defect_spends_retries_goes_one_tier_up_then_blocks_with_a_gate(self):
