@@ -392,7 +392,7 @@ class RunEngine:
         state = self.units.state(unit_id)
         spec = self._spec(unit_id)
         pr = state["pr"]
-        review_id = next_id("U", self.units.ids())
+        review_id = self.units.next_id()
         out = self.units.unit_dir(review_id) / "review" / "package.md"
         problem = review.cut_package(self.project_path, pr.get("base") or self.worktrees.default_branch(),
                                      pr["branch"], out, spec["declared_paths"]) if self._mechanical() else None
@@ -864,7 +864,7 @@ class RunEngine:
         routed = []
         new_keys = {}
         for draft in batch.units:
-            unit_id = next_id("U", self.units.ids() + list(new_keys.values()))
+            unit_id = next_id("U", self.units.folders() + list(new_keys.values()))
             new_keys[draft.key] = unit_id
             self.keys[draft.key] = unit_id
             spec = {"unit_id": unit_id, "cycle_id": cycle_id, "agent": draft.agent,

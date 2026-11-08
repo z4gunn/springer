@@ -52,6 +52,17 @@ class TransitionTest(EngineCase):
         self.assertEqual(engine.units.repair_from_ledger(), ["U-0001"])
         self.assertEqual(engine.units.state("U-0001")["state"], "ready")
 
+    def test_a_unit_half_created_is_not_listed_and_its_id_is_not_reused(self):
+        """The API's live stream read a unit's folder between its spec and its state, and
+        the run summary raised NotFound, which dropped the TUI's stream."""
+        engine = self.engine()
+        engine.units.create({"unit_id": "U-0001"})
+        (engine.units.unit_dir("U-0002")).mkdir()
+        (engine.units.unit_dir("U-0002") / "spec.json").write_text("{}")
+        self.assertEqual(engine.units.ids(), ["U-0001"])
+        self.assertEqual(engine.units.next_id(), "U-0003")
+        engine.project()
+
     def test_terminal_means_done_cancelled_or_exhausted(self):
         self.assertTrue(is_terminal({"state": "done", "retries_spent": 0}))
         self.assertTrue(is_terminal({"state": "blocked", "retries_spent": 3}))

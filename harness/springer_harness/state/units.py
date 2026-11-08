@@ -39,6 +39,12 @@ class UnitStore:
         self.now = now
 
     def ids(self):
+        """The units that exist, which is once their state is written. A reader that does
+        not hold the daemon lock, such as the API's live stream, can see a unit's folder
+        between its spec and its state."""
+        return [u for u in self.folders() if (self.root / u / "state.json").exists()]
+
+    def folders(self):
         if not self.root.is_dir():
             return []
         return sorted(p.name for p in self.root.iterdir() if p.is_dir())
@@ -47,7 +53,7 @@ class UnitStore:
         return self.root / unit_id
 
     def next_id(self):
-        return next_id("U", self.ids())
+        return next_id("U", self.folders())
 
     def create(self, spec):
         unit_id = spec["unit_id"]
