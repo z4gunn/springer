@@ -11,7 +11,7 @@ from pathlib import Path
 
 from helpers import REPO, load_script
 
-cl = load_script(REPO / ".claude" / "skills" / "spgr-write-page-copy" / "scripts" / "copy_lint.py")
+cl = load_script(REPO / "runtime" / "skills" / "spgr-write-page-copy" / "scripts" / "copy_lint.py")
 
 CLEAN = """# Expense reports that close on time
 

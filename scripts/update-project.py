@@ -2,7 +2,7 @@
 """Record and update the Springer runtime inside a project instance.
 
 A project instance carries a copy of the runtime (.claude/skills, agents,
-references, hooks, and schemas) plus three files rendered from templates
+references, hooks, and schemas, each from runtime/ in the checkout) plus three files rendered from templates
 (CLAUDE.md, .claude/settings.json, .gitignore). Until now a runtime change
 reached an instance by hand, with rsync and a manual merge of the templates.
 This script makes the copy an owned set: a manifest records every runtime
@@ -15,6 +15,7 @@ Usage:
     python3 scripts/update-project.py adopt <target> --profile <profile> [--force]
     python3 scripts/update-project.py update <target> [--dry-run] [--force]
     python3 scripts/update-project.py status <target>
+    python3 scripts/update-project.py set-profile <target> <profile>
 
 manifest  writes <target>/.claude/springer-manifest.json from the files now
           in the target. new-project.sh calls it after the initial copy.
@@ -28,6 +29,9 @@ update    brings the target up to this checkout. Per runtime file: added when
           hand merge. Refuses to touch a target with a live run lock unless
           --force, because a harness may be mid-tick.
 status    prints what update would do, same as update --dry-run.
+set-profile  records the profile a project's brief derives. The ruleset is re-stamped
+          only when the instance never edited it, and the manifest follows, so an
+          update does not read the change as a local edit.
 adopt     installs the runtime into an existing repository that was not made
           by new-project.sh. Never deletes or replaces a file the repository
           already has: a runtime path that already holds different content
@@ -49,7 +53,17 @@ import time
 from pathlib import Path
 
 SOURCE = Path(__file__).resolve().parents[1]
-RUNTIME_DIRS = (".claude/skills", ".claude/agents", ".claude/references", ".claude/hooks", "schemas")
+# Each runtime directory as (where it lives in a Springer checkout, where it
+# lands in an instance). Manifest keys and everything else that describes an
+# instance use the instance path, so the source layout never reaches one.
+RUNTIME_LAYOUT = (
+    ("runtime/skills", ".claude/skills"),
+    ("runtime/agents", ".claude/agents"),
+    ("runtime/references", ".claude/references"),
+    ("runtime/hooks", ".claude/hooks"),
+    ("runtime/schemas", "schemas"),
+)
+RUNTIME_DIRS = tuple(instance_rel for _, instance_rel in RUNTIME_LAYOUT)
 MANIFEST_REL = ".claude/springer-manifest.json"
 UPDATE_DIR_REL = ".claude/springer-update"
 PROFILES = ("brochure", "small", "saas", "mobile", "api")
@@ -73,19 +87,34 @@ def sha256_text(text):
     return "sha256:" + hashlib.sha256(text.encode()).hexdigest()
 
 
-def runtime_files(root):
-    """Every file under the runtime directories, as relative posix paths."""
+def _collect(base, key_prefix):
+    """Every runtime file under base, keyed under key_prefix."""
     out = {}
-    for rel_dir in RUNTIME_DIRS:
-        base = root / rel_dir
-        if not base.is_dir():
+    if not base.is_dir():
+        return out
+    for path in sorted(base.rglob("*")):
+        if not path.is_file():
             continue
-        for path in sorted(base.rglob("*")):
-            if not path.is_file():
-                continue
-            if any(part in SKIP_NAMES for part in path.parts) or path.suffix in SKIP_SUFFIXES:
-                continue
-            out[path.relative_to(root).as_posix()] = path
+        if any(part in SKIP_NAMES for part in path.parts) or path.suffix in SKIP_SUFFIXES:
+            continue
+        out[f"{key_prefix}/{path.relative_to(base).as_posix()}"] = path
+    return out
+
+
+def runtime_files(root):
+    """Every runtime file in an instance, keyed by its path in the instance."""
+    out = {}
+    for instance_rel in RUNTIME_DIRS:
+        out.update(_collect(root / instance_rel, instance_rel))
+    return out
+
+
+def source_runtime_files(source):
+    """Every runtime file in a Springer checkout, keyed by the path it takes in
+    an instance, so the result compares directly against runtime_files."""
+    out = {}
+    for source_rel, instance_rel in RUNTIME_LAYOUT:
+        out.update(_collect(source / source_rel, instance_rel))
     return out
 
 
@@ -203,7 +232,7 @@ def plan_update(target, source, manifest):
             "remove": [], "keep_modified_removed": [], "keep_instance_only": [],
             "template_replace": [], "template_unchanged": [], "template_merge": []}
     recorded = manifest.get("runtime", {})
-    src_files = runtime_files(source)
+    src_files = source_runtime_files(source)
     tgt_files = runtime_files(target)
     src_hashes = {rel: sha256(path) for rel, path in src_files.items()}
 
@@ -270,7 +299,7 @@ def prune_empty_dirs(target, directory):
 
 
 def apply_update(target, source, manifest, plan, force):
-    src_files = runtime_files(source)
+    src_files = source_runtime_files(source)
     for rel in plan["add"] + plan["replace"] + (plan["keep_modified"] if force else []):
         dest = target / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -328,7 +357,7 @@ def cmd_manifest(target, profile):
     # Adopting an instance that was synced by hand: anything that already
     # differs from this checkout is recorded as owned as it stands, so the
     # next update will replace it. Say so, so a local edit is not lost unseen.
-    src = {rel: sha256(path) for rel, path in runtime_files(SOURCE).items()}
+    src = {rel: sha256(path) for rel, path in source_runtime_files(SOURCE).items()}
     differing = sorted(rel for rel, h in manifest["runtime"].items() if rel in src and src[rel] != h)
     if differing:
         print(f"{len(differing)} runtime file(s) differ from this checkout and are recorded as "
@@ -381,7 +410,7 @@ def cmd_adopt(target, profile, force):
     if load_manifest(target) is not None:
         sys.stderr.write(f"{target} already has {MANIFEST_REL}. Use update instead.\n")
         return 1
-    src_files = runtime_files(SOURCE)
+    src_files = source_runtime_files(SOURCE)
     tgt_files = runtime_files(target)
     conflicts = sorted(rel for rel, path in src_files.items()
                        if rel in tgt_files and sha256(tgt_files[rel]) != sha256(path))
@@ -459,6 +488,20 @@ def cmd_adopt(target, profile, force):
     return 0
 
 
+def keep_ownership(new, previous, plan, force=False):
+    """A rebuilt manifest hashes every file now in the tree. An instance's edit must
+    stay an edit and a file the instance added must stay its own, or the next update
+    would overwrite the one and delete the other."""
+    recorded = previous.get("runtime", {})
+    if not force:
+        for rel in plan["keep_modified"] + plan["keep_modified_removed"]:
+            if rel in recorded:
+                new["runtime"][rel] = recorded[rel]
+    for rel in plan["keep_instance_only"]:
+        new["runtime"].pop(rel, None)
+    return new
+
+
 def cmd_update(target, dry_run, force):
     manifest = load_manifest(target)
     if manifest is None:
@@ -475,21 +518,51 @@ def cmd_update(target, dry_run, force):
     if dry_run:
         return 0
     apply_update(target, SOURCE, manifest, plan, force)
-    write_manifest(target, build_manifest(target, SOURCE, manifest.get("profile") or "saas", manifest))
+    write_manifest(target, keep_ownership(build_manifest(target, SOURCE, manifest.get("profile") or "saas", manifest),
+                                          manifest, plan, force))
     print(f"manifest refreshed at source {source_commit(SOURCE) or 'unknown'}")
+    return 0
+
+
+def cmd_set_profile(target, profile):
+    """Record the profile a brief derives. The ruleset an instance edited is left alone,
+    and reported, because it is theirs."""
+    manifest = load_manifest(target)
+    if manifest is None:
+        sys.stderr.write(f"{target} has no {MANIFEST_REL}\n")
+        return 1
+    if manifest.get("profile") == profile:
+        print(f"profile is already {profile}")
+        return 0
+    rel = manifest.get("claude_md") or "CLAUDE.md"
+    pristine = (target / rel).exists() and sha256(target / rel) == sha256_text(renders_for(SOURCE, manifest)[rel][1])
+    manifest["profile"] = profile
+    render = renders_for(SOURCE, manifest)[rel][1]
+    manifest["templates"][rel]["rendered_hash"] = sha256_text(render)
+    if pristine:
+        (target / rel).write_text(render)
+        print(f"profile set to {profile} in {rel}")
+    else:
+        print(f"profile set to {profile}. {rel} has local edits and was left as it is.")
+    write_manifest(target, manifest)
     return 0
 
 
 def main(argv):
     args = [a for a in argv[1:] if not a.startswith("--")]
     flags = [a for a in argv[1:] if a.startswith("--")]
-    if len(args) < 2 or args[0] not in ("manifest", "adopt", "update", "status"):
+    if len(args) < 2 or args[0] not in ("manifest", "adopt", "update", "status", "set-profile"):
         sys.stderr.write(__doc__)
         return 2
     target = Path(args[1]).resolve()
     if not target.is_dir():
         sys.stderr.write(f"no such directory: {target}\n")
         return 1
+    if args[0] == "set-profile":
+        if len(args) < 3 or args[2] not in PROFILES:
+            sys.stderr.write(f"set-profile needs one of {', '.join(PROFILES)}\n")
+            return 2
+        return cmd_set_profile(target, args[2])
     if args[0] in ("manifest", "adopt"):
         profile = None
         if "--profile" in argv:

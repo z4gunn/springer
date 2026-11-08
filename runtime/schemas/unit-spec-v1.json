@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/unit-spec-v1.json",
+  "title": "SPGR Unit Spec v1",
+  "description": "spec.json, the dispatch contract for one unit. Written once by the daemon. The scheduler computes disjointness from declared_paths.",
+  "type": "object",
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "unit_id",
+    "cycle_id",
+    "agent",
+    "role_prompt_ref",
+    "model_tier",
+    "brief",
+    "input_artifact_refs",
+    "expected_outcome",
+    "workstream",
+    "declared_paths",
+    "allowlist",
+    "mcp_config_ref",
+    "budget",
+    "risk_baseline",
+    "dependencies",
+    "executable_check"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "unit-spec"
+    },
+    "schema_version": {
+      "const": "v1"
+    },
+    "unit_id": {
+      "type": "string",
+      "pattern": "^U-[0-9]{4,}$"
+    },
+    "cycle_id": {
+      "type": "string",
+      "pattern": "^CYCLE-[0-9]{4,}$"
+    },
+    "agent": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Slug of the domain agent this unit runs."
+    },
+    "role_prompt_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path of the role prompt the provider loads."
+    },
+    "model_tier": {
+      "type": "string",
+      "enum": [
+        "haiku",
+        "sonnet",
+        "opus"
+      ]
+    },
+    "brief": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The compact context brief."
+    },
+    "input_artifact_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "expected_outcome": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What Check compares the result against."
+    },
+    "workstream": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "declared_paths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "The files the unit may touch. Empty for a unit that writes only to the run store."
+    },
+    "allowlist": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "The tool permissions the session runs under."
+    },
+    "mcp_config_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "budget": {
+      "type": "object",
+      "required": [
+        "tokens",
+        "wall_clock_seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_clock_seconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "risk_baseline": {
+      "type": "string",
+      "enum": [
+        "L0",
+        "L1",
+        "L2",
+        "L3"
+      ]
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^U-[0-9]{4,}$"
+      }
+    },
+    "executable_check": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "The command that proves the outcome. Null only for a unit whose outcome is an artifact validated by schema."
+    },
+    "gating_commands": {
+      "type": "array",
+      "description": "The commands the harness runs itself at the branch head when the session returns. Their receipts are the evidence the merge reads. A unit planned before this field existed has none, and its session's own receipts are verified instead.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "command",
+          "kind"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "test",
+              "check",
+              "product"
+            ]
+          },
+          "count_regex": {
+            "type": "string"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "story_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "The backlog items (story_id) the unit builds, named by the Plan step. The Backlog screen places each story by the state of its units."
+    },
+    "review_of": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^U-[0-9]{4,}$",
+      "description": "Set on a review unit the daemon opened: the unit whose PR it reviews. The review sits on that PR's head and its verdict decides whether the PR merges."
+    },
+    "review_session": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^S-[0-9]{4,}$",
+      "description": "Set on a review unit: the reviewed unit's session whose PR head it reviews. A retry starts a new session, which gets a new review."
+    }
+  },
+  "additionalProperties": false
+}

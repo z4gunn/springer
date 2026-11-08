@@ -6,7 +6,7 @@ model: inherit
 ---
 
 <!--
-GOLDEN TEMPLATE. Copy to .claude/agents/spgr-agent-<role>.md and fill in. Delete every comment before shipping.
+GOLDEN TEMPLATE. Copy to runtime/agents/spgr-agent-<role>.md and fill in. Delete every comment before shipping.
 RULES (see ../CLAUDE.md Build Standards): name + description required. ALWAYS declare tools (least privilege, omitting inherits all).
 Description framed for WHEN TO DELEGATE. The body below IS the system prompt (it replaces the default).
 TOOLS by role: review/audit → Read, Grep, Glob (+ Bash only to run linters/scanners). Developer → Read, Edit, Write, Bash, Grep, Glob.

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/session-v1.json",
+  "title": "SPGR Session v1",
+  "description": "usage.json plus the session record fields. A unit may run across more than one session, and a session may die without returning.",
+  "type": "object",
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "session_id",
+    "unit_id",
+    "provider",
+    "state",
+    "started_at"
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "session"
+    },
+    "schema_version": {
+      "const": "v1"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^S-[0-9]{4,}$"
+    },
+    "unit_id": {
+      "type": "string",
+      "pattern": "^U-[0-9]{4,}$"
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider_session_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pid": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "haiku",
+        "sonnet",
+        "opus"
+      ]
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "spawned",
+        "streaming",
+        "handoff",
+        "exited",
+        "killed",
+        "dead"
+      ]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "exit_code": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "return",
+        "handoff",
+        "killed",
+        "dead",
+        null
+      ]
+    },
+    "input_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "context_percent_at_exit": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "cost_usd_list_price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Computed at list price as information. Never a cap under subscription auth."
+    }
+  },
+  "additionalProperties": false
+}

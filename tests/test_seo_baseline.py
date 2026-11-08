@@ -13,7 +13,7 @@ from pathlib import Path
 
 from helpers import REPO, load_script
 
-sb = load_script(REPO / ".claude" / "skills" / "spgr-check-seo-baseline" / "scripts" / "seo_baseline.py")
+sb = load_script(REPO / "runtime" / "skills" / "spgr-check-seo-baseline" / "scripts" / "seo_baseline.py")
 
 TITLE = "Expense reporting for small finance teams, by Ledgerly"  # 54 characters
 DESCRIPTION = ("Ledgerly turns receipts into approved expense reports in one pass, with policy checks, "

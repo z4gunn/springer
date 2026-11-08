@@ -1,0 +1,966 @@
+# PDCA harness reference
+
+Policy for the harness daemon, which drives every run: the per-tick state machine, the
+rehydration algorithm, the scheduling rules, gate and
+escalation handling, the advisory-learnings mechanism, and the determinism
+scripts. The skill body holds the loop. This file holds the rules behind it.
+
+## Contents
+- Roles and the single delegation hop
+- Run profiles
+- Lanes
+- Modes
+- Reference implementation
+- Walking skeleton
+- The PDCA tick
+- Mechanical Check
+- Product check
+- Verdict and transition table
+- Rehydration: start equals resume
+- Parallel Do: disjoint scheduling
+- Token economy and dispatch efficiency
+- Dispatch contract
+- Main-session budget
+- Fold-in policy
+- Docs rendering policy
+- Vertical budget
+- Human gates
+- Autonomy levels
+- Decision classes and the defaults ledger
+- Intake question sweep
+- Direction review
+- Gates hold only dependent work
+- Gate batching and auto-merge
+- Escalations
+- Rule budget and the outcome figure
+- Self-improvement: advisory learnings
+- Determinism scripts
+- Increment status
+
+## Roles and the single delegation hop
+
+The harness runs in the main session and is the only writer of run state. Each
+tick it invokes the orchestrator agent for the routing decision and the routed
+domain agents for the work, both as sibling subagents. The orchestrator returns
+routing only and never invokes a domain agent. This keeps exactly one delegation
+hop, so Springer's rule that a subagent cannot spawn a subagent holds by
+construction. See ADR-002.
+
+## Run profiles
+
+A run declares a profile when it opens, on a `profile:` line in the problem
+statement and in `runs/<run-id>/run-brief.json`. The profile scales the
+lifecycle to the product. The reference case is a one-page brochure site with a
+written spec and a working prototype in hand that ran the full SaaS lifecycle:
+29 stories, 55 criteria, seven ADRs, 32 fold-ins, nine human gates, and thirty
+hours before the first visible content. Nothing in the harness said "small".
+
+| Profile | Fits | Phases routed | Stories | Architecture | Criteria | PR unit |
+|---------|------|---------------|---------|--------------|----------|---------|
+| brochure | static site, landing page, docs site, no backend | requirements, design, development | at most 10, one per visible section or behavior | one architecture note (stack, file layout, constraints), no ADR set | one sentence plus one check command each | one PR per page |
+| small | one service or app, one or two integrations, user accounts allowed, no tenancy and no billing | requirements, architecture, design, development | at most 25 | ADRs only for decisions a later change would regret | statement plus check | one PR per co-scheduled batch |
+| api | a headless service or product with no UI: a backend API, a webhook or integration service, a CLI, a library | requirements, architecture, development | at most 25 | ADRs only for decisions a later change would regret, plus the API design standards | statement plus check | one PR per co-scheduled batch |
+| saas | multi-tenant product with auth, billing, or an API surface | the full lifecycle | as scoped by the PM | full ADR set | full Given/When/Then sets | per story or batch |
+| mobile | store-distributed app | the full lifecycle plus the App Store vertical | as scoped | full ADR set | full sets | per story or batch |
+
+Choosing a profile is four questions, answered in order, and the first yes
+wins: is it distributed through an app store (`mobile`), does it charge
+money or serve more than one tenant (`saas`), does it have a user interface
+(`small`, or `brochure` when it also has no backend), otherwise `api`. User
+accounts alone do not make a run `saas`. A product that is both a store app
+and a multi-tenant service runs as `mobile` with the billing and tenancy
+verticals tagged, which the Architect does when the architecture names them.
+
+A `mobile` run may add a `size: small` line for a utility app with no
+backend of its own and no store commerce beyond a single purchase. It keeps
+the mobile phase set and the App Store vertical, and takes the `small`
+ceremony: at most 25 stories, ADRs only for regrettable decisions, statement
+plus check criteria, one PR per batch. `size` is ignored on every other
+profile. The size is recorded in the run brief `flags.size`.
+
+A problem statement with no `profile:` line, or one the table does not name,
+is not an error. The harness answers the four questions from the statement,
+opens the run on the profile they give, records the choice as a
+defaults-ledger line with the answers, and carries it to the first gate as a
+default-review decision. Under supervised it asks before opening instead.
+
+Rules the profile carries:
+- A phase outside the profile's set is not routed. Discovery runs on brochure
+  or small only when the human asks for it. Compliance scope on brochure is one
+  line in the requirements unit, not a consultation.
+- NFR consultations on brochure and small fold into the PM unit as a checklist.
+  A vertical is dispatched only when a later diff touches its surface.
+- `api` has no design phase. The Design, Accessibility, and i18n verticals
+  are never dispatched, the design-direction gate never fires, the direction
+  review carries the PRD and the architecture option only, and the API Design
+  and Documentation sign-offs take the place of the design handoff.
+- The definition of done on brochure is the CI check, which includes the SEO
+  baseline from spgr-check-seo-baseline run strict on every built page. No DoD
+  artifact is written.
+- The orchestrator reads the profile from the readiness snapshot and holds any
+  unit outside the profile's phase set. Changing the profile mid-run is a
+  scope-change gate.
+- The PM agent enforces the story and criteria caps at authoring time. A
+  backlog over the cap is merged or cut before the prd-approval gate.
+- Content sources are complete before the build. On brochure and small the
+  requirements unit lists every fact the spec cites (figures, dates, names,
+  URLs, tag lists) with its in-repo source under `docs/inputs/`. A document
+  the human supplies as a file becomes that source through
+  spgr-ingest-document, which records its provenance and extraction
+  confidence. A fact that
+  lives only outside the repository is an intake question put to the human at
+  the first gate, never a discovery a build unit makes. Under supervised the
+  orchestrator holds the build unit while any source is missing. Under standard
+  and autopilot an unanswered fact is built as a visible placeholder under the
+  defaults ledger, and the placeholder blocks the merge. See Decision classes
+  and the defaults ledger. In the reference
+  run the only findings left open after the page shipped were a date range, a
+  LinkedIn URL, and a tag list, each referenced by the spec and held only in a
+  private vault.
+
+## Lanes
+
+A profile scales a build from nothing. A lane says what kind of change the
+run makes. The run brief records it in `flags.lane`, from a `lane:` line in
+the problem statement. With no line, one question decides: does the product
+already run where a user can reach it? Yes opens `polish`, no opens `build`.
+The project CLAUDE.md names the default an unclear answer falls back to,
+`build` for a new instance and `polish` for an adopted repository, and the
+choice is a defaults-ledger line like an inferred profile.
+
+| Lane | Fits | Intake | Unit of work | Ceremony |
+|------|------|--------|--------------|----------|
+| build | a product that does not exist yet | the problem statement | the profile's phase set and stories | the profile's |
+| polish | a product that exists and is deployed: a gap a human saw, a port from a reference, a fix, a visible improvement | one issue in the human's own words, from `/springer polish` in Slack, `springer polish` in a terminal, or the statement | one PR per issue, or per batch of file-disjoint issues | code review, the verticals the diff touches under the vertical budget, and the product check |
+
+Under polish there is no PRD, story, criteria, test-plan, or ADR artifact.
+The dispatch brief carries the human's words, the files the implementer
+reads, the check command, and the product check the change must pass. The
+expected outcome in Plan is what the human will see, in one sentence. A
+polish change meets a blocking decision (the gate list in Decision classes)
+exactly as a build change does, and nothing else pauses it. A polish change
+that grows past one PR, or needs a decision on the gate list, is a
+scope-change question to the human, who may open a build run for it.
+
+The reference case: on a saas instance a one-rule CSS fix received eight
+acceptance criteria, and "show the candidate's name" became a compliance
+flag, an architecture checkpoint, and a three-version ADR for a regex rule
+that never ran on a real PDF. Under polish each is one PR checked by a real
+upload.
+
+## Modes
+
+A person reaches a project three ways, and the same product comes out of
+all three. Autopilot is the build lane: the brief, the architecture and
+design gates, and the daemon drives to the MVP. Claude Code is the polish
+lane from a terminal: `springer polish "<issue>"` starts one run on one
+issue in the person's words, and `springer tail <run>` follows it in the
+wording Slack and the TUI use, stopping at a gate with the gate's Slack
+link. Manual is the person's own editor, with or without an agent they
+invoke by hand, and the daemon sees the change only when it lands. Two
+rules keep the three in step.
+
+Git's default branch is the code truth. Every mode lands through a PR, or
+a commit the person makes themselves, and the daemon never shares a working
+tree with a person. On a GitHub-hosted project the daemon owns a clone in
+its home, and that clone is the run store root: records are committed and
+pushed from it, a session writes there by the absolute path in its brief,
+and the person's checkout holds committed records only. The daemon reads
+the brief from the person's checkout when it is newer there, read-only, and
+commits it as the first run record. A local-host project shares the
+checkout, because it is the single-machine mode. The run-harness skill
+never writes under `runs/` and never answers a gate. A hand-invoked agent
+is manual mode: no ledger, no review, no product check.
+
+The daemon is the record truth, and it reconciles. Once a minute it
+compares the default branch tip to the last line of `runs/_reconcile.jsonl`.
+A commit that is not its own, by identity or by a PR number in a run
+ledger, is an external change, grouped by PR. For each one it records the
+paths and the author, closes a story a `Closes` trailer names with source
+external and the PR number, attaches a hint to a not-done story whose
+units' declared paths the change overlaps, runs the product checks those
+paths touch once per batch and marks the close verified or unverified,
+restacks an in-flight unit the paths overlap, validates a hand-edited
+artifact and notes the doc it renders as stale, and posts one Slack line
+per batch. A change in a gate-list area (auth, data, money, infra, a vendor
+manifest, a destructive migration) asks in Slack at once: record a
+decision-log line on the ADR, not an architecture change, or open a polish
+run to review it. Reconcile never runs code review or a vertical on a
+person's change.
+
+The backlog is a project fact at `runs/_backlog.json`, committed with run
+records and shown for every run. A build run's PM artifact merges into it
+by id: new items append, a done item stays done, and a not-done item the
+artifact leaves out becomes deferred with a note. A polish issue is one
+TASK or BUG item under a Polish feature with a daemon-allocated id, which
+the run names so its unit carries the story. A story closes by its units,
+by a trailer, or by a person on the board, and the column rule is the
+closed record first, then the units, then ready. A polish asked while a run
+is active is offered as a bug on the board instead of refused.
+
+## Reference implementation
+
+A problem statement may carry a `reference:` line naming a repo path or URL
+to a POC, prototype, or earlier version of the product. The run brief
+records it in `flags.reference`. When a reference exists it is the spec,
+and the rules change in four places.
+- The PM unit's first output is a feature inventory of the reference: every
+  screen, action, field, and behavior a user can reach, read from its code,
+  one line each with the reference's own file paths. The backlog is
+  transcribed from the inventory, not re-derived from the problem. A
+  feature the backlog drops is a logged deferral the human sees at the
+  first gate.
+- Design directions start from the reference's look. The directions unit
+  reads its tokens, layout, and components before proposing, and one of the
+  directions is the reference carried forward. The human may pick another.
+- Parity is in the definition of done. A build is not complete while a line
+  of the inventory is absent from the product and not deferred by the
+  human. The product check covers the reference's primary flows.
+- A guard against copying the reference's name or brand never becomes a
+  guard against copying its product. The reference case carried a trademark
+  guard that the run read as "never propagate the POC", and four months
+  later the product had none of the POC's candidate card, contact links, or
+  resume view.
+
+## Walking skeleton
+
+On small, saas, and mobile the first build batch is a walking skeleton: the
+primary flow end to end, thin at every step, deployed to staging, with its
+product check passing. The orchestrator routes no other story into
+development until it has landed. Every later batch is ordered by the gap
+the product check and the human's use of the skeleton show, not by backlog
+position, and the orchestrator names the observed gap each unit closes.
+
+The backlog is a hierarchy: epic, feature, then story, task, or bug. A bug a
+check or QA finds joins the feature it breaks. After the skeleton the
+orchestrator finishes one feature, every item in it merged and its product
+check passing on the deployed result, before it starts the next, unless the
+WIP limit has room for both, and an epic is done when its features are.
+
+Once the skeleton has landed, the product exists, and every later story
+runs at polish ceremony: one implementing unit that writes the failing test
+and the product check itself, then review, the verticals the diff touches,
+and the product check. The QA acceptance-test unit and the pre-build
+consultations run only for a story that touches a gate-list surface (the
+data model or tenancy boundary, auth, billing, a vendor, anything
+irreversible), which keeps the profile's ceremony.
+
+The reference case built the auth, tenancy, encryption, billing, and audit
+surfaces in full across four months before a recruiter could see a name on
+the leaderboard. The skeleton for that product is sign up, upload, score,
+list, in one PR.
+
+## The PDCA tick
+
+Each tick runs four phases in order.
+
+1. Plan. Run `derive-ready-queue.py` for the deterministic readiness snapshot
+   (open gates, open escalations, confirmed-artifact inventory, latest phase,
+   blocked flag). Pass the snapshot and the open escalations to the orchestrator.
+   The orchestrator returns a routed batch (one unit in the sequential spine,
+   several within WIP limits once parallel Do is enabled), each unit carrying the
+   agent, its input artifact refs, and the expected outcome.
+2. Do. Dispatch each routed unit to its domain agent. The agent reads its inputs
+   and writes its artifact to the store. Agents return or write artifacts only.
+   They never touch run state.
+3. Check. Validate every produced artifact with spgr-validate-artifact. Fan out
+   the always-active vertical audits read-only and in parallel. Compare the
+   actual outcome against the expected outcome from Plan. Reduce to one verdict.
+4. Act. Persist the transition: append one immutable pdca-cycle artifact, then
+   refresh the projection with `rebuild-projection.py`, then version or archive
+   any artifact that a transition supersedes. Carry out the transition the
+   verdict implies, then loop back to Plan or terminate.
+
+## Mechanical Check
+
+Check is mechanical first. It runs `schemas/validate.py` on every produced
+artifact, `receipt.py verify` on the unit's receipts, and reads CI on the PR
+head. The main session never re-runs an agent's verification by hand or
+re-reads a claim a script covers, and a claim no receipt or CI job backs is
+unverified. When a code-review artifact carries a
+`cannot_verify` list, Check runs each named command and folds the result into
+the verdict, so a check the reviewer could not run from the package is
+answered by execution rather than by the implementer's word. The reviewer's
+`declined_to_judge` list is carried into the cycle record unchanged.
+
+A model-based audit is dispatched only when the diff touches a vertical's
+declared surface: UI markup or styles for Accessibility, dependencies, headers,
+or data handling for Security, a schema or a query for Performance. A change
+that touches only `runs/`, `docs/`, or the run's own ledgers is never sent to
+the Code Reviewer and never audited. Its check is validate plus a diff summary.
+On brochure and small the Code Reviewer carries the Accessibility checklist
+in its own pass rather than a separate audit being dispatched, because the two
+overlapped on the same defects in the reference run. Accessibility is
+dispatched separately only for a re-check by execution after a fix.
+
+Review is bounded to one review pass and one re-review. A second
+REQUEST_CHANGES routes the open findings to the human at the pr-merge gate as a
+list. The bound exists because one docs-regeneration chore in the reference
+case received three REQUEST_CHANGES passes, 45 findings, and five hours. The
+bound controls the cost of a review. The pre-report gate in the Code Reviewer
+agent controls its precision: a finding names its line, its failing input, and
+the rule it violates, a blocking finding carries evidence the code-review
+schema requires, and a known class of false findings is never raised. Under
+auto-merge the reviewer's verdict is the last gate, so both bounds matter.
+
+## Product check
+
+Validation says an artifact matches its schema. A test suite says the code
+matches its tests. Neither says the product does what the human asked. The
+product check does: `scripts/product-check.py <run-dir> --touches <changed
+paths>` runs the project's own checks from `runs/_product-check.json`, each
+a command that drives the real product on real inputs (the fixtures under
+`tests/fixtures/real/`, the deployed staging host, the human's own sample
+files) and exits 0 when a human would see the promised outcome. It records
+every result under `runs/<run-id>/product-checks/` and as `product_check`
+events, which feed the dashboard's outcome figure, and with `--unit` writes
+the unit a `product` receipt, `zero-run` when no check watches its paths.
+
+- Check runs it for every unit whose diff touches UI, a pipeline, or
+  user-visible data. The cycle record carries the result in
+  `check.product_check`. Such a unit's receipts are verified with
+  `--require product`, so a unit with no product check does not reach a
+  pr-merge gate.
+- The expected outcome in Plan for such a unit is what a human sees, in one
+  sentence, and the check that proves it is named in the dispatch brief. A
+  unit that cannot name its check names the fixture it is missing, and
+  adding the fixture is part of the unit.
+- Real fixtures, not synthetic ones. A fixture written by the agent that
+  wrote the rule tests the rule's idea of the input. The project keeps a
+  small set of real, anonymized inputs under `tests/fixtures/real/`, and
+  the human's own sample files are the first ones in it.
+- On a build run the QA unit writes the first checks with the test plan,
+  one per primary flow, and the implementing unit of a later story adds the
+  check its story needs. On polish the implementing unit adds or extends
+  the check in the same PR.
+- The product check is the definition of done for a user-visible story.
+  Validation, a green suite, and a reviewer APPROVE are the merge bar. The
+  story is done when its product check passes on the deployed result.
+
+The reference case: a name-derivation rule passed its unit tests through
+three ADR amendments and never produced a name on staging, because every
+fixture was a synthetic header and the real PDF path flattened each page
+into one line. Nobody uploaded a real resume until the human did.
+
+## Verdict and transition table
+
+The Check verdict selects the Act transition.
+
+| Verdict | Meaning | Act transition |
+|---------|---------|----------------|
+| pass | validation clean, audits PASS, outcome matched | advance, then loop |
+| fail | validation failed or outcome mismatch | retry: route a fix, loop |
+| gate | a human checkpoint is required | pause: write the checkpoint, terminate |
+| blocked | an open escalation needs routing | escalate: route per the rules, loop or pause |
+
+A complete transition is recorded when the orchestrator reports no further work
+in any phase, which ends the run and triggers the retrospective.
+
+An audit that returns GATE, or any open Critical or High finding, is a hard stop.
+Act must route it and must never advance past it.
+
+## Rehydration: start equals resume
+
+The harness never blocks waiting on a human. It terminates at a gate and is
+re-invoked later. Every entry, whether a fresh start or a resume, begins the same
+way, so crash recovery and resume share one path. See ADR-003.
+
+On entry:
+1. Run `derive-ready-queue.py` to read the current store.
+2. If a gate in `answered_gates` has a response, stamp that hil-checkpoint
+   resumed, consume the response, and route its held batch.
+3. If the snapshot is blocked by a gate holding all work, exit immediately
+   doing no work. A gate that holds only some work does not stop the loop.
+   See Gates hold only dependent work.
+4. Otherwise resume the loop at Plan from the latest cycle's next phase. The
+   loop exits waiting on a human only when the orchestrator returns an empty
+   batch while a gate is open.
+
+The held batch lives in the checkpoint's `held_batch` field, or in the paused
+pdca-cycle artifact for a gate that holds all work, never in checkpoint prose,
+so resume is deterministic.
+
+## Parallel Do: disjoint scheduling
+
+The daemon runs units concurrently, each in its own session and worktree, and it is the
+only writer of run state. Cycles may overlap: it plans a new cycle whenever the ready
+queue is empty and WIP and usage-window room exist, and it knows from each unit's
+declared paths which units can run together. A cycle closes when every unit it routed is
+terminal, and a new one does not wait for it. See `state-model.md`.
+
+Two rules keep a parallel batch safe.
+- Disjoint work only. Co-scheduled units must be file-disjoint. If two units
+  would edit the same file, the orchestrator serializes them instead.
+- WIP limits are hard. The scheduler enforces them at dispatch. Never exceed a limit to
+  make progress. Queue the excess. An L2 hold does not count against dispatch, because
+  a hold stops the merge and never the agent.
+
+The read-only audit fan-out in Check parallelizes with zero contention and is the
+low-risk half of parallelism.
+
+Co-scheduled build units run in separate git worktrees. File-disjoint is not
+checkout-disjoint: two units in one working tree that each run `git checkout
+-b` on their own branch switch the tree out from under each other, and one
+unit's commit carries the other's half-written files. spgr-create-branch in
+worktree mode gives each unit `.worktrees/<branch>/`, a linked worktree on its
+own branch cut from the protected base, and the dispatch prompt names that
+path as the unit's working directory. Every command in the unit runs there.
+The run store stays in the daemon's checkout (see Modes). A unit writes its
+artifacts to that checkout's `runs/<run-id>/` by the absolute path the prompt
+carries, never to the copy under its own worktree, so there is still one
+store and one writer. A linked worktree carries no ignored files (`node_modules`, `.venv`,
+build output), so the unit installs dependencies the way CI does and runs its
+scoped baseline tests before it writes code. At Act, after spgr-create-pr has
+opened the unit's PR, the harness removes the worktree with `git worktree
+remove .worktrees/<branch>` and keeps the branch. A removal git refuses is
+left in place and reported, never forced.
+
+The run is single-writer. The daemon holds `runs/<run-id>/.lock` with a `daemon:` id and
+refreshes it at every tick. A session that finds a live lock it does not hold leaves the
+run alone. A lock not refreshed for thirty minutes is stale and is taken over.
+
+## Token economy and dispatch efficiency
+
+Session limits are account-wide and rolling, so every subagent's spend counts
+against the main session's window. In the reference case a +18/-6 fix cost
+322k tokens because resuming the implementation agent re-paid its ~300k
+transcript first. These rules keep a run inside its window without lowering
+the quality bar.
+
+1. Fresh-by-default for bounded fixes. A bounded fix or follow-up dispatches a
+   NEW agent carrying a tight prompt, the finding text, and artifact refs.
+   Resume an existing agent only when its accumulated context is itself the
+   input: the orchestrator across Plans, or an interrupted unit with
+   substantial un-persisted work in its own transcript. Never resume a
+   heavy-transcript agent for light work.
+2. Story context brief. At Act, when a story's operative contract or rulings
+   changed that cycle, the harness refreshes a compact brief at
+   `runs/<run-id>/artifacts/story-brief-<story-id>.json`: operative artifact
+   refs, pinned strings and rulings, open conditions, and merge-bar state, held
+   to a few thousand tokens. Dispatched units read the brief first and open a
+   full artifact only for a section the brief cites. A unit that must find
+   an artifact the brief does not cite opens spgr-read-artifact in `index`
+   mode (one header line per artifact) and fetches by id, never the corpus. The brief is a projection
+   like run-state: derived, regenerable, never the source of truth. Its
+   contract is `schemas/story-brief-v1.json`.
+3. Scoped verification inside units. A unit runs the named test files its work
+   touches with filtered output, and single-workspace typechecks when the diff
+   is contained. Whole-suite, all-workspace proof belongs to CI at the publish
+   step, not to every unit locally.
+4. Effort and model tiering. Mechanical units (seed folds, doc renders, chore
+   commits, artifact transcription) dispatch at reduced effort on a smaller
+   model. Full effort is reserved for design, implementation, adversarial
+   review, and vertical sign-off, where the depth has repeatedly paid for
+   itself. The dispatch-tier table below is the operative assignment.
+5. Recovery from a session-limit death is the transient class in Failure
+   classes. When limits recur within a run, serialize the heavy units across
+   ticks rather than stacking them in one parallel batch.
+6. Artifact diet. A producing agent writes what downstream consumers need and
+   links the rest by reference. Folded-in history belongs to the archived prior
+   version, not the operative artifact. An operative artifact is capped at
+   roughly 30k tokens. Fixtures, coverage gates, and check design live in the
+   test suite and the check script, not in the criteria artifact. A producing
+   agent that would exceed the cap splits the artifact or links by reference.
+   The reference case let a criteria artifact grow to 45k tokens over seven
+   versions, three criteria of which described a checker in more detail than
+   the checker's own source.
+7. Run brief. `runs/<run-id>/run-brief.json` holds the profile, the run flags,
+   the pinned human rulings as one line each, and the operative artifact list
+   with versions, held to a few thousand tokens. The harness refreshes it at
+   Act whenever a ruling lands or an artifact is versioned. Rehydration reads
+   the run brief and the story brief, not the corpus. Its contract is
+   `schemas/run-brief-v1.json`.
+
+### Dispatch tiers
+
+A skill carries no model of its own. It runs at the tier of whatever invokes
+it, so a skill the harness opens inline runs at the main-session model, the most
+expensive tier. Assign every unit to a tier before dispatch. The Agent tool
+takes a `model` override per dispatch, so a mechanical unit goes to haiku even
+when the skill it uses is one an opus-pinned agent normally runs. A mechanical
+unit is fresh every time under rule 1 and never inherits a transcript.
+
+| Tier | Runs as | Units |
+|------|---------|-------|
+| Deterministic | Bash, no model | `schemas/validate.py`, `rebuild-projection.py`, `derive-ready-queue.py`, `pin-learnings.py`, `capture-comps.py` (the comp and PR screenshot matrix plus the slop detector), `review-package.py`, `receipt.py`, `floor_guard.py` (the diff-scoped scan for a lowered quality bar) |
+| Mechanical | haiku subagent, fresh each time | spgr-version-artifact, spgr-archive-artifact, spgr-render-doc, story-brief refresh, spgr-write-bug-report from a captured failure, spgr-create-pr from a finished branch, chore commits, artifact transcription |
+| Pinned agent | the agent's own `model` | every domain-agent unit at full effort: design including the comp critique, implementation, adversarial review, vertical sign-off |
+| Inline main session | the session model, kept minimal | orchestrator dispatch, the Check comparison of expected versus actual, the verdict and transition, spgr-notify-human, run-state writes |
+
+## Dispatch contract
+
+Every dispatch prompt is `assets/dispatch-preamble.md` (relative to the
+spgr-run-harness skill) pasted byte for byte, then one line naming the
+unit's brief. The preamble is the unit-facing contract: read order, binding
+rulings, receipts for every gating command, no edits to check config, the
+defaults ledger, the unit result file, and the fifteen-line return. Every fact that
+changes between dispatches (run id, cycle, unit directory, gate state,
+autonomy, rulings, interfaces) lives in the brief, never in the preamble,
+so dispatches of one agent share a cached prompt prefix. A claim with no
+receipt is unverified, and Check reads receipts with `receipt.py verify`,
+never the result file's prose, so a receipt for another commit or a moved tree
+is stale. In a daemon run the harness runs the gating commands a unit's spec
+names itself, through `receipt.py run`, at the branch head after the session
+returns, so those receipts are always for the commit the merge takes and a
+session's own receipts are not evidence.
+
+The contract travels in files, not in the prompt and not in the return value,
+so neither the task text nor the diff transits the main session.
+
+- The brief, `runs/<run-id>/dispatch/<cycle-id>/<unit-id>/brief.md`: one
+  line of context, the files to read in order, the binding rulings, the
+  interfaces consumed and produced with exact names and signatures, the
+  gating commands, the working directory, the run-store path, and the unit
+  directory. A unit reads its brief, never the whole plan or the corpus.
+- The return and the result. The harness saves the return as `return.txt`
+  in the unit directory, reads its status, and opens `result.md` only for a
+  section Check needs. The name is not `report.md`, because Claude Code
+  refuses a subagent's write to a file named like a report. A `BLOCKED` or
+  `NEEDS_CONTEXT` return routes as an escalation.
+- The review package. Before a review unit the harness runs
+  `scripts/review-package.py <base> <head> --out <dir>/review.md`, which
+  refuses a head that does not descend from the base and writes the commit
+  list, the stat, and the diff with ten lines of context under a header that
+  records both SHAs and whether the tree was dirty. Pass the story's touch
+  paths with `--touch-paths`. The package opens with the gate-integrity
+  tags (removed or skipped tests, lost assertions, check-config and
+  suppression changes, edited fixtures or snapshots, out-of-scope files,
+  source before its test), and the reviewer gives each a disposition in the
+  code-review `gate_tags` list, which `review-package.py dispositions`
+  checks before the verdict counts. The reviewer reads the brief, the
+  report, and the package. The main session never reads the diff.
+  The reviewer prompt never caps a severity, excludes an area, or says what
+  not to flag. Pre-judging a finding is the harness grading the work itself,
+  and the reviewer is told to ignore such a sentence and note it.
+
+The `dispatch/` directory is run-store history like the cycle log. The
+store-reading scripts do not scan it, and it is never an artifact.
+
+### Failure classes
+
+A failed unit is classified before it is retried, with
+`scripts/classify-failure.py <unit-dir> --run-dir <run-dir>` over the saved
+return text (`return.txt`), the result file, and the receipts, and the cycle
+record carries the class in `check.failures`. A `transient` platform failure
+is redispatched unchanged after a pause, and three in a row on one unit pause
+the run. A `context` overflow is split or given a narrower brief. A `blocked`
+return routes as an escalation. An `environment` failure runs preflight and
+fixes the tool or asks the human. None of these spends a retry. Only a
+`defect`, including a failed or zero-run receipt, enters the fix loop below.
+
+### Bounded fix loop
+
+Review is one pass and one re-review, and a defect gets two bounded retries.
+Those counts stay. The loop inside them has a fixed shape.
+
+1. A fix dispatch carries the finding text verbatim, the lines it names, and
+   the brief. The first retry goes to a fresh agent at the unit's tier. The
+   second retry goes to a fresh agent one tier up (sonnet to opus) with the
+   statement that a prior implementer attempted the fix once and the new
+   agent owns it now. A heavy-transcript agent is never resumed for a fix.
+2. The re-review is scoped. It receives the prior findings and a review
+   package cut from the fix commit, verdicts each prior finding `ADDRESSED`
+   or `NOT ADDRESSED`, and raises a new finding only for breakage the fix
+   diff introduced. It never re-reviews the whole PR.
+3. At the bound the harness adjudicates each open finding rather than looping
+   again. A P0 or P1 goes to the human at the gate as a list, as before. A P2
+   or P3 under standard or autopilot is parked as one defaults-ledger line
+   carrying the finding, the ruling, and the cost if the ruling is wrong, and
+   is reviewed at the next gate with the other defaults. Under supervised
+   every open finding goes to the human.
+4. A finding the reviewer could not verify from the package (`cannot verify
+   from diff`) is the harness's to resolve by running the named check, never
+   the implementer's to argue away and never silently dropped.
+
+## Main-session budget
+
+The harness daemon drives every run, so a main session in an instance does not
+dispatch or write run state. It answers the person, edits by hand when asked,
+and stays small. The `session-usage.py` hook is the sensor. It writes the main
+session's context and tokens to `runs/_dashboard/sessions/<session-id>.json`,
+and at 60 percent of the window it advises ending at the next clean point, at
+80 percent finishing the current task and stopping. It never blocks.
+
+The instance settings from `templates/project-settings.json` carry the
+allowlist for the commands a session runs (validate, the harness scripts by
+name, the project verification scripts, git, and the gh pr commands) and a
+denylist for the destructive git forms. The daemon passes the same lists to
+each headless session as flags, so an unlisted command is refused, never
+prompted.
+
+## Fold-in policy
+
+A fold-in is a correction to a confirmed artifact found downstream. It is one
+line in `runs/<run-id>/pending-foldins.md`: id, target artifact, the change in
+one sentence, and the story or gate that consumes it. It is applied by a haiku
+unit in the same cycle it opens, or moved to a `deferred` list. A fold-in is
+opened only when it changes shipped bytes or a criterion the next build unit
+owns.
+
+Not fold-ins: confidence markers, checksums, stale prose in an artifact nothing
+reads next, doc fidelity, and any finding about the harness itself. Those are
+one batched hygiene pass at a human gate, or skipped. A fold-in never has
+another fold-in as its subject. A retraction is one line appended to the
+original. In the reference case 30 of 32 fold-ins concerned artifacts, docs, or
+the harness, one retracted another, one amended another's remedy, and the
+93 KB ledger outgrew everything the site will ever ship.
+
+## Docs rendering policy
+
+`docs/` is a review copy rendered at a human gate for the artifacts that gate
+reads, and only then. It is not refreshed on every artifact edit, and its
+fidelity is not audited beyond the render skill's own validation step. A human
+who wants a current copy of an artifact between gates asks for spgr-render-doc.
+A doc that is stale between gates is expected and says so in its header. The
+reference case spent one session of six regenerating and policing the mirror.
+
+## Vertical budget
+
+Verticals are consulted by diff and budgeted by PR. They are advisory by
+default and block only inside their own gate.
+- Routing is by path. The project CLAUDE.md carries a path-to-vertical table
+  (for example the database package and migrations to Multi-tenancy and
+  Performance, the auth module to Auth and Security, the web package to
+  Accessibility). A vertical whose paths the diff does not touch is not
+  dispatched, and there is no scheduled sweep inside a story's cycle.
+- At most two vertical units per PR, chosen by the orchestrator from the
+  paths touched, Security first when a path on its list is touched. A third
+  concern is a follow-up issue on the board, not a unit.
+- A vertical finding blocks merge only when it is Critical in that
+  vertical's own domain: a cross-tenant read, a secret in the diff, a
+  Critical WCAG A failure on a core flow, a query that cannot complete.
+  Every other finding is a follow-up issue naming the vertical, and the PR
+  merges.
+- Pre-build consultation stays for the three classes where a late finding
+  cost a retry in the test-bed run: UI error and retry paths
+  (Accessibility), cascade or foreign-key delete paths (Performance,
+  Multi-tenancy), and pagination (API Design, Performance). The orchestrator
+  routes those consultations in the batch ahead of the build unit and the
+  handoff carries the folded conditions. They count toward the two.
+
+The reference case: in a saas run the six vertical agents took 247 of 585
+dispatches and the frontend developer 24, and the product surface was the
+thinnest part of the result.
+
+## Human gates
+
+The gate types are fixed by the checkpoint schema: direction-review,
+architecture-options-selection, architecture-confirmation, prd-approval,
+design-direction-selection, pr-merge, security-compliance-flag, and
+scope-change. The run's autonomy level decides which of them fire and which
+are combined into one sitting. Inventing a gate outside this set violates
+minimal-human-in-the-loop. At a gate the harness writes the hil-checkpoint with
+pipeline_status paused, its `holds`, and its `held_batch`, fires
+spgr-notify-human, and keeps running any work the gate does not hold.
+
+Every gate that fires also carries the open lines of the defaults ledger as
+default-review decisions, so reviewing defaults never costs a sitting of its
+own.
+
+## Autonomy levels
+
+A run declares its autonomy in the run brief `flags.autonomy`. The level sets
+how many times the human is interrupted. It never changes who decides: the
+human always selects the architecture option and the design direction, and
+always rules on a security or compliance flag.
+
+| Gate | supervised | standard | autopilot |
+|------|------------|----------|-----------|
+| intake questions and PRD approval | prd-approval, its own sitting | inside direction-review | inside direction-review |
+| architecture option | architecture-options-selection | inside direction-review | inside direction-review |
+| architecture confirmation | architecture-confirmation | none, selection confirms | none, selection confirms |
+| design direction | design-direction-selection | inside direction-review | inside direction-review |
+| pr-merge | per PR unit | per PR unit, or by risk when `auto_merge_on_green` | by risk: low and medium merge, high gates |
+| security-compliance-flag | blocks | blocks | blocks |
+| scope-change | blocks | blocks beyond the profile cap or on a profile change, a default within the cap | same as standard |
+| deferrable decisions | each ruled in-cycle by the specialist, a human-constraint change escalates | defaults ledger, reviewed at the next gate that fires | defaults ledger, reviewed in the completion notice |
+
+Default: standard on every profile, because the blocking classes below
+hold at every level and supervised only multiplies the sittings. supervised
+is opt-in, and autopilot is allowed on every profile. Changing the level
+mid-run is a human instruction recorded as a pinned ruling, not a gate.
+
+Under standard and autopilot, the architecture downstream set is confirmed
+without a second sitting when it validates and every routed gate vertical
+(Auth, Security, Compliance) signs off. A vertical that cannot sign off fires
+the security-compliance-flag gate, which blocks at every level.
+
+## Decision classes and the defaults ledger
+
+Every decision a unit meets is one of two classes.
+
+Blocking, at every level:
+- the architecture option and the design direction
+- a Critical or High security or compliance finding
+- a change to a stated human constraint, to the profile, or to scope beyond
+  the profile's story cap
+- anything that spends money, creates an external account or credential, or
+  takes an irreversible external action (a store submission, a DNS change, a
+  data deletion, mail to real users)
+
+Deferrable: every other decision that is reversible within the profile and the
+approved architecture, for example copy wording, a heading or section owner,
+file layout, test-tier placement, a tooling choice inside the hard rules, and
+a content fact the human has not supplied.
+
+An architecture decision is blocking only when it is on the gate list: the
+data model and the tenancy boundary, the auth model, billing, a vendor or
+sub-processor, and anything irreversible. Every other ADR clause is
+amendable by the implementing unit: a derivation rule, a prompt, a layout, a
+library inside the approved stack, an extraction path. The unit records the
+amendment as one decision-log line on the ADR carrying the PR number and the
+reason, the PR description repeats it, and the reviewer checks that the line
+exists. No versioned ADR, no escalation, no gate. In the reference case a
+name-derivation regex went through ADR amendments v1.1, v1.2, and v1.3, each
+a human sitting, each a rule a PR note could have carried.
+
+Under standard and autopilot a unit meets a deferrable decision by taking the
+recommended option, recording it, and continuing. It never raises an
+escalation for it and never pauses. The unit report lists each default taken
+as one line, and the harness appends it at Act to
+`runs/<run-id>/pending-defaults.md`:
+
+```
+- DEF-007 | decision | default taken | alternative | cost to reverse | artifact or file | open
+```
+
+A default is not an assumption filled in silently. It is named, visible,
+recorded, and reviewed. A missing fact is never invented. Its default is a
+visible placeholder marked `TODO(DEF-<n>)` in the built output, and a
+placeholder blocks auto-merge, so a PR carrying one goes to a human pr-merge
+gate that lists it.
+
+At the next gate that fires, spgr-notify-human puts every open line in front
+of the human as a numbered default-review list. The human accepts all or
+overturns by number. An accepted line is marked accepted. An overturned line
+becomes a fold-in carrying the human's words and is applied in the next cycle.
+Under autopilot the list goes out in the completion notice instead, and an
+overturn is a new run input.
+
+Under supervised a deferrable decision is ruled in-cycle by the routed
+specialist, as the Escalations section describes, and no ledger is kept.
+
+## Intake question sweep
+
+The human's facts, assets, and preferences are asked for once, at the first
+gate, not discovered one at a time across the run. When the PM unit writes the
+PRD it also sweeps the spec, the stories, and the downstream phases for
+everything the run will need from the human: content facts, brand assets,
+links, domain and deploy target, account access, tone, and any preference a
+later unit would otherwise escalate. Each goes into the PRD `open_questions`
+with a `recommended_default`, a `blocking` flag set per the decision classes,
+and the story or phase that consumes it. The gate renders them as question
+decisions, so "accept defaults" answers every non-blocking question in one
+line. A blocking question left unanswered holds only its consumer.
+
+In the reference run twenty-three human decisions landed across three days.
+Eight of them were facts and small picks (the tagline, a years figure, the
+photo, two links, an h2 owner, the script language twice) that a day-one sweep
+or a logged default settles without a sitting of its own.
+
+## Direction review
+
+Under standard and autopilot the PRD approval, the intake questions, the
+architecture option, and the design direction are one sitting. When the PM
+unit validates, the orchestrator routes the architecture-options unit, the
+design-directions unit, and a buildability-check unit in the same batch, all
+reading the PRD and backlog at proposed status. The buildability check is
+the developer who will build first reading the requirements cold with
+spgr-check-buildability: its `minor` questions become defaults-ledger lines,
+its `human` questions join the gate, and its `answered` ones go nowhere.
+When all three return, the harness fires one direction-review checkpoint
+whose decisions list carries every question, the PRD approval, the
+architecture options, the design directions, and any open defaults. It holds
+all work past requirements until answered. Under supervised the check runs
+before prd-approval, and on the polish lane it does not run.
+
+On the response, the PRD and backlog are confirmed with the human's edits, the
+selected option and direction are recorded, and both downstream sets start in
+one batch. When the response edits the PRD in a way that invalidates an
+option or a direction, the invalidated unit is re-routed once against the
+confirmed PRD and its choice comes back as a follow-up decision at the next
+gate that fires, not as a new sitting of its own.
+
+## Gates hold only dependent work
+
+An open gate names what it holds in its `holds` field: phase names, story or
+artifact ids, or all. Everything outside the list keeps running while the
+human is away. `derive-ready-queue.py` sets blocked only for a gate that holds
+all, reports the rest in `held`, and the orchestrator routes around them.
+
+| Gate | holds |
+|------|-------|
+| direction-review, prd-approval | all phases past requirements |
+| architecture-options-selection | architecture, development |
+| architecture-confirmation | development |
+| design-direction-selection | design, and the development of UI stories |
+| pr-merge | the stories in the PR, and any unit that edits a file the PR edits |
+| security-compliance-flag | the flagged story or artifact |
+| scope-change | all |
+
+While a pr-merge gate is open the next file-disjoint batch builds on its own
+branch, in its own worktree, from the protected base, so the human merging one PR never idles the
+build of the next. Work that runs past an open gate never merges past it, and
+never consumes an artifact the gate may change.
+
+The loop exits waiting on a human only when the orchestrator returns an empty
+batch while a gate is open. In the reference run there was no agent activity
+for about 55 of the run's 70 hours, because every open gate stopped all work.
+
+## Gate batching and auto-merge
+
+The pr-merge gate fires per batch, where a batch is the set of stories the
+orchestrator co-scheduled onto one branch, or the whole page on brochure. It
+does not fire per story when several stories land in one PR.
+
+Risk, not the profile, decides who merges. Under autopilot, or with
+`auto_merge_on_green: true` in the run brief, the harness runs
+`scripts/pr-risk.py <base> <head> --tags <tags> --review <code-review>
+--audit <vertical artifacts>` once the merge bar holds (Code Reviewer
+APPROVE, receipts verified, dispositions answered, required CI green). Low
+and medium merge with `gh pr merge --squash` and the run proceeds. High is
+any change to auth, the data model or a destructive migration, billing, a
+new vendor, CI, IaC, deploy config, or secrets, an open Critical or High
+finding, or a `TODO(DEF-<n>)` placeholder. It fires a pr-merge gate that
+holds only the items depending on that PR, and the rest of the run keeps
+going. A project adds or exempts paths in `runs/_risk.json`. The cycle
+record carries the risk and its reasons for every merge. A production deploy
+is never a PR and stays a blocking decision at every level.
+
+### pr-merge gate: publish before pausing
+
+The pr-merge gate is reached by remote pull request, never a local-only branch,
+unless a human asks for one for a specific change. Once every automated
+sign-off passes (Code Reviewer APPROVE with no open P0 or P1, every triggered
+vertical signed off), the harness commits on the story branch, pushes, and
+opens the PR with spgr-create-pr against the protected base. Only then does it
+write the pr-merge hil-checkpoint carrying the PR URL and fire
+spgr-notify-human. On the next entry it reads the merge as the response and
+continues from the pending batch. Outside auto-merge it never merges and never
+bypasses protection, because the human merge is the gate.
+
+Verify the evidence before publishing. `receipt.py verify` over every unit
+in the PR, at the PR head, with `--require test` and, for a user-visible
+unit, `--require product`, exits 0, and `review-package.py dispositions`
+passes on the review. Either failing is a Check failure, and auto-merge
+never runs past one.
+
+Verify CI green before pausing. A green local suite is not sufficient, because
+CI runs the live-DB, integration, and other jobs the local Check skips, and
+those jobs are the real gate on that work. A failing required check is a Check
+failure on this cycle: diagnose it from the CI logs, route the fix as a bounded
+retry to the owning agent (two retries, then escalate), push, and re-verify.
+The harness never pauses at a pr-merge checkpoint, or reports a story ready,
+while a required check is failing or pending. A failing advisory check is
+recorded in the checkpoint and named, never implied green.
+
+## Escalations
+
+An escalation is a first-class artifact. The harness feeds every open escalation
+into the Plan input each tick, so resolving one is a routing decision like any
+other, never handled out of band. Route by the orchestrator's rules: ambiguity to
+the upstream agent, technical conflict to the Architect, policy or compliance or
+security to the human plus the specialist, an unresolvable block to the human. A
+constraint conflict with approved architecture routes to escalation, never an
+auto-fix that edits an ADR. See the orchestrator agent for the full routing map.
+
+An escalation reaches the human only when resolving it would change a stated
+human constraint or the scope of a confirmed artifact. Everything else the
+routed specialist rules in-cycle, records in the artifact's decision log and
+the PR description, and the run moves on. In the reference case three of four
+escalations went to the human: a favicon file count, which story owns a
+heading, and TypeScript for a thirty-line script, the last ruled twice.
+
+Under standard and autopilot a deferrable decision is not escalated at all.
+The unit takes the recommended option and reports it for the defaults ledger.
+An escalation is raised only for a blocking decision, for missing or
+contradictory input that no default can cover, or for a conflict with approved
+architecture.
+
+## Rule budget and the outcome figure
+
+This reference is capped at 1000 lines and the project CLAUDE.md template at
+60. A change that adds a rule removes or merges one of equal weight and
+names it in the commit. The run-retrospective lists the rules no cycle in
+the run exercised, as candidates for removal. Every rule here was added after
+a run that hurt, and the runs since hurt in new ways, because process
+answered process.
+
+The harness is measured by one figure: product checks passed per hundred
+agent dispatches, on the dashboard beside the token and cost lines. A change
+to the harness that does not move it is not an improvement. The reference
+instance recorded 767 dispatches, 125 cycles, and 785 run-store files before
+a recruiter could read a candidate's name.
+
+## Self-improvement: advisory learnings
+
+At run end the harness writes a run-retrospective artifact. Future runs may
+consult it, under three rules that prevent silent drift. See ADR-004.
+- Advisory, never dispositive. A Plan step may cite a learning as proposed
+  rationale in the cycle's decision log, but the decision still derives from
+  current artifacts plus pinned config.
+- Pinned per run. Freeze the learnings set by hash at run start and record it in
+  run-state.learnings_pinned, so a re-run with the same pinned set is reproducible.
+- Human-promoted rules. A learning that would change a rule (a WIP limit, the gate
+  set, a routing policy) carries requires_human_promotion true and is applied only
+  through a human gate, never by the loop.
+- Mechanical fixes become checks. A learning about a mistake a script can see
+  in a file, a diff, or an output carries remedy `check` and names the
+  validator rule, hook, test, or schema constraint that will catch it. Only a
+  judgment call takes remedy `reference`, and it names the rule it
+  displaces. This is how the rule budget stays honest: a repeated mistake
+  adds a check, not a paragraph.
+- Provenance travels with the learning. Each one records its `source`
+  (observed, user-stated, inferred) and the `files` it concerns. A run cites
+  a learning from another project only when its source is user-stated, and
+  a learning whose files no longer exist is dropped at pin time rather than
+  cited.
+
+## Determinism scripts
+
+These scripts keep the deterministic work out of the model.
+- `scripts/derive-ready-queue.py <run-dir>` prints the readiness snapshot. Pure
+  function of the store. Makes no routing decision.
+- `scripts/rebuild-projection.py <run-dir> [--validate]` rebuilds run-state.json
+  by replaying the cycle log. Run it after every Act, and any time the projection
+  is lost or suspected stale.
+- `scripts/pin-learnings.py <retrospective.json> ...` freezes the advisory
+  learnings set by content hash at run start. Pure function of the inputs. Makes
+  no judgment about which learnings apply.
+- `scripts/claim-run.py <run-dir> claim|release|status [<session-id>]` holds
+  the single-writer lock on a run with a heartbeat.
+- `scripts/review-package.py <base> <head> --out <file> [--touch-paths ...]`
+  writes the gate-integrity tags, commit list, stat, and diff a reviewer
+  reads, and refuses a range whose head does not descend from its base.
+  `dispositions <tags> <review>` fails a review that left a tag unanswered.
+- `scripts/receipt.py run|verify` records a gating command's evidence and
+  refuses a failed, zero-run, or stale receipt.
+- `scripts/classify-failure.py <unit-dir>` names a failed unit's class and
+  whether a retry is spent.
+- `scripts/pr-risk.py <base> <head>` scores a PR low, medium, or high and
+  exits 1 on high.
+- `scripts/product-check.py <run-dir> --touches <paths>` runs the project's
+  product checks from `runs/_product-check.json` against the real product
+  and records each result as a `product_check` event, plus a `product`
+  receipt with `--unit`. Exit 3 means the project has no checks.
+- `scripts/preflight.py [--profile <profile>]` checks once at run open that
+  the interpreter, the venv, git identity, gh auth, node, npx, and a headless
+  Chromium-family browser actually work, and prints the table the harness
+  records in the run brief. A build unit in the reference run lost time
+  discovering a broken chromium wrapper on its own.
+
+The story brief (`artifacts/story-brief-<story-id>.json`) is a projection in the
+same sense as run-state.json: derived from the operative artifacts, regenerable,
+never the source of truth.
+
+The store-reading scripts scan the active run-store subdirectories (artifacts,
+escalations, checkpoints, consultations) and never archive, so a checkpoint or
+escalation counts whether it sits in artifacts or in its own subdir, and a
+superseded artifact cannot resurrect a gate or a block.
+
+## Increment status
+
+Everything in this reference is live. Most rules trace to two reference
+runs: a brochure page that took nine gates and about 55 idle hours of 70,
+and a saas instance that took 767 dispatches and four months to show a
+candidate's name that a five-week hand-built POC already showed.

@@ -13,7 +13,7 @@ This repository holds the build: 27 agents and 202 skills, almost all mapped fro
 These constraints shape every agent and are non-negotiable.
 
 1. Architecture first. No development begins until the human approves the architecture. The Architecture agent proposes at least two distinct options with full tradeoffs and does not select. Once approved, the gate-list decisions (data model and tenancy boundary, auth model, billing, vendor or sub-processor, anything irreversible) are immutable, and a developer agent that cannot satisfy a requirement within them escalates rather than deviating. Every other architecture clause is amended by the implementing agent as a decision-log line with the PR number, never a versioned ADR or a gate.
-2. Minimal human-in-the-loop. The only required gates are architecture approval, design-direction selection, PR merge, a vertical security or compliance flag, and a scope change. Work between these gates flows agent to agent. Every run declares an autonomy level (`supervised`, `standard`, `autopilot`) that fixes how many sittings these decisions take: under `standard` the PRD, the intake questions, the architecture option, and the design direction are one direction review, and a reversible decision inside the profile is taken by default, logged, and reviewed in a batch at the next gate rather than escalated. An open gate holds only the work that depends on it. Every question or next step for the human is asked through the interactive question tool (`AskUserQuestion`) with the recommended option first, never left as prose at the end of a turn, so a turn never ends idle with an open question in the chat body. The PR-merge gate fires per batch or per page, not per story, and under `autopilot` on any profile a PR that `pr-risk.py` scores low or medium merges on reviewer approval, verified receipts, and green CI, while a high-risk PR (auth, the data model, billing, a vendor, infra and CI, an open Critical or High finding) gates only the work that depends on it. `run-unattended.py` keeps a run going across fresh sessions and usage-limit resets and notifies the human through Slack when it stops. The levels and the decision classes live in `.claude/references/pdca-harness.md`.
+2. Minimal human-in-the-loop. The only required gates are architecture approval, design-direction selection, PR merge, a vertical security or compliance flag, and a scope change. Work between these gates flows agent to agent. Every run declares an autonomy level (`supervised`, `standard`, `autopilot`) that fixes how many sittings these decisions take: under `standard` the PRD, the intake questions, the architecture option, and the design direction are one direction review, and a reversible decision inside the profile is taken by default, logged, and reviewed in a batch at the next gate rather than escalated. An open gate holds only the work that depends on it. Every question or next step for the human is asked through the interactive question tool (`AskUserQuestion`) with the recommended option first, never left as prose at the end of a turn, so a turn never ends idle with an open question in the chat body. The PR-merge gate fires per batch or per page, not per story, and under `autopilot` on any profile a PR that `pr-risk.py` scores low or medium merges on reviewer approval, verified receipts, and green CI, while a high-risk PR (auth, the data model, billing, a vendor, infra and CI, an open Critical or High finding) gates only the work that depends on it. The harness daemon keeps a run going across usage-limit resets and without the TUI open. The levels and the decision classes live in `.claude/references/pdca-harness.md`.
 3. Structured artifact contracts. Every handoff is a typed artifact with enumerated required fields, per-section rationale, explicit confidence signals (confirmed, proposed, needs-human-input), and a versioned schema. The receiving agent validates the artifact before acting on it.
 4. Escalation is not failure. An agent that refuses to proceed on incomplete or contradictory input, and returns a precise list of what is missing, is doing its job. Agents do not fill gaps with assumptions. A default taken on a reversible decision is not a gap filled silently: it is named in the defaults ledger and reviewed at the next gate.
 5. Vertical agents are consulted by diff and budgeted. Cross-cutting concerns (auth, security, compliance, observability, performance, accessibility) are not bound to a single phase. A vertical is dispatched when a diff touches its paths, at most two per pull request, its sign-off gates the architecture artifacts it owns, and on a pull request it blocks only on a Critical finding in its own domain.
@@ -27,11 +27,16 @@ These constraints shape every agent and are non-negotiable.
 springer/
   README.md              project overview for people (overview, motivation, methodology, agent and skill catalog)
   CLAUDE.md              this file, the operative ruleset for AI, loaded every session
-  .claude/
-    skills/<name>/SKILL.md   built skills, auto-loaded in this repo
-    agents/<name>.md         built agents, auto-loaded in this repo
+  harness/               the springer-harness Python package: daemon, API, TUI, providers
+  runtime/               the source of the runtime an instance receives
+    skills/<name>/SKILL.md   built skills
+    agents/<name>.md         built agents
     references/<name>.md     shared cross-skill references (e.g. diagram-standards), cited by repo-relative path
     hooks/                   harness hooks (e.g. the agent event logger that feeds the run dashboard)
+    schemas/                 artifact JSON Schemas, built first (see Build Order)
+  schemas                symlink to runtime/schemas
+  .claude/
+    skills, agents, references, hooks   symlinks into runtime/, so this repo loads its own runtime
     workflows/               one-time build scripts that read the Phase 1 specs (see Spec Source below)
     settings.json            repo-level Claude Code settings, registers the hooks
   .claude-plugin/        the plugin and marketplace manifests, so Springer installs with /plugin
@@ -41,7 +46,6 @@ springer/
     agent.template.md
     project-CLAUDE.md    the tailored CLAUDE.md a project instance receives
     project-settings.json the instance settings: harness permission allowlist plus the event hooks
-  schemas/               artifact JSON Schemas, built first (see Build Order)
   scripts/               repo tooling (new-project.sh instantiates a project instance, update-project.py brings one up to a newer runtime or adopts an existing repository, validate-repo.py enforces the hard rules below, eval-skills.py runs the behavioral evals)
   evals/                 behavioral eval scenarios, one JSON per behavior an agent must show in a real transcript
   tests/                 unittest suite for the harness scripts, the hooks, the validator, and the eval checker, run by CI
@@ -49,6 +53,8 @@ springer/
   runs/                  the run store where a project's artifacts accumulate (gitignored)
   brand/                 brand assets (avatars, favicon, social preview)
 ```
+
+Edit the runtime under `runtime/`. A path written inside a runtime file, such as `.claude/skills/<name>/SKILL.md` or `schemas/validate.py`, is the path it takes in an instance and stays that way. The symlinks make those paths resolve in this repository too, and `scripts/new-project.sh` and `scripts/update-project.py` copy from `runtime/` to the instance paths, so an instance never sees `runtime/`, `harness/`, or a symlink.
 
 A repo-level README.md is intentional. The no-README rule in Universal Rules below applies inside a skill or agent directory, not at the repository root.
 
@@ -110,7 +116,7 @@ Guidance:
 
 ### Per-Artifact Checklist
 
-Run this checklist on every artifact before it is committed. The shape rules in it (frontmatter keys, the description cap, the catalog budget, skill reachability, the body cap, reference depth and contents, agent model and tools, the em-dash ban) are enforced by `python3 scripts/validate-repo.py`, which CI runs with `schemas/validate.py --self-check` and `python3 -m unittest discover -s tests -t tests` on every push. A harness script or hook change ships with a test in `tests/`.
+Run this checklist on every artifact before it is committed. The shape rules in it (frontmatter keys, the description cap, the catalog budget, skill reachability, the body cap, reference depth and contents, agent model and tools, the em-dash ban) are enforced by `python3 scripts/validate-repo.py`, which CI runs with `runtime/schemas/validate.py --self-check` and `python3 -m unittest discover -s tests -t tests` on every push. A harness script or hook change ships with a test in `tests/`.
 - [ ] Started from a template, not a blank file
 - [ ] Name matches the file or directory, lowercase-kebab, `spgr-` prefix, globally unique
 - [ ] Skill frontmatter is `name` and `description`, plus `disable-model-invocation: true` unless the main session invokes it. Agent declares `tools` at least privilege and `model`
@@ -136,7 +142,7 @@ Hard:
 
 Each item is a prerequisite for the next.
 
-1. Artifact schemas (`schemas/`), the typed output for every handoff. Everything else validates against them.
+1. Artifact schemas (`runtime/schemas/`), the typed output for every handoff. Everything else validates against them.
 2. Orchestrator agent, which routes artifacts, tracks WIP, and manages the escalation queue.
 3. PM and Architecture agents. Validate the full architecture checkpoint flow (PM to Architecture to human approval) before any developer agents.
 4. Architecture-gate verticals: Auth, Security, and Compliance, wired as consultants and gates before the architecture checkpoint is operational.

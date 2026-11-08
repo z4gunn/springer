@@ -171,14 +171,17 @@ A skill is a single-responsibility capability that an agent invokes, such as wri
 springer/
   README.md              this file, project overview for people
   CLAUDE.md              the operative ruleset for AI agents, loaded every session
-  .claude/
-    agents/<name>.md         the 27 agents, auto-loaded in this repo
-    skills/<name>/SKILL.md    the 202 skills, auto-loaded in this repo
+  harness/               the springer-harness Python package: daemon, API, TUI, providers (under construction)
+  runtime/               the source of the runtime each project instance receives
+    agents/<name>.md          the 27 agents
+    skills/<name>/SKILL.md    the 202 skills
     references/<name>.md      shared cross-skill references (for example pdca-harness, design-quality, typescript-standards)
     hooks/                    the event logger, the session-usage sensor, the design detector, and the git and config guards
+    schemas/                  JSON Schemas for the typed artifacts that flow between agents
+  schemas                symlink to runtime/schemas
+  .claude/               symlinks into runtime/ so this repo auto-loads its own runtime, plus the repo settings
   .claude-plugin/        the plugin and marketplace manifests, so Springer installs with /plugin
   plugin/skills/         the plugin's one skill, spgr-install-runtime
-  schemas/               JSON Schemas for the typed artifacts that flow between agents
   scripts/               new-project.sh, update-project.py (update or adopt an instance), validate-repo.py, eval-skills.py
   evals/                 behavioral eval scenarios, one per behavior an agent must show in a real transcript
   tests/                 unittest suite for the harness scripts, hooks, validator, and eval checker, run by CI
@@ -206,19 +209,7 @@ A lane says what kind of change a run makes. `build` takes a product that does n
 
 The harness automates the loop a person otherwise runs by hand. The orchestrator decides the next unit of work and then stops. The `spgr-run-harness` skill is the loop around it. It reads run state, asks the orchestrator what runs next, dispatches the work, checks the result, records the tick, and repeats, pausing only at the human gates. It models the cycle as Plan-Do-Check-Act. Plan is the orchestrator routing the next batch of work. Do is each domain agent producing its artifact. Check is schema validation, the read-only vertical audits, and evidence a script can hold: every gating command a unit runs writes a receipt with its exit code, the number of tests that ran, and the commit and tree it ran on, and a pull request does not reach its merge gate while a receipt is failed, stale, or zero-run. The reviewer reads a package that opens with every change that eases a gate (a skipped or removed test, a loosened check config, an edited real fixture, a file outside the story) and answers each one, and an instance hook refuses an agent edit to an existing check config outright. Act records the transition and then advances, retries a failure, routes an escalation, or pauses at a gate. A failure is classified before it is retried: a platform glitch, a context overflow, an agent that stopped to ask, and a broken tool each get their own response, and only a real defect spends one of the two bounded retries. The harness dispatches under a token-economy rule set: every dispatch opens with the same fixed contract so repeat dispatches reuse a cached prompt prefix, bounded fixes go to fresh agents, mechanical units go to the smallest model tier, and each story carries a compact context brief so units read a projection instead of the full artifact corpus. At the end of a run the retrospective records what it learned, and a mistake a script could catch must name the check that will catch it next time rather than add a paragraph of rules.
 
-To start a run, open this repository in Claude Code and ask for the harness by name, giving it a run id and a one-paragraph problem statement:
-
-```
-Use spgr-run-harness to start run-id acme-1 on this problem: <one paragraph>
-```
-
-The harness drives phase to phase and stops at the first human gate that holds all work, for example the direction review under `standard` or prd-approval under `supervised`. It writes a checkpoint and reports what it needs. Answer the checkpoint, then ask the harness to resume:
-
-```
-The architecture gate is answered, resume spgr-run-harness for run-id acme-1
-```
-
-Start and resume are the same path. On every entry the harness rehydrates from disk, so a run survives being stopped and is safe to pick up later. Run the harness in the main Claude session, never as a subagent, because it dispatches the orchestrator and the domain agents as its own subagents.
+To start a run, type `springer` in a terminal. It starts the daemon when none is running and opens the TUI, where you write the brief and start. The harness drives phase to phase and stops at the human gates, which you answer in the TUI. On this branch the daemon runs a mock provider, so a real project needs step 6 of the build plan, or `main`.
 
 What a run leaves behind, all under `runs/<run-id>/`:
 
@@ -227,17 +218,11 @@ What a run leaves behind, all under `runs/<run-id>/`:
 - `run-state.json`, a derived projection of where the run is now: phase, WIP board, open gates, and open escalations. It is a cache that the harness rebuilds from the cycle log, never edited by hand.
 - A `hil-checkpoint` artifact at each gate, and an `escalation` artifact whenever an agent refuses to proceed on a real risk rather than guessing.
 
-The loop rules, the rehydration algorithm, the parallel barrier, and the advisory-learnings model are in `.claude/references/pdca-harness.md`.
+The loop rules, the rehydration algorithm, the scheduling rules, and the advisory-learnings model are in `.claude/references/pdca-harness.md`.
 
 ### Leave a run going unattended
 
-Start the run with `autonomy: autopilot` in the problem statement and answer the one direction review. Then, from a terminal in the project:
-
-```bash
-python3 .claude/skills/spgr-run-harness/scripts/run-unattended.py acme-1
-```
-
-The driver runs the harness in back-to-back headless sessions, each starting with a fresh context, so a full context window never waits for you. It sleeps through a usage limit until the reset, and stops after three failed or two idle sessions so a stuck run does not burn a night. Under autopilot, `pr-risk.py` scores every pull request once the reviewer approves and CI is green. Low and medium risk merge on their own. High risk waits for you: auth, the data model or a destructive migration, billing, a new vendor, CI and infra, secrets, an open Critical or High finding, or a placeholder for a fact only you have. A high-risk PR holds only the work that depends on it. Production deploys always wait. When the run completes or every remaining item waits on you, the driver posts to the Slack incoming webhook in `SPRINGER_SLACK_WEBHOOK_URL` (set it in `.env`). It falls back to a macOS notification and always writes `runs/<run-id>/unattended-status.md`. Tools are allowed by the instance settings allowlist, with edits accepted, so a command outside the list is refused rather than left waiting at a prompt.
+Quit the TUI while a run is in progress and the daemon keeps it going. Run `springer` to come back.
 
 The backlog is an epic, feature, then story, task, or bug hierarchy, and the orchestrator finishes a whole feature, product check included, before it starts the next.
 
@@ -264,12 +249,6 @@ python3 .claude/skills/spgr-run-harness/scripts/run-dashboard.py --once   # one 
 ```
 
 Token and timing figures cover activity recorded since the event hook was installed. Runs that predate it show run state and gates but no agent metrics.
-
-### Project the backlog onto a Linear board
-
-Optionally, a project can use a Linear board as the human-facing backlog and kanban. The typed artifacts under `runs/` stay the source of truth, and the harness projects them onto the board: confirmed stories become issues, each story's position on the WIP board moves its issue through the Linear states, and the pull request opened at a pr-merge gate is attached to the issue. A human dragging cards is never fought, and a sync failure never blocks the run.
-
-It is off unless `runs/_linear/config.json` exists. To turn it on, copy the template at `.claude/skills/spgr-run-harness/assets/linear-config.template.json` to that path, fill in the workspace ids, set `LINEAR_API_KEY` in your environment or the project's `.env`, and run `npx tsx .claude/skills/spgr-run-harness/scripts/linear-sync.ts ensure-labels`. It needs Node. The projection rules and the intake path are in the Linear section of `.claude/references/pdca-harness.md`.
 
 ### Quickstart: start a new project
 

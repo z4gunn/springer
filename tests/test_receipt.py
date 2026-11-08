@@ -50,6 +50,14 @@ class CountTest(unittest.TestCase):
         self.assertIsNone(rc.count_tests("all good"))
         self.assertEqual(rc.count_tests("cases: 4 ok", r"cases: (\d+) ok"), 4)
 
+    def test_per_line_output_and_a_regex_that_misses(self):
+        """A self-test that prints one PASS line per check, under a guessed regex."""
+        output = "PASS parity:hero\nPASS parity:footer\nserving on 8000\nPASS state:print\n"
+        self.assertEqual(rc.count_tests(output), 3)
+        self.assertEqual(rc.count_tests(output, r"(\d+)\s+(?:fixtures?|tests?)"), 3)
+        self.assertEqual(rc.count_tests("ok 1 - a\nok 2 - b\n"), 2)
+        self.assertIsNone(rc.count_tests("PASS\nok  pkg 0.1s"), "a bare PASS is a package line, not a test")
+
 
 class ReceiptTest(unittest.TestCase):
     def setUp(self):

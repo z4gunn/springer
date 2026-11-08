@@ -13,7 +13,7 @@ from pathlib import Path
 
 from helpers import REPO, load_script
 
-ing = load_script(REPO / ".claude" / "skills" / "spgr-ingest-document" / "scripts" / "ingest_document.py")
+ing = load_script(REPO / "runtime" / "skills" / "spgr-ingest-document" / "scripts" / "ingest_document.py")
 
 RICH = "# Title\\n\\nA paragraph long enough to count as real text, repeated to pass the density floor. " * 4
 FAKE_MARKITDOWN_RICH = f"""#!/bin/sh

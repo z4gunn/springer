@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 from helpers import SCRIPTS, load_script
 
@@ -51,6 +52,16 @@ class ProductCheckTest(unittest.TestCase):
     def unit_receipt(self, unit):
         with open(os.path.join(unit, "receipts", "product-check.json")) as fh:
             return json.load(fh)
+
+    def test_a_worktree_session_records_into_the_project_run_store(self):
+        self.two_checks()
+        project = os.path.join(self.tmp.name, "project")
+        with mock.patch.dict(os.environ, {"SPRINGER_PROJECT_DIR": project}):
+            self.run_cmd("--only", "ok")
+        self.assertEqual(self.events(), [], "nothing is written into the worktree copy of runs/")
+        with open(os.path.join(project, "runs", "r1", "events.jsonl")) as fh:
+            self.assertEqual(json.loads(fh.readline())["check_id"], "ok")
+        self.assertTrue(os.listdir(os.path.join(project, "runs", "r1", "product-checks")))
 
     def test_unit_receipt_records_pass_fail_and_zero_run(self):
         unit = os.path.join(self.run_dir, "dispatch", "C1", "U1")

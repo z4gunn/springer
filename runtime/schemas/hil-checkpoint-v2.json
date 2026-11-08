@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/hil-checkpoint-v2.json",
+  "title": "SPGR Human-in-the-Loop Checkpoint v2",
+  "allOf": [
+    {
+      "$ref": "https://springer.local/schemas/_envelope-v1.json"
+    }
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "hil-checkpoint"
+    },
+    "content": {
+      "$ref": "#/$defs/content"
+    },
+    "schema_version": {
+      "const": "v2"
+    }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": [
+        "checkpoint_id",
+        "checkpoint_type",
+        "artifact_ref",
+        "decision_prompt",
+        "options",
+        "pipeline_status",
+        "level",
+        "holds",
+        "digest"
+      ],
+      "properties": {
+        "checkpoint_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checkpoint_type": {
+          "type": "string",
+          "enum": [
+            "direction-review",
+            "architecture-options-selection",
+            "architecture-confirmation",
+            "prd-approval",
+            "design-direction-selection",
+            "pr-merge",
+            "security-compliance-flag",
+            "scope-change",
+            "discovery-go-no-go",
+            "structure-confirmation",
+            "scope-review",
+            "taste-review",
+            "production-release",
+            "provisioning-required",
+            "routine-decision"
+          ]
+        },
+        "artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_summary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "option",
+              "consequence"
+            ],
+            "properties": {
+              "option": {
+                "type": "string"
+              },
+              "consequence": {
+                "type": "string"
+              },
+              "cost_if_wrong": {
+                "type": "string",
+                "description": "What reversing this choice later takes."
+              },
+              "recommended_because": {
+                "type": "string",
+                "description": "Set on exactly one option: the one-sentence reason it is recommended."
+              }
+            }
+          },
+          "description": "Ordered, recommended option first."
+        },
+        "urgency": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "critical"
+          ]
+        },
+        "pipeline_status": {
+          "type": "string",
+          "enum": [
+            "paused",
+            "resumed"
+          ]
+        },
+        "response_received": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "option"
+          ],
+          "properties": {
+            "option": {
+              "type": "string"
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "resume_instruction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decisions": {
+          "type": "array",
+          "description": "The separate decisions one sitting answers. A direction-review carries the intake questions, the PRD approval, the architecture option, and the design direction. Any gate may carry default-review items from pending-defaults.md. decision_prompt and options summarize the set.",
+          "items": {
+            "type": "object",
+            "required": [
+              "decision_id",
+              "kind",
+              "prompt"
+            ],
+            "properties": {
+              "decision_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "question",
+                  "prd-approval",
+                  "architecture-options-selection",
+                  "design-direction-selection",
+                  "default-review"
+                ]
+              },
+              "prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "artifact_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "option",
+                    "consequence"
+                  ],
+                  "properties": {
+                    "option": {
+                      "type": "string"
+                    },
+                    "consequence": {
+                      "type": "string"
+                    },
+                    "cost_if_wrong": {
+                      "type": "string",
+                      "description": "What reversing this choice later takes."
+                    },
+                    "recommended_because": {
+                      "type": "string",
+                      "description": "Set on exactly one option: the one-sentence reason it is recommended."
+                    }
+                  }
+                }
+              },
+              "recommended": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The option or default taken if the human answers accept-defaults. Never set on architecture-options-selection or design-direction-selection, which the human always picks."
+              },
+              "response": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "holds": {
+          "type": "array",
+          "description": "The unit ids whose merge or start waits on this gate. Work outside the list keeps running.",
+          "items": {
+            "type": "string",
+            "pattern": "^U-[0-9]{4,}$"
+          }
+        },
+        "held_batch": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "The routed units this gate holds, dispatched on resume. Replaces reconstructing held work from prose.",
+          "items": {
+            "type": "object"
+          }
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3"
+          ],
+          "description": "The risk level. L2 holds the merge of the units in holds and nothing else. L3 holds their start."
+        },
+        "digest": {
+          "type": "boolean",
+          "description": "True when the gate is informational and closes on view. A digest entry never pauses, so its pipeline_status is resumed."
+        },
+        "channel_refs": {
+          "type": "array",
+          "description": "Where the gate was sent.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "response": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "option",
+            "by",
+            "at"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "option": {
+              "type": "string",
+              "minLength": 1
+            },
+            "free_text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rule_change": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "by": {
+              "type": "string",
+              "minLength": 1
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "digest": {
+                "const": true
+              }
+            },
+            "required": [
+              "digest"
+            ]
+          },
+          "then": {
+            "properties": {
+              "holds": {
+                "maxItems": 0
+              },
+              "level": {
+                "enum": [
+                  "L0",
+                  "L1"
+                ]
+              },
+              "pipeline_status": {
+                "const": "resumed"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "level": {
+                "const": "L2"
+              }
+            },
+            "required": [
+              "level"
+            ]
+          },
+          "then": {
+            "properties": {
+              "holds": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

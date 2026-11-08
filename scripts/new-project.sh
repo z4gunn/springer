@@ -11,7 +11,8 @@
 # Usage: scripts/new-project.sh <target-dir> [profile]
 #
 # The target directory must not already exist or must be empty. The script copies
-# the runtime subset (.claude/skills, .claude/agents, .claude/references, schemas),
+# the runtime from runtime/ to where an instance holds it (.claude/skills,
+# .claude/agents, .claude/references, .claude/hooks, schemas),
 # installs the downstream project ruleset as CLAUDE.md, seeds an empty run store,
 # and initializes a git repository with one commit.
 #
@@ -56,19 +57,20 @@ fi
 echo "Creating Springer project at $TARGET"
 echo "  source: $SRC"
 
-# 1. Copy the runtime subset. Exclude the build-only and workspace pieces:
-#    .claude/workflows (the scripts that built Springer), templates, .venv,
-#    .git, README.md, and any existing run output.
+# 1. Copy the runtime. Copy from runtime/ and not through the .claude symlinks,
+#    because cp -R would copy the links themselves. Exclude the build-only and
+#    workspace pieces: .claude/workflows (the scripts that built Springer),
+#    harness, templates, .venv, .git, README.md, and any existing run output.
 mkdir -p "$TARGET/.claude"
-cp -R "$SRC/.claude/skills"     "$TARGET/.claude/skills"
-cp -R "$SRC/.claude/agents"     "$TARGET/.claude/agents"
-cp -R "$SRC/.claude/references" "$TARGET/.claude/references"
-cp -R "$SRC/.claude/hooks"      "$TARGET/.claude/hooks"
+cp -R "$SRC/runtime/skills"     "$TARGET/.claude/skills"
+cp -R "$SRC/runtime/agents"     "$TARGET/.claude/agents"
+cp -R "$SRC/runtime/references" "$TARGET/.claude/references"
+cp -R "$SRC/runtime/hooks"      "$TARGET/.claude/hooks"
 # The instance settings carry the permission allowlist the harness needs for
 # its own git, gh, validate, and verification commands, so a run does not
 # stall on permission prompts, plus the event-logging hooks.
 cp "$SRC/templates/project-settings.json" "$TARGET/.claude/settings.json"
-cp -R "$SRC/schemas"            "$TARGET/schemas"
+cp -R "$SRC/runtime/schemas"    "$TARGET/schemas"
 
 # 2. Install the downstream ruleset as the project's CLAUDE.md, stamping the
 #    default run profile.

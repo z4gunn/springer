@@ -1,0 +1,440 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://springer.local/schemas/run-state-v2.json",
+  "title": "SPGR Run State v2",
+  "description": "Derived, rebuildable projection over the pdca-cycle log and the event ledger. A cache, never an independent source of truth. Every v1 field is kept, and open_gates changes from checkpoint ids to objects because the run screen needs each gate's level, holds, and age.",
+  "allOf": [
+    {
+      "$ref": "https://springer.local/schemas/_envelope-v1.json"
+    }
+  ],
+  "properties": {
+    "artifact_type": {
+      "const": "run-state"
+    },
+    "content": {
+      "$ref": "#/$defs/content"
+    },
+    "schema_version": {
+      "const": "v2"
+    }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": [
+        "run_id",
+        "regenerable",
+        "active_phase",
+        "wip_board",
+        "cycle_counter",
+        "units",
+        "in_flight",
+        "generated_from_seq",
+        "open_gates",
+        "paused"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "brochure",
+            "small",
+            "saas",
+            "mobile",
+            "api"
+          ],
+          "description": "The run profile, projected from run-brief.json. Scales the phase set, caps, and PR unit."
+        },
+        "regenerable": {
+          "const": true,
+          "description": "Always true. Declares this artifact a cache that can be rebuilt from the cycle log."
+        },
+        "generated_from_cycle": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "cycle_number of the last cycle this projection reflects, for staleness detection."
+        },
+        "active_phase": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workstreams": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "workstream_id",
+              "phase"
+            ],
+            "properties": {
+              "workstream_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "phase": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "wip_board": {
+          "type": "object",
+          "required": [
+            "backlog",
+            "development",
+            "review",
+            "validation",
+            "done"
+          ],
+          "description": "Stories or units by stage. The scheduler enforces the WIP limit, and the projection reports what is true, because an L2 hold never blocks the agent, so review can exceed the limit.",
+          "properties": {
+            "backlog": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "development": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "review": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "validation": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "done": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "ready_queue": {
+          "type": "array",
+          "description": "Units ready to dispatch on the next tick.",
+          "items": {
+            "type": "object",
+            "required": [
+              "agent"
+            ],
+            "properties": {
+              "agent": {
+                "type": "string",
+                "minLength": 1
+              },
+              "input_artifact_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "workstream": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "open_gates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "level",
+              "holds",
+              "age_seconds"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^G-[0-9]{4,}$"
+              },
+              "level": {
+                "type": "string",
+                "enum": [
+                  "L0",
+                  "L1",
+                  "L2",
+                  "L3"
+                ]
+              },
+              "holds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^U-[0-9]{4,}$"
+                }
+              },
+              "age_seconds": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "open_escalations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "escalation_id of every unresolved escalation."
+        },
+        "cycle_counter": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of ticks executed in this run."
+        },
+        "learnings_pinned": {
+          "type": "array",
+          "description": "The advisory learnings set frozen at run start, pinned by hash for reproducibility.",
+          "items": {
+            "type": "object",
+            "required": [
+              "retrospective_ref",
+              "hash"
+            ],
+            "properties": {
+              "retrospective_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hash": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "units": {
+          "type": "object",
+          "description": "Count of units by state.",
+          "additionalProperties": false,
+          "properties": {
+            "planned": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ready": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "running": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "returned": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "checking": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gated": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "done": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "retry": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "redispatch": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "blocked": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "abandoned": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cancelled": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "in_flight": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "unit_id",
+              "session_id",
+              "agent",
+              "model",
+              "started_at"
+            ],
+            "properties": {
+              "unit_id": {
+                "type": "string",
+                "pattern": "^U-[0-9]{4,}$"
+              },
+              "session_id": {
+                "type": "string",
+                "pattern": "^S-[0-9]{4,}$"
+              },
+              "agent": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "started_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "context_percent": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 100
+              },
+              "cost": {
+                "type": "number",
+                "minimum": 0
+              },
+              "last_tool_call": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "worktrees": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "unit_id",
+              "path"
+            ],
+            "properties": {
+              "unit_id": {
+                "type": "string",
+                "pattern": "^U-[0-9]{4,}$"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "mvp_line": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "above",
+            "below"
+          ],
+          "description": "Feature ids either side of the MVP line. Null until the backlog exists.",
+          "properties": {
+            "above": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "below": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "deferred": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Deferred feature ids."
+        },
+        "window": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "provider",
+            "used_fraction",
+            "resets_at"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "minLength": 1
+            },
+            "used_fraction": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "resets_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "generated_from_seq": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The last event seq this projection reflects."
+        },
+        "paused": {
+          "type": "boolean",
+          "description": "True while run.pause is in force. Rebuilt from operation_applied events."
+        },
+        "waiting_on": {
+          "enum": [
+            null,
+            "usage_window",
+            "gate",
+            "provisioning"
+          ]
+        }
+      }
+    }
+  }
+}
