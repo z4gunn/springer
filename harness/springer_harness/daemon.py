@@ -13,14 +13,14 @@ import uuid
 from pathlib import Path
 
 from . import cleanup
-from .common import artifact_header, iso, read_json, write_json
+from .common import artifact_header, iso, read_json, write_json, write_text
 from .errors import IllegalTransition, InvalidArgs, NotFound
 from .providers.local import LocalSourceHost
 from .registry import Home
 from .release import Releases, ready_to_ship
 from .scheduler.engine import RunEngine
 from .scheduler.worktrees import Worktrees
-from .state.brief import BriefStore, derive
+from .state.brief import BriefStore, derive, parse
 from .state.lock import daemon_owner
 from .state.usage import UsageWindow
 
@@ -99,6 +99,13 @@ def _content_of(path):
     return doc.get("content", {}) if isinstance(doc, dict) else {}
 
 
+def _brief_version(text):
+    try:
+        return int(parse(text)[0].get("brief_version", 1))
+    except (InvalidArgs, TypeError, ValueError):
+        return 0
+
+
 class Daemon:
     def __init__(self, home, provider, source_host, planner_factory, secrets, now, maximum=2, local_host=None):
         """source_host is the hosted one (GitHub) a project opts into. local_host is the
@@ -130,11 +137,70 @@ class Daemon:
 
     # --- projects and runs ---
 
-    def project_path(self, slug):
+    def checkout_path(self, slug):
+        """The person's checkout. The daemon reads it, and the one file it writes there
+        is docs/brief.md on the person's own edit from a client."""
         return Path(self.home.project(slug)["path"])
 
+    def project_path(self, slug):
+        """The checkout the daemon works in: its own clone of a hosted project, else the
+        person's, which a local project shares (see Modes in pdca-harness)."""
+        record = self.home.project(slug)
+        return Path(record["clone"]) if record.get("clone") else Path(record["path"])
+
     def brief(self, slug):
-        return BriefStore(self.project_path(slug))
+        """The brief is the person's document, read and edited in their checkout. A run
+        takes a copy into the daemon's checkout at start (see _take_brief)."""
+        return BriefStore(self.checkout_path(slug))
+
+    def ensure_clone(self, slug):
+        """A hosted project gets a clone of its own under the daemon's home, so the
+        daemon never commits in the person's checkout. The working state of every run
+        moves in with it. None while the project has no origin, because the clone is
+        cut from origin and waits for the remote."""
+        record = self.home.project(slug)
+        if record.get("clone"):
+            return Path(record["clone"])
+        checkout = Path(record["path"])
+        origin = subprocess.run(["git", "-C", str(checkout), "remote", "get-url", "origin"],
+                                capture_output=True, text=True)
+        if origin.returncode:
+            return None
+        running = self.active_run(slug)
+        if running:
+            raise IllegalTransition(f"{slug} has {running} in progress, so the daemon cannot move to a clone yet")
+        clone = self.home.root / "clones" / slug
+        if not (clone / ".git").exists():
+            clone.parent.mkdir(parents=True, exist_ok=True)
+            done = subprocess.run(["git", "clone", "--quiet", origin.stdout.strip(), str(clone)],
+                                  capture_output=True, text=True)
+            if done.returncode:
+                raise IllegalTransition(f"could not clone {slug}: {done.stderr.strip()[-300:]}")
+        for key, value in (("user.name", "Springer"), ("user.email", "springer@local")):
+            subprocess.run(["git", "-C", str(clone), "config", key, value], capture_output=True)
+        cleanup.move_untracked(checkout, checkout / "runs", cleanup.tracked_under(checkout, "runs/"), clone / "runs")
+        self.home.save_project(slug, {**self.home.project(slug), "clone": str(clone)})
+        self._forget_engines(slug)
+        return clone
+
+    def drop_clone(self, slug):
+        """Back to local: the working state returns to the person's checkout, which a
+        local project shares with the daemon. The clone stays on disk."""
+        record = self.home.project(slug)
+        if not record.get("clone"):
+            return
+        running = self.active_run(slug)
+        if running:
+            raise IllegalTransition(f"{slug} has {running} in progress, so the daemon cannot leave its clone yet")
+        clone, checkout = Path(record["clone"]), Path(record["path"])
+        cleanup.move_untracked(clone, clone / "runs", cleanup.tracked_under(clone, "runs/"), checkout / "runs")
+        self.home.save_project(slug, {k: v for k, v in record.items() if k != "clone"})
+        self._forget_engines(slug)
+
+    def _forget_engines(self, slug):
+        """Engines built on the old checkout are rebuilt from disk on the next read."""
+        for key in [k for k in self.engines if k[0] == slug]:
+            self.engines.pop(key)
 
     def run_ids(self, slug):
         root = self.project_path(slug) / "runs"
@@ -337,33 +403,60 @@ class Daemon:
         return read_json(self.home.root / "index" / f"{slug}.json", {"runs": [], "learnings": []})
 
     def start_run(self, slug, kind, sections=None, lane=None, issue=None):
-        front, _ = self.brief(slug).load()
+        source = self._prepare(slug, kind)
+        path = self.project_path(slug)
+        front, _ = BriefStore(path).load()
         # A pruned run keeps its number, so a new run never reuses its branch names.
         count = len(self.run_ids(slug)) + sum(1 for r in self.pruned_runs(slug).values() if r.get("daemon_run")) + 1
         run_id = f"{slug}-{kind}-{count}" if kind != "build" else f"{slug}-{count}"
-        path = self.project_path(slug)
         derived = derive(front)
         doc = artifact_header(f"run-brief-{run_id}", "run-brief", "run_brief", "v1", self.now())
         doc["content"] = {"run_id": run_id, "profile": derived["profile"], "kind": kind, "lane": lane or derived["lane"],
                           "issue": issue,
-                          "brief_version": front.get("brief_version", 1), "sections": sections,
+                          "brief_version": front.get("brief_version", 1), "brief_source": source, "sections": sections,
                           "pinned_rulings": list(front.get("pinned_rulings") or [])}
         write_json(path / "runs" / run_id / "run-brief.json", doc)
-        stale = Worktrees(self.home.root, slug, path).sync_default()
-        if stale:
-            sys.stderr.write(f"{slug}: {stale}\n")
         if kind == "build":
             self._stamp_profile(path, derived["profile"])
             self.commit_brief(slug, path, run_id)
-            host = self.host_for(slug)
-            if hasattr(host, "ensure_remote"):
-                private = (self.config or {}).get("private_repos", True)
-                try:
-                    host.ensure_remote(slug, private=private)
-                except RuntimeError as exc:
-                    raise InvalidArgs(f"the project has no GitHub repository and one could not be made: {exc}")
         self.engines[(slug, run_id)] = self._new_engine(slug, path, run_id, kind)
         return run_id
+
+    def _prepare(self, slug, kind):
+        """Before a run: a hosted build has its remote and the daemon has its clone, the
+        daemon's checkout is at origin's tip, and the brief is the person's when theirs
+        is the newer one. Returns where the run's brief comes from."""
+        host = self.host_for(slug)
+        if kind == "build" and hasattr(host, "ensure_remote"):
+            private = (self.config or {}).get("private_repos", True)
+            try:
+                host.ensure_remote(slug, private=private)
+            except RuntimeError as exc:
+                raise InvalidArgs(f"the project has no GitHub repository and one could not be made: {exc}")
+        if self.settings(slug)["source_host"] == "github":
+            self.ensure_clone(slug)
+        path = self.project_path(slug)
+        stale = Worktrees(self.home.root, slug, path).sync_default()
+        if stale:
+            sys.stderr.write(f"{slug}: {stale}\n")
+        return self._take_brief(slug)
+
+    def _take_brief(self, slug):
+        """The person writes docs/brief.md in their checkout. When the daemon works in a
+        clone, their copy is taken when its version is at least the clone's and the text
+        differs, read-only on their side. Returns commit when the brief the run reads is
+        committed, else working_tree."""
+        checkout, path = self.checkout_path(slug), self.project_path(slug)
+        theirs, mine = checkout / "docs" / "brief.md", path / "docs" / "brief.md"
+        if path != checkout and theirs.exists():
+            text = theirs.read_text()
+            current = mine.read_text() if mine.exists() else None
+            if text != current and (current is None or _brief_version(text) >= _brief_version(current)):
+                mine.parent.mkdir(parents=True, exist_ok=True)
+                write_text(mine, text)
+        status = subprocess.run(["git", "-C", str(path), "status", "--porcelain", "--", "docs/brief.md"],
+                                capture_output=True, text=True)
+        return "working_tree" if status.stdout.strip() else "commit"
 
     def commit_brief(self, slug, path, run_id, message=None):
         """Start run is the commit, and so is an applied brief change: a unit's worktree

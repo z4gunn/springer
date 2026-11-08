@@ -697,6 +697,16 @@ class SetupTest(FakeBinCase):
         (home / "daemon.json").write_text(json.dumps({"port": 1, "pid": 999999}))
         self.assertEqual(setup.repair(home, {}), ["removed a stale daemon record"])
 
+    def test_doctor_names_a_hosted_project_without_a_clone(self):
+        home = self.root / "home"
+        hosted = {"path": str(self.root / "acme"), "settings": {"source_host": "github"}}
+        found = setup.check_clones(home, {"acme": hosted, "local": {"path": "/x", "settings": {}}})
+        self.assertEqual([(f.name, f.ok, f.required) for f in found], [("clone acme", False, False)])
+        clone = self.root / "clone"
+        (clone / ".git").mkdir(parents=True)
+        found = setup.check_clones(home, {"acme": {**hosted, "clone": str(clone)}})
+        self.assertEqual([(f.name, f.ok, f.detail) for f in found], [("clone acme", True, str(clone))])
+
 
 if __name__ == "__main__":
     unittest.main()

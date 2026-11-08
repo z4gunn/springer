@@ -1240,3 +1240,78 @@ class RunCleanupTest(ApiCase):
         self.assertTrue((self.project_path / "runs/old/artifacts/notes-old.json").exists(),
                         "the checkout keeps the files until the pull request merges")
         self.assertFalse(any(p.name.startswith("_prune") for p in (self.daemon.home.root / "worktrees" / "acme").iterdir()))
+
+
+class HostedCloneTest(ApiCase):
+    """A hosted project works from the daemon's own clone, so the person's checkout is
+    read for the brief and never committed in (Modes in pdca-harness)."""
+
+    GIT = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+
+    def git(self, *args, cwd=None):
+        return subprocess.run(["git", "-C", str(cwd or self.project_path), *args], capture_output=True, text=True,
+                              check=True).stdout
+
+    def hosted(self):
+        origin = self.root / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+        self.git("remote", "add", "origin", str(origin))
+        self.git("push", "-q", "origin", "main")
+        out = self.confirmed("project.configure", {"source_host": "github"})
+        return origin, Path(out["result"]["clone"])
+
+    def finish(self, run_id):
+        first = self.op("run.cancel", run_id=run_id)
+        if first["status"] == "needs_confirmation":
+            self.op("run.cancel", run_id=run_id, token=first["confirm_token"])
+        self.daemon.tick_all()
+
+    def test_opting_into_github_gives_the_daemon_a_clone_and_leaves_the_checkout_alone(self):
+        _, clone = self.hosted()
+        self.assertEqual(clone, self.daemon.home.root / "clones" / "acme")
+        self.assertEqual(self.daemon.project_path("acme"), clone)
+        self.assertEqual(self.daemon.checkout_path("acme"), self.project_path)
+        (self.project_path / "scratch.txt").write_text("work in progress in the person's editor\n")
+        run_id = self.start()
+        brief = json.loads((clone / "runs" / run_id / "run-brief.json").read_text())["content"]
+        self.assertEqual(brief["brief_source"], "working_tree")
+        self.assertEqual((clone / "docs" / "brief.md").read_text(), (self.project_path / "docs" / "brief.md").read_text())
+        self.assertIn(f"docs: the brief for {run_id}", self.git("log", "--oneline", "-1", cwd=clone))
+        self.assertFalse((self.project_path / "runs").exists(), "the person's checkout holds no run store")
+        self.assertEqual(self.git("log", "--oneline").count("\n"), 1, "the person's main did not move")
+        self.assertEqual(self.get("/v1/projects")[0]["clone"], str(clone))
+
+    def test_a_newer_brief_on_origin_wins_over_an_older_one_in_the_checkout(self):
+        origin, clone = self.hosted()
+        other = self.root / "other"
+        subprocess.run(["git", "clone", "-q", str(origin), str(other)], check=True)
+        text = (self.project_path / "docs" / "brief.md").read_text()
+        (other / "docs").mkdir()
+        (other / "docs" / "brief.md").write_text(text.replace(f"brief_version: {self.version}", "brief_version: 40", 1))
+        self.git("add", "-A", cwd=other)
+        self.git(*self.GIT, "commit", "-q", "-m", "a later brief from another machine", cwd=other)
+        self.git("push", "-q", "origin", "main", cwd=other)
+        run_id = self.start()
+        brief = json.loads((clone / "runs" / run_id / "run-brief.json").read_text())["content"]
+        self.assertEqual((brief["brief_source"], brief["brief_version"]), ("commit", 40))
+        self.assertIn("brief_version: 40", (clone / "docs" / "brief.md").read_text())
+
+    def test_switching_hosts_moves_the_working_state_with_the_daemon(self):
+        run_id = self.start()
+        self.finish(run_id)
+        self.assertTrue((self.project_path / "runs" / run_id / "events.jsonl").exists())
+        _, clone = self.hosted()
+        self.assertTrue((clone / "runs" / run_id / "events.jsonl").exists())
+        self.assertFalse((self.project_path / "runs" / run_id / "events.jsonl").exists())
+        self.assertIn(run_id, self.daemon.run_ids("acme"))
+        self.confirmed("project.configure", {"source_host": "local"})
+        self.assertTrue((self.project_path / "runs" / run_id / "events.jsonl").exists())
+        self.assertIsNone(self.daemon.home.project("acme").get("clone"))
+        self.assertEqual(self.daemon.project_path("acme"), self.project_path)
+
+    def test_a_local_project_keeps_the_person_s_checkout_as_the_run_store(self):
+        run_id = self.start()
+        self.assertEqual(self.daemon.project_path("acme"), self.project_path)
+        brief = json.loads((self.project_path / "runs" / run_id / "run-brief.json").read_text())["content"]
+        self.assertEqual(brief["brief_source"], "working_tree")
+        self.assertIsNone(self.daemon.home.project("acme").get("clone"))

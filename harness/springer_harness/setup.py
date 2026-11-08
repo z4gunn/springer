@@ -178,14 +178,31 @@ def doctor(home):
     print("springer doctor")
     if config is None:
         print("  warn  config         not onboarded, so runs use the mock provider. Run: springer onboard")
-    found = checks(config) + check_notifications(home)
+    projects = Home(home).projects()
+    found = checks(config) + check_notifications(home) + check_clones(home, projects)
     print(report(found))
-    fixed = repair(home, Home(home).projects())
+    fixed = repair(home, projects)
     for line in fixed:
         print(f"  fixed {line}")
     failed = [f for f in found if f.required and not f.ok]
     print("All required checks pass." if not failed else f"{len(failed)} required check(s) fail.")
     return 1 if failed else 0
+
+
+def check_clones(home, projects):
+    """A hosted project works from the daemon's own clone. One without it yet gets it
+    at the next run start, once the project has an origin to clone from."""
+    found = []
+    for slug, project in projects.items():
+        if (project.get("settings") or {}).get("source_host") != "github":
+            continue
+        clone = project.get("clone")
+        if clone and (Path(clone) / ".git").exists():
+            found.append(Finding(f"clone {slug}", True, clone, required=False))
+        else:
+            found.append(Finding(f"clone {slug}", False, "no clone yet, the daemon makes one at the next run start",
+                                 required=False, fix="Push the project to its origin first when it has none."))
+    return found
 
 
 def _ask(question, default, assume_yes):

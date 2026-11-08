@@ -60,6 +60,7 @@ class ProjectSummary(BaseModel):
     lane: str | None = None
     settings: dict = {}  # ci_signal
     adopted_brief_version: int | None = None  # a build on an adopted project waits for a brief delta
+    clone: str | None = None  # the daemon's own checkout of a hosted project, which holds the run store
     has_design: bool = False  # docs/design/index.html exists
 
 

@@ -690,6 +690,17 @@
             "title": "Archived",
             "type": "boolean"
           },
+          "clone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clone"
+          },
           "deploy": {
             "anyOf": [
               {

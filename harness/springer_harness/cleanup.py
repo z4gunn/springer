@@ -39,11 +39,24 @@ def plan(path, run_id):
 
 
 def move_ignored(path, run_id, tracked, target):
-    """Move every file under the run folder that git does not track to target, keeping
-    its place under the folder. Returns how many moved."""
-    folder, tracked = Path(path) / "runs" / run_id, set(tracked)
+    """A run's untracked files, see move_untracked. Zero when git rm took the last file,
+    and the folder with it."""
+    return move_untracked(path, Path(path) / "runs" / run_id, tracked, target)
+
+
+def tracked_under(path, prefix):
+    """The files git tracks under prefix, as repository-relative paths."""
+    out = _git(path, "ls-files", "-z", "--", prefix).stdout
+    return [f for f in out.split("\0") if f]
+
+
+def move_untracked(path, folder, tracked, target):
+    """Move every file under folder that git does not track to target, keeping its
+    place under the folder, and drop the directories that empties. Returns how many
+    moved."""
+    folder, tracked = Path(folder), set(tracked)
     if not folder.is_dir():
-        return 0  # git rm took the last file, and the folder with it
+        return 0
     moved = 0
     for file in sorted(p for p in folder.rglob("*") if p.is_file() or p.is_symlink()):
         rel = file.relative_to(path).as_posix()

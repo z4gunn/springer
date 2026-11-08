@@ -47,8 +47,8 @@ This reference defines the durable state the Springer harness daemon reads and w
 | Entity | Id | Lives at | Written by |
 |--------|----|----------|------------|
 | Project | slug | ~/.springer/projects.json | onboard, register |
-| Run | run_id | runs/<run_id>/ in the project | daemon |
-| Brief | brief_version | docs/brief.md, projected to runs/<run_id>/run-brief.json | human, daemon projection |
+| Run | run_id | runs/<run_id>/ in the daemon's checkout: its clone of a hosted project under ~/.springer/clones/<slug>, the person's checkout of a local one | daemon |
+| Brief | brief_version | docs/brief.md in the person's checkout, taken into the daemon's checkout at run start when theirs is the newer one, projected to runs/<run_id>/run-brief.json with brief_source | human, daemon projection |
 | Cycle | CYCLE-nnnn | runs/<run_id>/artifacts/ as pdca-cycle artifacts, as today | daemon at Plan and at Act |
 | Unit | U-nnnn | runs/<run_id>/units/U-nnnn/ | daemon writes spec and state, the session writes outputs |
 | Session | S-nnnn | runs/<run_id>/units/U-nnnn/sessions/S-nnnn/, including gate-request.json when the session needs a person | daemon and the session |
@@ -187,7 +187,7 @@ Keeps every v1 field, changes open_gates from checkpoint ids to objects (id, lev
 
 ## Worktree claim and lock
 
-The daemon allocates ~/.springer/worktrees/<project>/<run_id>/<unit_id> with git worktree add on the unit's branch, unit/<run_id>/<unit_id>, because unit ids restart at U-0001 in every run, cut from the base the spec names (main, or the open PR branch of a dependency for a stacked unit). The claim is recorded as an event and in the unit state. The run store is never inside a worktree. A session writes artifacts to the project's runs/<run_id>/ by the absolute path in its brief, as today.
+The daemon allocates ~/.springer/worktrees/<project>/<run_id>/<unit_id> with git worktree add on the unit's branch, unit/<run_id>/<unit_id>, because unit ids restart at U-0001 in every run, cut from the base the spec names (main, or the open PR branch of a dependency for a stacked unit). The claim is recorded as an event and in the unit state. The run store is never inside a worktree. A session writes artifacts to the daemon's checkout's runs/<run_id>/ by the absolute path in its brief, never to the person's.
 
 A worktree is released at Act after the PR is open, with git worktree remove. A removal git refuses is logged and left for the human, never forced, except that the rulings copy the harness carried in never holds a worktree. When the run completes, every remaining worktree is released the same way and the branch of every unit that merged is deleted, locally and on origin. A cancelled unit's branch is kept. A run starts by fast-forwarding the default branch from origin when the checkout is clean. A unit in retry or redispatch reuses its worktree when the branch is intact and rebuilds it otherwise.
 

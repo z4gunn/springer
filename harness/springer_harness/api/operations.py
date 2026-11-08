@@ -232,7 +232,14 @@ def project_configure(c):
     if "source_host" in changes and changes["source_host"] != c.daemon.settings(c.project)["source_host"] \
             and c.daemon.active_run(c.project):
         raise IllegalTransition(f"{c.project} has a run in progress, so its source host cannot change")
-    return {"settings": c.daemon.save_settings(c.project, **changes)}
+    # The daemon works from its own clone of a hosted project, and the working state
+    # moves with it, so the clone is made or left before the setting says so.
+    if changes.get("source_host") == "github":
+        c.daemon.ensure_clone(c.project)
+    elif changes.get("source_host") == "local":
+        c.daemon.drop_clone(c.project)
+    settings = c.daemon.save_settings(c.project, **changes)
+    return {"settings": settings, "clone": c.daemon.home.project(c.project).get("clone")}
 
 
 def project_archive(c):
