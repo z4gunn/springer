@@ -11,12 +11,13 @@ import secrets as stdlib_secrets
 from dataclasses import dataclass, field
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from ..check.critique import critique
 from ..common import iso, read_json, write_json
 from ..errors import (ConfirmationInvalid, CritiqueErrors, IllegalTransition, InvalidArgs, NotAllowedForActor,
                       UnknownOperation)
+from .. import risk_rules
 from ..state.backlog import BacklogStore
 
 CONFIRM_SECONDS = 300
@@ -88,6 +89,14 @@ class GateAnswer(Args):
     decisions: list[DecisionAnswer] = []
     free_text: str | None = None
     rule_change: str | None = None
+
+    @field_validator("rule_change")
+    @classmethod
+    def _a_rule(cls, value):
+        if value is None or not value.strip():
+            return None
+        risk_rules.parse(value)
+        return value.strip()
 
 
 class RunNote(Args):
@@ -346,6 +355,7 @@ def gate_answer(c):
         c.daemon.commit_brief(c.project, c.daemon.project_path(c.project), c.run_id,
                               f"docs: the brief change applied at {c.args.gate_id}")
     if c.args.rule_change:
+        c.daemon.apply_risk_rule(c.project, c.args.rule_change, c.args.gate_id)
         c.daemon.home.audit({"type": "risk.rule_change", "gate_id": c.args.gate_id, "rule": c.args.rule_change,
                              "actor": c.actor, "project": c.project}, c.daemon.now())
     return {}

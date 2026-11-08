@@ -732,8 +732,29 @@ class OperationCatalogTest(ApiCase):
     def test_gate_answer_with_a_rule_change_needs_confirmation(self):
         run_id = self.start()
         gate_id = self._open_gate(run_id)
-        args = {"gate_id": gate_id, "option": "yes", "rule_change": "Auth tests are enough for L1."}
+        args = {"gate_id": gate_id, "option": "yes", "rule_change": "low ^docs/"}
         self.confirmed("gate.answer", args, run_id=run_id)
+
+    def test_a_rule_change_updates_the_risk_rules_and_commits_them(self):
+        run_id = self.start()
+        gate_id = self._open_gate(run_id)
+        self.confirmed("gate.answer", {"gate_id": gate_id, "option": "yes",
+                                       "rule_change": "high auth ^src/server/session/"}, run_id=run_id)
+        project = self.daemon.project_path("acme")
+        rules = json.loads((project / "runs" / "_risk.json").read_text())
+        self.assertEqual(rules, {"high": {"auth": ["^src/server/session/"]}})
+        git = lambda *a: subprocess.run(["git", "-C", str(project), *a], capture_output=True, text=True).stdout.strip()
+        self.assertEqual(git("log", "-1", "--format=%s"), f"chore(runs): risk rule from {gate_id}")
+        self.assertEqual(git("status", "--porcelain", "--", "runs/_risk.json"), "")
+
+    def test_a_rule_change_that_is_not_a_rule_is_refused_before_the_answer(self):
+        run_id = self.start()
+        gate_id = self._open_gate(run_id)
+        for text in ("Auth tests are enough for L1.", "low ([", "high Auth ^x"):
+            body = self.op("gate.answer", {"gate_id": gate_id, "option": "yes", "rule_change": text},
+                           run_id=run_id, expect=400)
+            self.assertIn("rule", json.dumps(body))
+        self.assertIsNone(self.daemon.engine("acme", run_id).gates.get(gate_id)["content"].get("response"))
 
     def test_gate_answer_refuses_an_option_not_offered(self):
         run_id = self.start()

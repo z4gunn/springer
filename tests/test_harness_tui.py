@@ -891,14 +891,14 @@ class RunScreenTest(TuiCase):
             await pilot.press("n")
             await self.dialog(pilot, FormDialog)
             self.app.screen.query_one("#field-notes", Input).value = "Fix expiry."
-            self.app.screen.query_one("#field-rule_change", Input).value = "Auth tests suffice."
+            self.app.screen.query_one("#field-rule_change", Input).value = "low ^docs/"
             self.app.screen.query_one("#field-notes", Input).focus()
             await pilot.press("enter")
             await self.dialog(pilot, ConfirmDialog)
             await pilot.press("y")
             await self.until(pilot, lambda: self.engine(run_id).gates.get(gate_id)["content"]["response"])
             response = self.engine(run_id).gates.get(gate_id)["content"]["response"]
-            self.assertEqual((response["free_text"], response["rule_change"]), ("Fix expiry.", "Auth tests suffice."))
+            self.assertEqual((response["free_text"], response["rule_change"]), ("Fix expiry.", "low ^docs/"))
 
     async def test_risky_merge_diff(self):
         async with self.app.run_test(size=self.SIZE) as pilot:

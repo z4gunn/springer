@@ -12,7 +12,7 @@ import traceback
 import uuid
 from pathlib import Path
 
-from . import cleanup
+from . import cleanup, risk_rules
 from .common import artifact_header, iso, read_json, write_json, write_text
 from .errors import IllegalTransition, InvalidArgs, NotFound
 from .providers.local import LocalSourceHost
@@ -490,6 +490,13 @@ class Daemon:
         """Reconcile's ledger, its product check results, and the backlog closes it made
         go in as one commit whose subject reconcile knows as its own."""
         path = self.project_path(slug)
+    def apply_risk_rule(self, slug, rule, gate_id):
+        """A gate answer's rule change goes into the project's risk rules and is
+        committed, so the next merge's pr-risk.py reads it."""
+        path = self.project_path(slug)
+        if risk_rules.apply(path, rule):
+            self._commit(slug, path, [risk_rules.FILE], f"chore(runs): risk rule from {gate_id}", "the risk rules")
+
         files = [p for p in ("runs/_reconcile.jsonl", "runs/_reconcile", "runs/_backlog.json") if (path / p).exists()]
         return self._commit(slug, path, files, "chore(runs): reconcile", "the reconcile records")
 

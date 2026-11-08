@@ -286,7 +286,7 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 | run.cancel | none | Yes | Cancels every unfinished unit, closes its gates, and ends the run, so a new one can start. Open PRs stay open |
 | unit.cancel | `unit_id` | Yes | Kills the live session and moves the unit to cancelled |
 | unit.redispatch | `unit_id`, `model_tier` (optional, equal or higher) | Yes | Kills the live session if any and moves the unit to redispatch. No retry is spent |
-| gate.answer | `gate_id`, `option`, `decisions`, `free_text`, `rule_change` | With rule_change | Records the response and releases what the gate holds. `decisions` carries one `{decision_id, response}` per item of a one-sitting gate, and `free_text` carries the structure notes. `rule_change` updates the risk rules file |
+| gate.answer | `gate_id`, `option`, `decisions`, `free_text`, `rule_change` | With rule_change | Records the response and releases what the gate holds. `decisions` carries one `{decision_id, response}` per item of a one-sitting gate, and `free_text` carries the structure notes. `rule_change` is `low <regex>` or `high <category> <regex>`, refused otherwise, and is merged into `runs/_risk.json` and committed |
 | digest.mark_viewed | `gate_ids` | No | Closes digest entries |
 | run.note | `text` | No | Adds a person's note to the next session brief of every open unit in the run, and records it in the ledger. Refused for the chat actor |
 | project.unlock_config | `path`, `reason` | Yes | Records a ruling in the project's `runs/_config-unlock.json` that lets a session edit one protected check file. A path outside the project, or the rulings file itself, is refused. Refused for the chat actor |
