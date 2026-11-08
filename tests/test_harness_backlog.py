@@ -56,11 +56,16 @@ class BacklogFromArtifactTest(unittest.TestCase):
         self.store = BacklogStore(self.project)
         self.file = self.project / "runs" / "_backlog.json"
 
-    def write(self, name, doc, tick=0, run="acme-1"):
+    def write(self, name, doc, tick=0, run="acme-1", kind="build"):
+        """An artifact in a run. A daemon run's brief carries a kind, a pre-daemon one's
+        does not, and that is how the store tells history from the runs it drives."""
         path = self.project / "runs" / run / "artifacts" / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(doc))
         os.utime(path, ns=(10**18 + tick, 10**18 + tick))
+        brief = path.parents[1] / "run-brief.json"
+        if not brief.exists():
+            brief.write_text(json.dumps({"content": {"run_id": run, **({"kind": kind} if kind else {})}}))
         return path
 
     def stories(self, view):
@@ -145,6 +150,18 @@ class BacklogFromArtifactTest(unittest.TestCase):
         self.assertEqual(view["epics"][0]["features"][0]["stories"][1]["title"], "Story 3 again")
         self.assertEqual([s["run_id"] for s in json.loads(self.file.read_text())["sources"]], ["acme-1", "acme-2"])
 
+    def test_a_pre_daemon_runs_stories_a_later_run_leaves_out_close_as_history(self):
+        self.write("prioritized-backlog-old.json", artifact([item(1), item(2)]), tick=1, run="redesign", kind=None)
+        self.write("prioritized-backlog-x.json", artifact([item(2, title="Story 2 again"), item(3)]), tick=2)
+        view = self.store.view(Units(), "0")
+        self.assertEqual(self.stories(view), [("F-STORIES", "STORY-2026-001"), ("F-STORIES", "STORY-2026-002"),
+                                              ("F-STORIES", "STORY-2026-003")])
+        shipped, kept, new = view["epics"][0]["features"][0]["stories"]
+        self.assertEqual((shipped["column"], shipped["closed"]["source"], shipped["closed"]["run_id"],
+                          shipped["closed"]["left_out_by"]), ("done", "history", "redesign", "acme-1"))
+        self.assertEqual((kept["title"], kept["run_id"], kept.get("closed")), ("Story 2 again", "redesign", None))
+        self.assertEqual(new["run_id"], "acme-1")
+
     def test_a_polish_issue_is_one_item_the_run_carries(self):
         task = self.store.add_issue("acme-2", "Move the newsletter form above the footer")
         bug = self.store.add_issue("acme-3", "The footer link is broken")
@@ -163,7 +180,10 @@ class BacklogFromArtifactTest(unittest.TestCase):
                       {"U-0001": "gated", "U-0002": "running", "U-0003": "running"})
         stories = self.store.view(units, "0", run_id="acme-1")["epics"][0]["features"][0]["stories"]
         self.assertEqual([(s["unit_ids"], s["column"], s["in_run"]) for s in stories],
-                         [(["U-0001"], "in_review", True), (["U-0002"], "in_progress", True), ([], "ready", False)])
+                         [(["U-0001"], "in_review", True), (["U-0002"], "in_progress", True), ([], "ready", True)])
+        # Seen from another run, only a unit of that run puts a story in it.
+        stories = self.store.view(units, "0", run_id="acme-2")["epics"][0]["features"][0]["stories"]
+        self.assertEqual([s["in_run"] for s in stories], [True, True, False])
 
     def test_a_done_unit_closes_its_story_once_and_a_closed_record_wins(self):
         self.write("prioritized-backlog-x.json", artifact([item(1), item(2)]))

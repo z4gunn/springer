@@ -804,6 +804,21 @@ class OperationCatalogTest(ApiCase):
         self.assertEqual((story["column"], story.get("closed")), ("ready", None))
         self.op("backlog.close_story", {"story_id": "S-9"}, run_id=run_id, expect=404)
 
+    def test_project_reconcile_answer_records_the_answer_to_a_question(self):
+        """The full reconcile flow is in test_harness_reconcile. This covers the operation."""
+        self.start()
+        self.daemon.reconciler.tick("acme", self.clock())
+        (self.project_path / "billing").mkdir()
+        (self.project_path / "billing" / "plans.py").write_text("PRO = 20\n")
+        subprocess.run(["git", "-C", str(self.project_path), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.project_path), "-c", "user.name=Dev", "-c", "user.email=dev@example.com",
+                        "commit", "-q", "-m", "Price the pro plan"], check=True)
+        record = self.daemon.reconciler.tick("acme", self.clock() + 61)
+        self.assertTrue(record["changes"][0]["question"])
+        out = self.op("project.reconcile_answer", {"change_id": "R-1", "option": "not-architecture"})
+        self.assertEqual(out["result"]["answer"]["option"], "not-architecture")
+        self.op("project.reconcile_answer", {"change_id": "R-1", "option": "not-architecture"}, expect=409)
+
     def test_a_polish_run_puts_its_issue_on_the_project_backlog(self):
         run_id = self.confirmed("run.start", {"base_version": self.version, "lane": "polish",
                                               "issue": "The footer link is broken on the About page"})["result"]["run_id"]
@@ -868,6 +883,7 @@ COVERAGE = {
     "backlog.answer_unknown": "test_backlog_answer_unknown",
     "backlog.close_story": "test_backlog_close_and_reopen_a_story",
     "backlog.reopen_story": "test_backlog_close_and_reopen_a_story",
+    "project.reconcile_answer": "test_project_reconcile_answer_records_the_answer_to_a_question",
     "provisioning.set_secret": "test_provisioning_set_secret_records_no_value_anywhere",
     "config.set_role_model": "test_config_set_role_model", "config.set_gate_channels": "test_config_set_gate_channels",
     "run.note": "test_run_note_reaches_the_next_session_of_each_open_unit",

@@ -141,6 +141,12 @@ class StoryRef(Args):
     note: str | None = None
 
 
+class ReconcileAnswer(Args):
+    change_id: str
+    option: Literal["decision", "not-architecture", "review"]
+    text: str | None = Field(default=None, max_length=2000)
+
+
 class SetSecret(Args):
     item_id: str
     value: str = Field(min_length=1)
@@ -439,6 +445,11 @@ def reopen_story(c):
     return {}
 
 
+def reconcile_answer(c):
+    return {"answer": c.daemon.reconciler.answer(c.project, c.args.change_id, c.args.option, c.args.text, c.actor,
+                                                 c.daemon.now())}
+
+
 def set_secret(c):
     items = None
     for run_id in reversed(c.daemon.run_ids(c.project)):
@@ -553,6 +564,10 @@ CATALOG = {op.type: op for op in [
     Operation("backlog.close_story", StoryRef, close_story,
               "Closes the story by hand. Its column is done from then on, whatever its units do.", scope="run"),
     Operation("backlog.reopen_story", StoryRef, reopen_story, "Drops the closed record.", scope="run"),
+    Operation("project.reconcile_answer", ReconcileAnswer, reconcile_answer,
+              "Answers reconcile's question on an external change in a gate-list area: decision records the "
+              "decision-log line, not-architecture records that it is none, review opens a polish run on it.",
+              chat=False),
     Operation("provisioning.set_secret", SetSecret, set_secret,
               "Stores the value in the OS keyring. The value is never logged, returned, or recorded.",
               chat=False, secret_fields=("value",)),

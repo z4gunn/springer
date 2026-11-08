@@ -4,7 +4,7 @@ This file is the operative ruleset for the AI agents building this application. 
 
 ## How to start
 
-Run `springer` in a terminal and write the brief in `docs/brief.md`. The harness daemon loops the Orchestrator (`spgr-agent-orchestrator`), which returns routing only, and the domain agents it routes, and pauses only at the gates your autonomy level fires. Do not drive a run from a Claude session: the daemon is its only writer. You can also invoke one agent for one phase by hand, for example `spgr-agent-discovery` to start research or `spgr-agent-architect` to produce architecture options.
+Run `springer` in a terminal and write the brief in `docs/brief.md`. The harness daemon loops the Orchestrator (`spgr-agent-orchestrator`), which returns routing only, and the domain agents it routes, and pauses only at the gates your autonomy level fires. Do not drive a run from a Claude session: the daemon is its only writer. Invoking one agent by hand, for example `spgr-agent-discovery` to start research, is manual mode: no ledger, no review, no product check, and the daemon records the result when it lands on the default branch, closing a story a `Closes STORY-2026-n` trailer names.
 
 ## Core Design Principles
 

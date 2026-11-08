@@ -16,6 +16,7 @@ from . import cleanup
 from .common import artifact_header, iso, read_json, write_json, write_text
 from .errors import IllegalTransition, InvalidArgs, NotFound
 from .providers.local import LocalSourceHost
+from .reconcile import Reconciler
 from .registry import Home
 from .release import Releases, ready_to_ship
 from .scheduler.engine import RunEngine
@@ -135,6 +136,8 @@ class Daemon:
         self.started_at = now()
         self.config = None  # set when onboarded
         self.degradations = []  # what doctor found missing, shown in the TUI
+        self.reconciler = Reconciler(self)
+        self.announcements = []  # lines for the person's channel, drained by the notifier
 
     # --- projects and runs ---
 
@@ -479,7 +482,8 @@ class Daemon:
         True when nothing is left to record."""
         path = self.project_path(slug)
         files = [".gitignore"] if ignore_run_store(path) else []
-        files += [p for p in (f"runs/{run_id}", "runs/_config-unlock.json", "runs/_backlog.json") if (path / p).exists()]
+        files += [p for p in (f"runs/{run_id}", "runs/_config-unlock.json", "runs/_backlog.json",
+                              "runs/_reconcile.jsonl", "runs/_reconcile") if (path / p).exists()]
         return self._commit(slug, path, files, f"chore(runs): record {run_id}", f"the records of {run_id}")
 
     def _clean_up(self, engine):
@@ -562,7 +566,26 @@ class Daemon:
                     else:
                         self._tick_errors.pop((slug, run_id), None)
                         self._tick_failures.pop((slug, run_id), None)
+            self.reconcile_all()
             return results
+
+    def reconcile_all(self):
+        """Once a minute per project, the external changes since the last look. See
+        reconcile.py and Modes in pdca-harness."""
+        now = self.now()
+        for slug, record in self.home.projects().items():
+            if record.get("archived") or not self.reconciler.due(slug, now):
+                continue
+            try:
+                self.reconciler.tick(slug, now)
+            except Exception as exc:  # noqa: BLE001, one project's defect must not stop the others
+                self.reconciler.last[slug] = now
+                traceback.print_exc(file=sys.stderr)
+                sys.stderr.write(f"could not reconcile {slug}: {exc}\n")
+
+    def announce(self, text):
+        """A line for the person's channel, posted by the notifier on its next poll."""
+        self.announcements.append(text)
 
     def _tick_failed(self, engine, key, exc):
         """A failing tick is written to the run's ledger, where the TUI shows it, once

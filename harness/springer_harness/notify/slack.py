@@ -22,6 +22,7 @@ import time
 import uuid
 from pathlib import Path
 
+from .. import reconcile
 from ..errors import HarnessError
 from .notifier import finished_at, join_notes, run_summary, trim
 
@@ -41,7 +42,7 @@ LOG_CHARS = 1800
 ONLY_YOU = "Only the person this app was set up for can do that."
 USAGE = ("status | gates | units [project] | polish <project> <issue> | build <project> | release <project> | "
          "release-command <project> <command> [word] | checks <project> [command...] | pause <project> | "
-         "resume <project> | "
+         "resume <project> | reconcile <project> <change> <option> [text] | "
          "redispatch <unit> [tier] | cancel <unit> | log <unit> | ruling [project] <text> | "
          "unlock [project] <path> <reason> | restart")
 
@@ -463,7 +464,7 @@ def handle_command(text, daemon, operations, user, allowed_user):
     if verb == "help":
         return f"/springer {USAGE}"
     if verb not in ("polish", "build", "release", "release-command", "checks", "pause", "resume", "redispatch", "cancel",
-                    "log", "ruling", "unlock", "restart"):
+                    "log", "ruling", "unlock", "reconcile", "restart"):
         return f"Try /springer {USAGE}"
     if user != allowed_user:
         return ONLY_YOU
@@ -501,6 +502,8 @@ def handle_command(text, daemon, operations, user, allowed_user):
                           {"facts": {"pinned_rulings": pinned}, "base_version": front["brief_version"]},
                           lambda outcome: "Pinned." + (f" {outcome['result']['gate_id']} asks you to apply it."
                                                        if outcome.get("result", {}).get("gate_id") else ""))
+        if verb == "reconcile":
+            return _reconcile(daemon, operations, rest)
         if verb == "unlock":
             slug, rest = _one_project(daemon, rest)
             if len(rest) < 2:
@@ -543,6 +546,20 @@ def _start(daemon, operations, lane, rest):
                 f"change in the brief first, or use /springer polish {slug} \"the issue\" for one fix.")
     return _apply(operations, "run.start", slug, None, args,
                   lambda outcome: f"Started {outcome['result']['run_id']}. Its progress thread opens in this DM.")
+
+
+def _reconcile(daemon, operations, rest):
+    """reconcile <project> <change> <option> [text]: answer reconcile's question on an
+    external change in a gate-list area."""
+    slug, rest = _one_project(daemon, rest)
+    if len(rest) < 2 or rest[1] not in reconcile.OPTIONS:
+        return (f'How? /springer reconcile {slug} R-1 decision "ADR-002: the session cookie is SameSite strict", '
+                f"/springer reconcile {slug} R-1 not-architecture, or /springer reconcile {slug} R-1 review")
+    args = {"change_id": rest[0], "option": rest[1], "text": " ".join(rest[2:]) or None}
+    replies = {"decision": "Recorded.", "not-architecture": "Noted, not an architecture change.",
+               "review": "Started {run} to review it."}
+    return _apply(operations, "project.reconcile_answer", slug, None, args,
+                  lambda outcome: replies[rest[1]].format(run=(outcome.get("result") or {}).get("answer", {}).get("run_id")))
 
 
 def _release(daemon, operations, verb, rest):

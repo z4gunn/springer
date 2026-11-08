@@ -75,10 +75,11 @@ class BacklogStore:
             return backlog
         first = backlog is None
         backlog = backlog or _empty()
+        history = self._history_runs()
         for run_id, name, digest, doc in new:
             source = {"run_id": run_id, "artifact": name, "digest": digest}
             try:
-                merge(backlog, from_artifact(doc["content"]), run_id)
+                merge(backlog, from_artifact(doc["content"]), run_id, history)
             except Exception as exc:  # noqa: BLE001, one unreadable artifact must not take the board down
                 source["skipped"] = f"{type(exc).__name__}: {exc}"[:200]
             backlog["sources"].append(source)
@@ -87,6 +88,15 @@ class BacklogStore:
                 carry(old, backlog)
         self.save(backlog)
         return backlog
+
+    def _history_runs(self):
+        """Runs from before the daemon, an adopted instance's history: a run folder whose
+        brief carries no kind. Their stories are done when a later run leaves them out,
+        because those runs shipped."""
+        if not self.root.is_dir():
+            return set()
+        return {p.name for p in self.root.iterdir() if p.is_dir() and not p.name.startswith(("_", "."))
+                and not ((read_json(p / "run-brief.json") or {}).get("content") or {}).get("kind")}
 
     def _legacy_boards(self):
         """The per-run backlog.json files runs kept before the project backlog, oldest
@@ -186,6 +196,22 @@ class BacklogStore:
                            if v is not None}
         self.save(backlog)
         return story["closed"]
+
+    def add_hint(self, story_id, hint):
+        """An external change touched the paths a story's units declared. A hint, never
+        a close."""
+        backlog = self.require()
+        self.story(backlog, story_id).setdefault("hints", []).append(hint)
+        self.save(backlog)
+
+    def verify(self, story_ids, passed):
+        """The product checks ran after the change that closed these stories."""
+        backlog = self.require()
+        for story_id in story_ids:
+            story = self.story(backlog, story_id)
+            if story.get("closed"):
+                story["closed"]["verified"] = bool(passed)
+        self.save(backlog)
 
     def reopen_story(self, story_id):
         backlog = self.require()
@@ -373,12 +399,14 @@ def _flatten(content):
     return {**content, "epics": epics, "features": features, "backlog": items}
 
 
-def merge(backlog, fresh, run_id):
+def merge(backlog, fresh, run_id, history=()):
     """An artifact merges into the project backlog by id. New epics, features and
-    stories append. A known feature takes the new title and outcome, a known story the
-    new title, type and dependencies, and keeps its place, its closed record, and what
-    a person set. A not-done story the artifact leaves out moves under Deferred with a
-    note naming the run, never deleted."""
+    stories append, each story remembering the run it came from. A known feature takes
+    the new title and outcome, a known story the new title, type and dependencies, and
+    keeps its place, its closed record, and what a person set. A not-done story the
+    artifact leaves out moves under Deferred with a note naming the run, never deleted,
+    unless it came from a run before the daemon, which shipped: that story closes with
+    source history."""
     epics = {e["epic_id"]: e for e in backlog["epics"]}
     features = {f["feature_id"]: f for e in backlog["epics"] for f in e["features"]}
     stories = {s["story_id"]: (f, s) for f in features.values() for s in f["stories"]}
@@ -405,6 +433,7 @@ def merge(backlog, fresh, run_id):
                 seen.add(story["story_id"])
                 known = stories.get(story["story_id"])
                 if known is None:
+                    story.setdefault("run_id", run_id)
                     target["stories"].append(story)
                     stories[story["story_id"]] = (target, story)
                     continue
@@ -413,6 +442,10 @@ def merge(backlog, fresh, run_id):
                         known[1][key] = story[key]
     for story_id, (feature, story) in list(stories.items()):
         if story_id in seen or story.get("closed") or feature["feature_id"] in OWN_FEATURES:
+            continue
+        if story.get("run_id") in history:
+            story["closed"] = {"source": "history", "run_id": story["run_id"], "left_out_by": run_id,
+                               "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
             continue
         feature["stories"].remove(story)
         story["note"] = f"left out by {run_id}'s backlog"

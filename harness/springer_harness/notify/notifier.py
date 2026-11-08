@@ -278,6 +278,7 @@ class Notifier:
             gates, events, runs, escalations = self._gather(state)
             try:
                 sent += self._send_restart()
+                sent += self._send_announcements()
                 sent += self._send_gates(state, gates, settings)
                 sent += self._send_escalations(state, escalations)
                 sent += self._send_events(state, events, runs, settings)
@@ -380,6 +381,17 @@ class Notifier:
                               f"({item['type']}): {item['description']}")
             state["escalations"].append(item["key"])
             sent.append(("escalation", item["id"]))
+        return sent
+
+    def _send_announcements(self):
+        """Lines the daemon left for the person, such as reconcile's digest and its
+        questions. Posted at any hour, because a question waits on nobody else."""
+        sent = []
+        pending = getattr(self.daemon, "announcements", None)
+        while pending:
+            text = pending.pop(0)
+            self.channel.post(text)
+            sent.append(("announce", text.split("\n", 1)[0][:60]))
         return sent
 
     def _send_events(self, state, events, runs, settings):
