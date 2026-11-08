@@ -315,6 +315,13 @@ class RunEngine:
         level = risk_for(result, self._spec(unit_id)["risk_baseline"])
         write_json(self.units.unit_dir(unit_id) / "risk.json",
                    {"level": level, "triggers": triggers(result.touched_paths), "findings": list(result.findings)})
+        if result.outcome != "pr" and self.worktrees.path(unit_id).exists() \
+                and not self.worktrees.own_commits(unit_id, self._base_for(unit_id)):
+            # Nothing of its own to land. Its findings are in the run store, and a stacked
+            # parent's code is that parent's change, never a second one.
+            self.units.transition(unit_id, "done", "no change of its own")
+            self._release(unit_id)
+            return
         code = [] if result.outcome == "pr" or not self.worktrees.path(unit_id).exists() \
             else self.worktrees.code_paths(unit_id)
         if code and not hasattr(self.source_host, "open"):

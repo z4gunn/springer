@@ -578,6 +578,7 @@ class MergePolicyTest(EngineCase):
         self.host.open = lambda project, branch, base, title="": opened.append((branch, base)) or 9
         engine = self.engine([batch(unit("a", agent="notable"))])
         engine.worktrees.code_paths = lambda unit_id: ["src/Hero.tsx"]
+        engine.worktrees.own_commits = lambda unit_id, base: 1
         integrated = []
         engine.worktrees.integrate = lambda unit_id: integrated.append(unit_id)
         self.provider.script["notable"] = [Attempt(result={"status": "pass", "outcome": "artifact"})]
@@ -586,9 +587,27 @@ class MergePolicyTest(EngineCase):
         self.assertEqual(opened, [("unit/U-0001", "main")])
         self.assertEqual(engine.units.state("U-0001")["pr"]["number"], 9)
 
+    def test_a_stacked_audit_with_no_commits_of_its_own_opens_no_change(self):
+        """A polish run planned an accessibility audit stacked on the change it read. It
+        committed nothing, but its branch carried the parent's code, so it got a change,
+        a merge gate, and a reviewer of its own."""
+        opened = []
+        self.host.open = lambda project, branch, base, title="": opened.append((branch, base)) or 9
+        self.provider.script["audit"] = [Attempt(result={"status": "pass", "outcome": "review", "findings": []})]
+        engine = self.engine([batch(unit("a", agent="risky"), unit("b", agent="audit", depends_on=("a",)))])
+        bases = []
+        engine.worktrees.own_commits = lambda unit_id, base: bases.append((unit_id, base)) or 0
+        engine.worktrees.code_paths = lambda unit_id: ["packages/auth/session.ts"]
+        engine.worktrees.integrate = lambda unit_id: self.fail("integrated a parent's code")
+        self.tick_until(engine, lambda: self.states(engine).get("U-0002") == "done")
+        self.assertEqual(engine.units.state("U-0002").get("pr"), None)
+        self.assertNotIn(("unit/U-0002", "unit/U-0001"), opened)
+        self.assertIn(("U-0002", "unit/U-0001"), bases, "counted against the parent it stacked on")
+
     def test_on_github_an_artifact_outcome_that_changes_code_is_a_defect(self):
         engine = self.engine([batch(unit("a", agent="notable"))])
         engine.worktrees.code_paths = lambda unit_id: ["src/Hero.tsx"]
+        engine.worktrees.own_commits = lambda unit_id, base: 1
         engine.worktrees.integrate = lambda unit_id: self.fail("integrated code")
         self.provider.script["notable"] = [Attempt(result={"status": "pass", "outcome": "artifact"}),
                                            Attempt(result=pr_result(5, touched=("src/Hero.tsx",)))]

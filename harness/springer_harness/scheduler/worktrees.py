@@ -101,6 +101,12 @@ class Worktrees:
         changed = _git(self.project, "diff", "--name-only", f"{self.default_branch()}...{self.branch(unit_id)}").stdout
         return [p for p in changed.splitlines() if p and not p.startswith(ARTIFACT_PATHS)]
 
+    def own_commits(self, unit_id, base):
+        """The commits the unit's branch has past the base it was cut from. A unit stacked
+        on an open change to read it, such as an audit, has none of its own."""
+        count = _git(self.project, "rev-list", "--count", f"{base}..{self.branch(unit_id)}").stdout.strip()
+        return int(count) if count.isdigit() else 0
+
     def integrate(self, unit_id):
         """Merge the unit's branch into the default branch, off the person's checkout.
         Returns None, "nothing to integrate", or why it was refused. Their uncommitted

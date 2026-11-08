@@ -111,8 +111,11 @@ Rules for the schema:
 - gates: only the gates the autonomy level fires (under standard, one direction-review
   holding the units that need the picked option and direction). holds names unit keys.
 - When the run brief's lane is polish, the run takes the one issue in run_brief.issue,
-  per Lanes in the reference: one implementing unit, its review, at most two verticals by
-  the paths it touches, and the product check, ending in one pull request. Write no PRD,
+  per Lanes in the reference: one implementing unit, at most two verticals by the paths it
+  touches, and the product check, ending in one pull request. The harness adds the code
+  review to every pull request itself, so plan no spgr-agent-code-reviewer unit. A vertical
+  audits the implementing unit's branch and returns its findings as an artifact, and fixes
+  go back to the implementing unit, not into a pull request of the vertical's own. Write no PRD,
   story, criteria, or ADR artifact unless the change is on the gate list. The implementing
   unit's story_ids is run_brief.story_ids, the issue's item on the project backlog. Every
   ruling in run_brief.pinned_rulings binds.
