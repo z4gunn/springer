@@ -29,6 +29,9 @@ from .state.usage import UsageWindow
 SOURCE = Path(__file__).resolve().parents[2]
 TICK_SECONDS = 5
 HEARTBEAT_FILE = "heartbeat.json"
+CRASH_FILE = "crashes.json"
+CRASH_WINDOW_SECONDS = 600
+CRASH_LIMIT = 3  # unclean starts inside the window that make a crash loop
 RESTART_FILE = "restart.json"
 STALL_AFTER = 3  # failed ticks in a row before a person is told at once
 
@@ -128,6 +131,7 @@ class Daemon:
         self._tick_errors = {}
         self._tick_failures = {}
         self.unclean_start = None  # the last heartbeat, when the daemon before did not stop cleanly
+        self.crash_loop = None  # {"count", "since"} when the unclean starts in the window reach CRASH_LIMIT
         self.restart_process = None  # set by serve, so a drained restart can replace the process
         self.operations = None  # set by the API app
         self._restarting = False
@@ -486,10 +490,6 @@ class Daemon:
                               "runs/_reconcile.jsonl", "runs/_reconcile") if (path / p).exists()]
         return self._commit(slug, path, files, f"chore(runs): record {run_id}", f"the records of {run_id}")
 
-    def commit_reconcile(self, slug):
-        """Reconcile's ledger, its product check results, and the backlog closes it made
-        go in as one commit whose subject reconcile knows as its own."""
-        path = self.project_path(slug)
     def apply_risk_rule(self, slug, rule, gate_id):
         """A gate answer's rule change goes into the project's risk rules and is
         committed, so the next merge's pr-risk.py reads it."""
@@ -497,6 +497,10 @@ class Daemon:
         if risk_rules.apply(path, rule):
             self._commit(slug, path, [risk_rules.FILE], f"chore(runs): risk rule from {gate_id}", "the risk rules")
 
+    def commit_reconcile(self, slug):
+        """Reconcile's ledger, its product check results, and the backlog closes it made
+        go in as one commit whose subject reconcile knows as its own."""
+        path = self.project_path(slug)
         files = [p for p in ("runs/_reconcile.jsonl", "runs/_reconcile", "runs/_backlog.json") if (path / p).exists()]
         return self._commit(slug, path, files, "chore(runs): reconcile", "the reconcile records")
 
@@ -638,9 +642,37 @@ class Daemon:
 
     def note_start(self):
         previous = read_json(self.home.root / HEARTBEAT_FILE)
+        crashes = self.home.root / CRASH_FILE
         if isinstance(previous, dict) and not previous.get("clean"):
             self.unclean_start = {"at": previous.get("at"), "pid": previous.get("pid")}
+            now = self.now()
+            starts = [s for s in (read_json(crashes) or []) if now - s < CRASH_WINDOW_SECONDS] + [now]
+            write_json(crashes, starts)
+            if len(starts) >= CRASH_LIMIT:
+                self.crash_loop = {"count": len(starts), "since": iso(starts[0]), "announce": len(starts) == CRASH_LIMIT}
+        elif isinstance(previous, dict):
+            crashes.unlink(missing_ok=True)
         self.beat()
+
+    def hold_for_crash_loop(self):
+        """A daemon that keeps dying must not keep dispatching into whatever kills it.
+        Every active run is paused, and the notifier tells the person once. A person
+        resumes each run when the cause is fixed."""
+        if not self.crash_loop or self.operations is None:
+            return []
+        paused = []
+        with self.lock:
+            runs = [(slug, run_id) for slug, run_id in self._active_runs() if not self.engine(slug, run_id).paused()]
+        for slug, run_id in runs:
+            try:
+                self.operations.apply(f"crash-loop-pause-{uuid.uuid4().hex}", "run.pause", slug, run_id,
+                                      {"reason": f"the daemon restarted {self.crash_loop['count']} times in "
+                                                 f"{CRASH_WINDOW_SECONDS // 60} minutes"}, None, "daemon")
+                paused.append(run_id)
+            except Exception as exc:  # noqa: BLE001, one run that cannot pause must not stop the rest
+                sys.stderr.write(f"could not pause {run_id} for the crash loop: {exc}\n")
+        self.crash_loop["paused"] = paused
+        return paused
 
     def mark_clean_stop(self):
         self.beat(clean=True)
@@ -705,6 +737,7 @@ class Daemon:
 
     def start(self, seconds=TICK_SECONDS):
         self.note_start()
+        self.hold_for_crash_loop()
         self.recover()
         if self.config is not None:
             threading.Thread(target=self._find_degradations, daemon=True, name="springer-doctor").start()

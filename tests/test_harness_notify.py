@@ -193,6 +193,39 @@ class EventTest(NotifyCase):
         self.daemon.note_start()
         self.assertIsNone(self.daemon.unclean_start, "a clean stop is not a crash")
 
+    def crash_start(self):
+        self.daemon.beat()  # a heartbeat never marked clean, as a killed daemon leaves it
+        self.daemon.unclean_start = self.daemon.crash_loop = None
+        self.notifier.restart_noted = False
+        self.daemon.note_start()
+        return self.daemon.hold_for_crash_loop()
+
+    def test_a_crash_loop_pauses_every_run_and_says_so_once(self):
+        self.set_up_slack()
+        for _ in range(2):
+            self.assertEqual(self.crash_start(), [])
+            self.clock.advance(30)
+        self.assertFalse(self.engine.paused(), "two crashes are not yet a loop")
+        self.assertEqual(self.crash_start(), [self.run_id])
+        self.assertTrue(self.engine.paused())
+        self.notifier.poll()
+        self.crash_start()
+        self.notifier.poll()
+        posts = [text for kind, text in self.channel.sent if kind == "post"]
+        self.assertEqual(len(posts), 1, "the restart that reached the limit says so, later ones are quiet")
+        self.assertIn("restarted 3 times", posts[0])
+        self.assertIn(self.run_id, posts[0])
+
+    def test_crashes_outside_the_window_or_after_a_clean_stop_do_not_loop(self):
+        for _ in range(2):
+            self.crash_start()
+            self.clock.advance(400)
+        self.assertEqual(self.crash_start(), [], "the first crash fell out of the ten-minute window")
+        self.daemon.mark_clean_stop()
+        self.daemon.note_start()
+        self.assertEqual(self.crash_start(), [], "a clean stop starts the count again")
+        self.assertFalse(self.engine.paused())
+
     def test_three_failed_ticks_in_a_row_mark_the_run_stalled(self):
         self.engine.tick = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
         for _ in range(4):

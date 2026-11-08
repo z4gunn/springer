@@ -342,6 +342,16 @@ class Notifier:
         crash = getattr(self.daemon, "unclean_start", None)
         if not crash or self.restart_noted:
             return []
+        loop = getattr(self.daemon, "crash_loop", None)
+        if loop:
+            self.restart_noted = True
+            if not loop.get("announce"):
+                return []  # the loop was announced on the start that reached the limit
+            paused = ", ".join(loop.get("paused") or ()) or "none were active"
+            self.channel.post(f"The daemon restarted {loop['count']} times since {loop['since']}, so it paused "
+                              f"every run ({paused}). The cause is in ~/.springer/daemon.log. "
+                              "Resume each one with /springer resume <project> once it is fixed.")
+            return [("crash_loop", loop["since"])]
         self.channel.post(f"The daemon restarted after it stopped without a clean shutdown "
                           f"(last heartbeat {crash.get('at', 'unknown')}). Runs pick up where they were.")
         self.restart_noted = True
