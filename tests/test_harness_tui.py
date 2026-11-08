@@ -152,7 +152,7 @@ class TuiCase(unittest.IsolatedAsyncioTestCase):
 
     async def backlog_screen(self, pilot):
         run_id = await self.run_screen(pilot)
-        (self.engine(run_id).run_dir / "backlog.json").write_text(json.dumps(BACKLOG))
+        (self.engine(run_id).run_dir.parent / "_backlog.json").write_text(json.dumps(BACKLOG))
         await pilot.press("k")
         await self.see(pilot, "MVP LINE")
         return run_id
@@ -723,7 +723,7 @@ class BacklogScreenTest(TuiCase):
             brief["content"]["lane"] = "polish"
             path.write_text(json.dumps(brief))
             await pilot.press("k")
-            await self.see(pilot, "is a polish run, which fixes one issue and has no backlog", "l runs")
+            await self.see(pilot, "is a polish run from before the project backlog", "l runs")
             await pilot.press("l")
             await self.dialog(pilot, RunsDialog)
 
@@ -756,19 +756,30 @@ class BacklogScreenTest(TuiCase):
             await pilot.press("plus")
             await self.dialog(pilot, FormDialog)
             await pilot.press(*"It broke", "enter")
-            await self.see(pilot, "BUG-1 It broke")
+            await self.see(pilot, f"BUG-{time.strftime('%Y', time.gmtime())}-1 It broke")
             await pilot.press("u")
             await self.dialog(pilot, FormDialog)
             await self.see(pilot, "Which currency?")
             await pilot.press(*"EUR", "enter")
             await self.see(pilot, "unknowns: 0")
 
+    async def test_close_and_reopen_a_story(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.backlog_screen(pilot)
+            await self.see(pilot, "this run: 0")
+            await self.select(pilot, "story:S-2")
+            await pilot.press("x")
+            await self.see(pilot, "closed by human")
+            self.assertIn("done", next(line for line in self.text().splitlines() if "S-2 Send" in line))
+            await pilot.press("x")
+            await self.until(pilot, lambda: "closed by human" not in self.text())
+
     async def test_a_refused_reorder_shows_the_reason(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             run_id = await self.backlog_screen(pilot)
             backlog = json.loads(json.dumps(BACKLOG))
             backlog["epics"][0]["features"][0]["stories"][1]["depends_on"] = ["S-1"]
-            (self.engine(run_id).run_dir / "backlog.json").write_text(json.dumps(backlog))
+            (self.engine(run_id).run_dir.parent / "_backlog.json").write_text(json.dumps(backlog))
             self.app.mark_dirty()
             await self.see(pilot, "needs S-1")
             await self.select(pilot, "story:S-2")
@@ -1203,6 +1214,7 @@ COVERAGE = {
     ("Backlog", "Move line, defer, restore, reorder, add bug, answer unknown"):
         (BacklogScreenTest, "test_move_line_defer_restore_reorder_add_bug_answer_unknown"),
     ("Backlog", "Open the PR"): (BacklogScreenTest, "test_open_the_pr"),
+    ("Backlog", "Close or reopen a story"): (BacklogScreenTest, "test_close_and_reopen_a_story"),
     ("Run", "Phase, in-flight rows with agent, model, elapsed, context, cost, last tool"):
         (RunScreenTest, "test_phase_and_in_flight_rows"),
     ("Run", "Live session output"): (RunScreenTest, "test_live_session_output"),

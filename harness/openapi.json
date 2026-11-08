@@ -82,6 +82,17 @@
             ],
             "title": "Lane"
           },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
           "state": {
             "enum": [
               "generated",

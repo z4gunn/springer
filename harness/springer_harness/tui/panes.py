@@ -682,6 +682,7 @@ class BacklogPane(Pane):
     BINDINGS = [Binding("v", "view", "view"), Binding("m", "move_line", "move line"), Binding("d", "defer", "defer"),
                 Binding("J", "down", "later"), Binding("K", "up", "earlier"), Binding("plus", "add_bug", "add bug"),
                 Binding("u", "unknown", "unknowns"), Binding("o", "open_pr", "open PR"),
+                Binding("x", "close", "close/reopen"),
                 Binding("space", "toggle", "fold"), Binding("l", "runs", "runs")]
 
     def __init__(self, **kwargs):
@@ -696,7 +697,7 @@ class BacklogPane(Pane):
         yield Static("", id="board", markup=False)
         yield Static(keys(("v", "view"), ("space", "fold"), ("m", "move line here"), ("d", "defer/restore"),
                           ("J/K", "reorder"), ("+", "add bug"), ("u", "unknowns"), ("o", "open PR"),
-                          ("l", "runs")), classes="hint")
+                          ("x", "close/reopen"), ("l", "runs")), classes="hint")
 
     def action_runs(self):
         if self.app.project:
@@ -711,16 +712,18 @@ class BacklogPane(Pane):
             return
         self.data = await self.client.get(run_path(self.app.project, self.app.run_id) + "/backlog")
         unanswered = sum(1 for u in self.data["unknowns"] if u["answer"] is None)
+        mine = sum(1 for s in self._stories() if s.get("in_run"))
         self.query_one("#backlog-title", Static).update(join(
             paint("backlog", "dim", bold=True), paint(f"   view: {self.view_name}", "dim"),
+            paint(f"   this run: {mine}", "dim"),
             paint(f"   unknowns: {unanswered}", "you" if unanswered else "dim")))
         table = self.query_one("#backlog", DataTable)
         board = self.query_one("#board", Static)
         table.display = self.view_name == "tree"
         board.display = self.view_name != "tree"
         if self.data["state"] == "not_generated":
-            empty = (f"{self.app.run_id} is a polish run, which fixes one issue and has no backlog. "
-                     "l opens another run." if self.data.get("lane") == "polish"
+            empty = (f"{self.app.run_id} is a polish run from before the project backlog, so its issue is "
+                     "not on the board. l opens another run." if self.data.get("lane") == "polish"
                      else "The backlog is not generated yet.")
             self.fill(table, [("empty", (empty, "", "", "", ""))])
             board.update(empty)
@@ -756,7 +759,10 @@ class BacklogPane(Pane):
                 for story in feature["stories"]:
                     pr = story.get("pr") or {}
                     deps = ", ".join(story.get("depends_on", []))
-                    note = " ".join(x for x in (f"change #{pr['number']}" if pr else "", f"needs {deps}" if deps else "") if x)
+                    note = " ".join(x for x in ("this run" if story.get("in_run") else "",
+                                                f"change #{pr['number']}" if pr else "",
+                                                f"needs {deps}" if deps else "",
+                                                f"closed by {story['closed'].get('source')}" if story.get("closed") else "") if x)
                     column, risk = story.get("column") or "", story.get("risk") or ""
                     rows.append((f"story:{story['story_id']}",
                                  (join(paint(f"      {story['story_id']} ", "dim"), story["title"]),
@@ -789,6 +795,14 @@ class BacklogPane(Pane):
 
     def _op(self, kind, args=None):
         self.app.spawn(self.app.apply(kind, args, project=self.app.project, run_id=self.app.run_id))
+
+    def action_close(self):
+        story_id = self._selected("story")
+        if not story_id:
+            return
+        story = next((s for s in self._stories() if s["story_id"] == story_id), None)
+        self._op("backlog.reopen_story" if story and story.get("closed") else "backlog.close_story",
+                 {"story_id": story_id})
 
     def action_view(self):
         self.view_name = VIEWS[(VIEWS.index(self.view_name) + 1) % len(VIEWS)]

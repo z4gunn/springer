@@ -113,8 +113,9 @@ Rules for the schema:
 - When the run brief's lane is polish, the run takes the one issue in run_brief.issue,
   per Lanes in the reference: one implementing unit, its review, at most two verticals by
   the paths it touches, and the product check, ending in one pull request. Write no PRD,
-  story, criteria, or ADR artifact unless the change is on the gate list. Every ruling in
-  run_brief.pinned_rulings binds.
+  story, criteria, or ADR artifact unless the change is on the gate list. The implementing
+  unit's story_ids is run_brief.story_ids, the issue's item on the project backlog. Every
+  ruling in run_brief.pinned_rulings binds.
 - A unit in blocked, gated, or planned behind a gate is waiting on a person, and the
   answer resumes that same unit. Never route its work again under a new key.
 - A unit whose PR is open (state gated) is not a reason to wait. Work that builds on it

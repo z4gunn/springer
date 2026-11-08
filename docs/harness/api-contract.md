@@ -185,7 +185,7 @@ The backlog view is used by the Backlog screen for the tree, the board, and the 
  "lane": "build"}
 ```
 
-`lane` is the run's lane from its run brief. A `polish` run takes one issue and never has a backlog, so the screen says so rather than waiting for one. `state` is `not_generated` with empty lists until the PM unit writes a `prioritized-backlog` artifact. The daemon builds the view from the newest one that is not a reference inventory, nests its flat epics, features, and items into the tree, and puts items with no known feature under one Stories feature and its deferrals under a Deferred feature below the MVP line. A revised artifact rebuilds the view and keeps what a person changed with the backlog operations. A story's `unit_ids` are the units whose spec names it in `story_ids`, which the Plan step fills, or whose expected outcome names its id. `column` is one of ready, in_progress, in_review, blocked, done. The dependency graph is carried by `depends_on`, and the MVP line by each feature's `mvp` flag, so the view has one source for each fact.
+The backlog is one project fact at `runs/_backlog.json`, committed with run records, and every run's view shows it. `run_id` is the run the view is seen from, `lane` its lane, and each story carries `in_run` when that run builds it or, on a polish run, when it is the run's issue. `state` is `not_generated` with empty lists until a PM unit writes a `prioritized-backlog` artifact or a person files a bug. The daemon merges every artifact that is not a reference inventory into the backlog by id, oldest first: it nests the flat epics, features, and items into the tree, puts items with no known feature under one Stories feature and its deferrals under a Deferred feature below the MVP line, appends what is new, takes a known story's new title and dependencies, keeps a closed story closed, and moves a not-done story a later artifact leaves out under Deferred with a note naming the run. A polish run's issue is one TASK or BUG item under a Polish feature, with an id from the project counter, named in the run brief's `story_ids`. A story's `closed` record says what finished it, source unit, pr, external, or human, with the PR number and the time, and the column rule is the closed record first, then the units, then ready. What a person changed with the backlog operations is never undone by an artifact. A story's `unit_ids` are the units whose spec names it in `story_ids`, which the Plan step fills, or whose expected outcome names its id. `column` is one of ready, in_progress, in_review, blocked, done. The dependency graph is carried by `depends_on`, and the MVP line by each feature's `mvp` flag, so the view has one source for each fact.
 
 ### Gate view
 
@@ -297,6 +297,8 @@ The catalog is the closed list of writes in v1, and `GET /v1/operations/catalog`
 | backlog.reorder | `story_id`, `position` | No | Reorders within a wave. A move that breaks a dependency returns illegal_transition |
 | backlog.add_bug | `title`, `description`, `severity` | No | Adds a bug to the backlog |
 | backlog.answer_unknown | `unknown_id`, `answer` | No | Records the answer |
+| backlog.close_story | `story_id`, `note` | No | Closes the story by hand with a `closed` record of source human. Its column is done from then on, whatever its units do |
+| backlog.reopen_story | `story_id` | No | Drops the closed record |
 | provisioning.set_secret | `item_id`, `value` | No | Stores the value in the OS keyring. The value is never logged, returned, or recorded. Refused for the chat actor |
 | config.set_role_model | `role`, `model` | Yes | Changes the model for a role (e.g. the reviewer) |
 | config.set_gate_channels | `level`, `channels` | Yes | Changes where gates of that level notify |
@@ -337,6 +339,7 @@ This section is used to check the contract against what the target README promis
 | Backlog | Tree, board, graph, MVP line, risk tags | GET {run}/backlog |
 | Backlog | Move line, defer, restore, reorder, add bug, answer unknown | backlog.* |
 | Backlog | Open the PR | `pr.url` in the backlog view |
+| Backlog | Close or reopen a story | backlog.close_story, backlog.reopen_story |
 | Run | Phase, in-flight rows with agent, model, elapsed, context, cost, last tool | GET {run}, run stream |
 | Run | Live session output | Session stream |
 | Run | Unit cards with tier, context bar, elapsed, cost, last tool | GET {run} |

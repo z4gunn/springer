@@ -249,7 +249,7 @@ def create_app(daemon):
     def backlog(slug: str, run_id: str):
         engine = daemon.engine(slug, run_id)
         brief = read_json(engine.run_dir / "run-brief.json") or {}
-        return {**BacklogStore(engine.run_dir).view(engine.units, engine.ledger.head()),
+        return {**BacklogStore(daemon.project_path(slug)).view(engine.units, engine.ledger.head(), run_id),
                 "lane": (brief.get("content") or {}).get("lane")}
 
     @app.get(run_path + "/units", response_model=m.Page, dependencies=secured)

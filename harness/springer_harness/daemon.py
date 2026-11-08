@@ -20,6 +20,7 @@ from .registry import Home
 from .release import Releases, ready_to_ship
 from .scheduler.engine import RunEngine
 from .scheduler.worktrees import Worktrees
+from .state.backlog import BacklogStore
 from .state.brief import BriefStore, derive, parse
 from .state.lock import daemon_owner
 from .state.usage import UsageWindow
@@ -410,9 +411,12 @@ class Daemon:
         count = len(self.run_ids(slug)) + sum(1 for r in self.pruned_runs(slug).values() if r.get("daemon_run")) + 1
         run_id = f"{slug}-{kind}-{count}" if kind != "build" else f"{slug}-{count}"
         derived = derive(front)
+        lane = lane or derived["lane"]
+        # A polish run's issue is one item on the project backlog, which its unit carries.
+        story_ids = [BacklogStore(path).add_issue(run_id, issue)] if lane == "polish" and issue else []
         doc = artifact_header(f"run-brief-{run_id}", "run-brief", "run_brief", "v1", self.now())
-        doc["content"] = {"run_id": run_id, "profile": derived["profile"], "kind": kind, "lane": lane or derived["lane"],
-                          "issue": issue,
+        doc["content"] = {"run_id": run_id, "profile": derived["profile"], "kind": kind, "lane": lane,
+                          "issue": issue, "story_ids": story_ids,
                           "brief_version": front.get("brief_version", 1), "brief_source": source, "sections": sections,
                           "pinned_rulings": list(front.get("pinned_rulings") or [])}
         write_json(path / "runs" / run_id / "run-brief.json", doc)
@@ -475,7 +479,7 @@ class Daemon:
         True when nothing is left to record."""
         path = self.project_path(slug)
         files = [".gitignore"] if ignore_run_store(path) else []
-        files += [p for p in (f"runs/{run_id}", "runs/_config-unlock.json") if (path / p).exists()]
+        files += [p for p in (f"runs/{run_id}", "runs/_config-unlock.json", "runs/_backlog.json") if (path / p).exists()]
         return self._commit(slug, path, files, f"chore(runs): record {run_id}", f"the records of {run_id}")
 
     def _clean_up(self, engine):

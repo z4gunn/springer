@@ -120,7 +120,8 @@ class BacklogView(Open):
     state: Literal["generated", "not_generated"]
     epics: list[dict]
     unknowns: list[dict]
-    lane: str | None = None  # a polish run takes one issue and has no backlog
+    lane: str | None = None  # the run's lane, from its run brief
+    run_id: str | None = None  # the run the view is seen from: its units and in_run marks
 
 
 class Page(BaseModel):

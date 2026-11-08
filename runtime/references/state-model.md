@@ -48,6 +48,7 @@ This reference defines the durable state the Springer harness daemon reads and w
 |--------|----|----------|------------|
 | Project | slug | ~/.springer/projects.json | onboard, register |
 | Run | run_id | runs/<run_id>/ in the daemon's checkout: its clone of a hosted project under ~/.springer/clones/<slug>, the person's checkout of a local one | daemon |
+| Backlog | story_id | runs/_backlog.json, one per project, merged by id from every run's prioritized-backlog artifact plus the polish issues, bugs, and closed records, committed with run records | daemon, a person through the backlog operations |
 | Brief | brief_version | docs/brief.md in the person's checkout, taken into the daemon's checkout at run start when theirs is the newer one, projected to runs/<run_id>/run-brief.json with brief_source | human, daemon projection |
 | Cycle | CYCLE-nnnn | runs/<run_id>/artifacts/ as pdca-cycle artifacts, as today | daemon at Plan and at Act |
 | Unit | U-nnnn | runs/<run_id>/units/U-nnnn/ | daemon writes spec and state, the session writes outputs |

@@ -1,31 +1,44 @@
-"""The backlog as a file in the run store, shown on the TUI board.
+"""The backlog as one project fact at runs/_backlog.json, shown on the TUI board.
 
-The PM unit writes the backlog as a prioritized-backlog artifact. backlog.json is built
-from the latest one and rebuilt when the PM revises it, keeping what a person changed
-on the board (the MVP line, deferrals, story order, bugs, answers)."""
+A build run's PM unit writes a prioritized-backlog artifact, and every such artifact in
+the project merges into the one backlog by id: new items append, a known story takes
+the new title and dependencies, a closed story stays closed, and a not-done story a later
+artifact leaves out moves under Deferred with a note. A polish run adds its one issue as
+an item. What a person changed on the board (the MVP line, deferrals, story order, bugs,
+answers, closes) is never undone by an artifact. See Modes in pdca-harness."""
 
 import hashlib
 import re
+import time
 from pathlib import Path
 
 from ..common import read_json, write_json
 from ..errors import IllegalTransition, NotFound
 
+FILE = "_backlog.json"
 BUG_EPIC = "E-BUGS"
 BUG_FEATURE = "F-BUGS"
 LOOSE_EPIC = "E-BACKLOG"
 LOOSE_FEATURE = "F-STORIES"
 DEFERRED_FEATURE = "F-DEFERRED"
+POLISH_FEATURE = "F-POLISH"
+OWN_FEATURES = (BUG_FEATURE, DEFERRED_FEATURE, POLISH_FEATURE)  # items no artifact owns
 # A unit that names no story_ids still counts for a story its expected outcome names.
 STORY_ID = re.compile(r"\b(?:STORY|TASK|BUG)-[0-9]{4}-[0-9]+\b")
+BUG_WORDS = re.compile(r"\b(bug|broken|breaks|fix|wrong|error|crash|fails?|404)\b", re.I)
 COLUMNS = {"planned": "ready", "ready": "ready", "retry": "in_progress", "redispatch": "in_progress",
            "running": "in_progress", "abandoned": "in_progress", "returned": "in_review", "checking": "in_review",
            "gated": "in_review", "blocked": "blocked", "done": "done", "cancelled": "done"}
 
 
 class BacklogStore:
-    def __init__(self, run_dir):
-        self.path = Path(run_dir) / "backlog.json"
+    def __init__(self, project_path):
+        self.root = Path(project_path) / "runs"
+        self.path = self.root / FILE
+
+    @classmethod
+    def for_run(cls, run_dir):
+        return cls(Path(run_dir).parents[1])
 
     def load(self):
         return read_json(self.path)
@@ -39,38 +52,43 @@ class BacklogStore:
     def save(self, backlog):
         write_json(self.path, backlog)
 
-    def source(self):
-        """The newest prioritized-backlog artifact that is not a reference inventory, as
-        (file name, digest, document), or None."""
+    def sources(self):
+        """Every prioritized-backlog artifact in the project that is not a reference
+        inventory, oldest first, as (run_id, file name, digest, document)."""
         found = []
-        for path in Path(self.path.parent, "artifacts").glob("prioritized-backlog*.json"):
+        for path in self.root.glob("*/artifacts/prioritized-backlog*.json"):
             doc = read_json(path)
             if not isinstance(doc, dict) or doc.get("artifact_type") != "prioritized-backlog" \
                     or not isinstance(doc.get("content"), dict) or _inventory(path, doc):
                 continue
-            found.append((path.stat().st_mtime_ns, path.name, path))
-        if not found:
-            return None
-        _, name, path = max(found)
-        raw = path.read_bytes()
-        return name, hashlib.sha256(raw).hexdigest(), read_json(path)
+            found.append((path.stat().st_mtime_ns, path.parents[1].name, path.name, path))
+        return [(run_id, name, hashlib.sha256(path.read_bytes()).hexdigest(), read_json(path))
+                for _, run_id, name, path in sorted(found)]
 
     def sync(self):
-        """backlog.json, built from the PM's artifact when that is newer than it. A
-        backlog with no artifact behind it is left as it is."""
+        """The backlog, with every artifact not yet absorbed merged in. The first build of
+        the file also carries over the boards older runs kept for themselves."""
         backlog = self.load()
-        found = self.source()
-        if found is None:
+        absorbed = {s["digest"] for s in (backlog or {}).get("sources") or ()}
+        new = [s for s in self.sources() if s[2] not in absorbed]
+        if not new:
             return backlog
-        name, digest, doc = found
-        if backlog and (backlog.get("source") or {}).get("digest") == digest:
-            return backlog
-        fresh = from_artifact(doc["content"])
-        fresh["source"] = {"artifact": name, "digest": digest}
-        if backlog:
-            carry(backlog, fresh)
-        self.save(fresh)
-        return fresh
+        first = backlog is None
+        backlog = backlog or _empty()
+        for run_id, name, digest, doc in new:
+            merge(backlog, from_artifact(doc["content"]), run_id)
+            backlog["sources"].append({"run_id": run_id, "artifact": name, "digest": digest})
+        if first:
+            for old in self._legacy_boards():
+                carry(old, backlog)
+        self.save(backlog)
+        return backlog
+
+    def _legacy_boards(self):
+        """The per-run backlog.json files runs kept before the project backlog, oldest
+        first, so the newest board's edits win."""
+        paths = sorted((p for p in self.root.glob("*/backlog.json")), key=lambda p: p.stat().st_mtime_ns)
+        return [b for b in (read_json(p) for p in paths) if isinstance(b, dict) and b.get("epics")]
 
     def features(self, backlog):
         return [f for epic in backlog["epics"] for f in epic["features"]]
@@ -80,6 +98,13 @@ class BacklogStore:
             if feature["feature_id"] == feature_id:
                 return feature
         raise NotFound(f"no feature {feature_id}")
+
+    def story(self, backlog, story_id):
+        for feature in self.features(backlog):
+            for story in feature["stories"]:
+                if story["story_id"] == story_id:
+                    return story
+        raise NotFound(f"no story {story_id}")
 
     def move_mvp_line(self, after_feature_id):
         """Every feature up to and including after_feature_id is above the line."""
@@ -121,19 +146,48 @@ class BacklogStore:
         raise NotFound(f"no story {story_id}")
 
     def add_bug(self, title, description, severity):
-        backlog = self.require()
-        epic = next((e for e in backlog["epics"] if e["epic_id"] == BUG_EPIC), None)
-        if epic is None:
-            epic = {"epic_id": BUG_EPIC, "title": "Bugs", "critical": False,
-                    "features": [{"feature_id": BUG_FEATURE, "title": "Bugs", "mvp": True, "deferred": False,
-                                  "stories": []}]}
-            backlog["epics"].append(epic)
-        stories = epic["features"][0]["stories"]
-        story_id = f"BUG-{len(stories) + 1}"
-        stories.append({"story_id": story_id, "title": title, "description": description, "severity": severity,
-                        "wave": None, "unit_ids": [], "pr": None, "depends_on": []})
+        """A bug a person files on the board. The backlog exists from then on, so a
+        project with no PM artifact yet has somewhere to put it."""
+        backlog = self.sync() or _empty()
+        feature = _own_feature(backlog, BUG_EPIC, "Bugs", BUG_FEATURE, "Bugs")
+        story_id = _allocate(backlog, "BUG")
+        feature["stories"].append({"story_id": story_id, "title": title, "description": description,
+                                   "severity": severity, "work_type": "bug", "wave": None, "unit_ids": [],
+                                   "pr": None, "depends_on": []})
         self.save(backlog)
         return story_id
+
+    def add_issue(self, run_id, issue):
+        """A polish run's one issue, in the person's words, as a TASK or a BUG the run's
+        unit carries. The id comes from the project counter, so it never collides."""
+        backlog = self.sync() or _empty()
+        feature = _own_feature(backlog, LOOSE_EPIC, "Backlog", POLISH_FEATURE, "Polish")
+        kind = "BUG" if BUG_WORDS.search(issue) else "TASK"
+        story_id = _allocate(backlog, kind)
+        title = issue.strip().splitlines()[0][:120] if issue.strip() else story_id
+        feature["stories"].append({"story_id": story_id, "title": title, "description": issue.strip(),
+                                   "work_type": kind.lower(), "run_id": run_id, "wave": None, "unit_ids": [],
+                                   "pr": None, "depends_on": []})
+        self.save(backlog)
+        return story_id
+
+    def close_story(self, story_id, source, at, pr=None, note=None, **extra):
+        """A story is done by the units that built it, by a pull request that names it,
+        by an external change, or by a person on the board. The record says which."""
+        backlog = self.require()
+        story = self.story(backlog, story_id)
+        if story.get("closed"):
+            return story["closed"]
+        story["closed"] = {k: v for k, v in {"source": source, "at": at, "pr": pr, "note": note, **extra}.items()
+                           if v is not None}
+        self.save(backlog)
+        return story["closed"]
+
+    def reopen_story(self, story_id):
+        backlog = self.require()
+        story = self.story(backlog, story_id)
+        story.pop("closed", None)
+        self.save(backlog)
 
     def answer_unknown(self, unknown_id, answer):
         backlog = self.require()
@@ -144,20 +198,42 @@ class BacklogStore:
                 return
         raise NotFound(f"no unknown {unknown_id}")
 
-    def view(self, units, as_of):
+    def view(self, units, as_of, run_id=None):
+        """The project backlog seen from one run: each story's units in that run, its
+        column, and in_run for the items the run builds. A story whose units in the run
+        are all done is closed by them, once."""
         backlog = self.sync()
         if backlog is None:
-            return {"as_of": as_of, "state": "not_generated", "epics": [], "unknowns": []}
-        links = story_units(units)
+            return {"as_of": as_of, "state": "not_generated", "epics": [], "unknowns": [], "run_id": run_id}
+        links, known = story_units(units), set(units.ids())
+        closed_now = {}
         for feature in self.features(backlog):
             for story in feature["stories"]:
-                story["unit_ids"] = sorted(set(story.get("unit_ids") or ()) | links.get(story["story_id"], set()))
+                # Units the Plan step named or whose outcome names the story, plus any a
+                # person pinned on the board, as long as this run still knows them.
+                mine = sorted((set(story.get("unit_ids") or ()) & known) | links.get(story["story_id"], set()))
+                story["unit_ids"] = mine
+                story["in_run"] = bool(mine) or story.get("run_id") == run_id
                 self._annotate(story, units)
+                if mine and story["column"] == "done" and not story.get("closed"):
+                    numbers = [(units.state(u).get("pr") or {}).get("number") for u in mine]
+                    closed_now[story["story_id"]] = {"source": "unit", "at": as_of, "run_id": run_id, "unit_ids": mine,
+                                                     "pr": next((n for n in numbers if n), None)}
+                    story["closed"] = closed_now[story["story_id"]]
+        if closed_now:
+            # The view's own fields stay out of the file, so the closes are written alone.
+            fresh = self.load()
+            for feature in self.features(fresh):
+                for story in feature["stories"]:
+                    if story["story_id"] in closed_now and not story.get("closed"):
+                        story["closed"] = closed_now[story["story_id"]]
+            self.save(fresh)
         return {"as_of": as_of, "state": "generated", "epics": backlog["epics"],
-                "unknowns": backlog.get("unknowns", [])}
+                "unknowns": backlog.get("unknowns", []), "run_id": run_id}
 
     def _annotate(self, story, units):
-        """Column and risk come from the units, so the board never diverges from them."""
+        """Column and risk come from the closed record first, then the units, so the
+        board never diverges from them."""
         states, risks = [], []
         for unit_id in story.get("unit_ids", []):
             states.append(units.state(unit_id)["state"])
@@ -165,13 +241,48 @@ class BacklogStore:
             if risk.get("level"):
                 risks.append(risk["level"])
         columns = [COLUMNS[s] for s in states]
-        for column in ("blocked", "in_progress", "in_review", "ready"):
-            if column in columns:
-                story["column"] = column
-                break
+        if story.get("closed"):
+            story["column"] = "done"
         else:
-            story["column"] = "done" if columns else "ready"
+            for column in ("blocked", "in_progress", "in_review", "ready"):
+                if column in columns:
+                    story["column"] = column
+                    break
+            else:
+                story["column"] = "done" if columns else "ready"
         story["risk"] = max(risks) if risks else story.get("risk")
+
+
+def _empty():
+    return {"epics": [], "unknowns": [], "sources": [], "next": {}}
+
+
+def _allocate(backlog, prefix):
+    """The next id of a kind the daemon hands out, BUG-2026-3 style, past any id a PM
+    artifact already used."""
+    year = time.strftime("%Y", time.gmtime())
+    taken = {s["story_id"] for e in backlog["epics"] for f in e["features"] for s in f["stories"]}
+    counters = backlog.setdefault("next", {})
+    number = counters.get(prefix, 0)
+    while True:
+        number += 1
+        story_id = f"{prefix}-{year}-{number}"
+        if story_id not in taken:
+            counters[prefix] = number
+            return story_id
+
+
+def _own_feature(backlog, epic_id, epic_title, feature_id, title, mvp=True, deferred=False):
+    """The feature the daemon keeps for items no artifact owns, made on first use."""
+    epic = next((e for e in backlog["epics"] if e["epic_id"] == epic_id), None)
+    if epic is None:
+        epic = {"epic_id": epic_id, "title": epic_title, "critical": False, "features": []}
+        backlog["epics"].append(epic)
+    feature = next((f for f in epic["features"] if f["feature_id"] == feature_id), None)
+    if feature is None:
+        feature = {"feature_id": feature_id, "title": title, "mvp": mvp, "deferred": deferred, "stories": []}
+        epic["features"].append(feature)
+    return feature
 
 
 def _inventory(path, doc):
@@ -232,11 +343,62 @@ def from_artifact(content):
     return {"epics": epics, "unknowns": []}
 
 
+def merge(backlog, fresh, run_id):
+    """An artifact merges into the project backlog by id. New epics, features and
+    stories append. A known feature takes the new title and outcome, a known story the
+    new title, type and dependencies, and keeps its place, its closed record, and what
+    a person set. A not-done story the artifact leaves out moves under Deferred with a
+    note naming the run, never deleted."""
+    epics = {e["epic_id"]: e for e in backlog["epics"]}
+    features = {f["feature_id"]: f for e in backlog["epics"] for f in e["features"]}
+    stories = {s["story_id"]: (f, s) for f in features.values() for s in f["stories"]}
+    seen = set()
+    for epic in fresh["epics"]:
+        home = epics.get(epic["epic_id"])
+        if home is None:
+            home = {**epic, "features": []}
+            backlog["epics"].append(home)
+            epics[epic["epic_id"]] = home
+        else:
+            home["title"] = epic["title"]
+        for feature in epic["features"]:
+            target = features.get(feature["feature_id"])
+            if target is None:
+                target = {**feature, "stories": []}
+                home["features"].append(target)
+                features[feature["feature_id"]] = target
+            else:
+                target["title"] = feature["title"]
+                if feature.get("outcome"):
+                    target["outcome"] = feature["outcome"]
+            for story in feature["stories"]:
+                seen.add(story["story_id"])
+                known = stories.get(story["story_id"])
+                if known is None:
+                    target["stories"].append(story)
+                    stories[story["story_id"]] = (target, story)
+                    continue
+                for key in ("title", "work_type", "depends_on", "note"):
+                    if key in story:
+                        known[1][key] = story[key]
+    for story_id, (feature, story) in list(stories.items()):
+        if story_id in seen or story.get("closed") or feature["feature_id"] in OWN_FEATURES:
+            continue
+        feature["stories"].remove(story)
+        story["note"] = f"left out by {run_id}'s backlog"
+        _own_feature(backlog, LOOSE_EPIC, "Backlog", DEFERRED_FEATURE, "Deferred",
+                     mvp=False, deferred=True)["stories"].append(story)
+    backlog["unknowns"] = backlog.get("unknowns") or []
+    known = {u["unknown_id"] for u in backlog["unknowns"]}
+    backlog["unknowns"] += [u for u in fresh.get("unknowns") or () if u["unknown_id"] not in known]
+
+
 def carry(old, fresh):
-    """What a person changed on the old board survives the PM's revision: the MVP line
-    and deferral per feature, story order within a feature, the bugs they added, and
-    the unknowns they answered."""
+    """What a person changed on an older board survives into the project backlog: the
+    MVP line and deferral per feature, story order within a feature, the bugs they
+    added, the unknowns they answered, and the stories they closed."""
     old_features = {f["feature_id"]: f for e in old.get("epics") or () for f in e["features"]}
+    old_stories = {s["story_id"]: s for f in old_features.values() for s in f["stories"]}
     for epic in fresh["epics"]:
         for feature in epic["features"]:
             before = old_features.get(feature["feature_id"])
@@ -245,11 +407,17 @@ def carry(old, fresh):
             feature["mvp"], feature["deferred"] = before["mvp"], before["deferred"]
             rank = {s["story_id"]: index for index, s in enumerate(before["stories"])}
             feature["stories"].sort(key=lambda s: rank.get(s["story_id"], len(rank)))
+            for story in feature["stories"]:
+                if old_stories.get(story["story_id"], {}).get("closed") and not story.get("closed"):
+                    story["closed"] = old_stories[story["story_id"]]["closed"]
     bugs = next((e for e in old.get("epics") or () if e["epic_id"] == BUG_EPIC), None)
     if bugs is not None:
-        fresh["epics"].append(bugs)
+        home = _own_feature(fresh, BUG_EPIC, "Bugs", BUG_FEATURE, "Bugs")
+        known = {s["story_id"] for s in home["stories"]}
+        home["stories"] += [s for f in bugs["features"] for s in f["stories"] if s["story_id"] not in known]
     answered = {u["unknown_id"]: u for u in old.get("unknowns") or ()}
-    fresh["unknowns"] = [answered.get(u["unknown_id"], u) for u in fresh["unknowns"]]
+    fresh["unknowns"] = [answered.get(u["unknown_id"], u) for u in fresh.get("unknowns") or []]
+    fresh["unknowns"] += [u for u in answered.values() if u["unknown_id"] not in {x["unknown_id"] for x in fresh["unknowns"]}]
 
 
 def story_units(units):

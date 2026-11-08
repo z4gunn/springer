@@ -61,7 +61,7 @@ def rebuild(run_dir, run_id, ledger, units, gates, cycles, now, sessions_for, wi
     elif open_gates and not in_flight:
         waiting = "gate"
     escalations = [read_json(p) for p in sorted(Path(run_dir, "artifacts").glob("E-*.json"))]
-    backlog = BacklogStore(run_dir).sync() or {"epics": []}
+    backlog = BacklogStore.for_run(run_dir).sync() or {"epics": []}
     features = [f for epic in backlog["epics"] for f in epic["features"]]
     doc = artifact_header(f"run-state-{run_id}", "run-state", "run_state", "v2", now())
     doc["content"] = {

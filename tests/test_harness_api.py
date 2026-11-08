@@ -117,8 +117,11 @@ class ApiCase(unittest.TestCase):
                 return units[0]
         self.fail("no unit appeared")
 
+    def backlog_file(self):
+        return self.daemon.project_path("acme") / "runs" / "_backlog.json"
+
     def with_backlog(self, run_id):
-        (self.daemon.engine("acme", run_id).run_dir / "backlog.json").write_text(json.dumps(BACKLOG))
+        self.backlog_file().write_text(json.dumps(BACKLOG))
 
     def error(self, response, status, code):
         self.assertEqual(response.status_code, status, response.text)
@@ -246,12 +249,12 @@ class ReadsTest(ApiCase):
         run = self.run_path(self.run_id)
         backlog = json.loads(json.dumps(BACKLOG))
         backlog["epics"][0]["features"][0]["stories"][0]["unit_ids"] = [self.unit["unit_id"]]
-        (self.daemon.engine("acme", self.run_id).run_dir / "backlog.json").write_text(json.dumps(backlog))
+        self.backlog_file().write_text(json.dumps(backlog))
         story = self.get(run + "/backlog")["epics"][0]["features"][0]["stories"][0]
         self.assertIn(story["column"], ("in_progress", "done", "ready", "in_review"))
 
     def test_backlog_before_it_exists_is_not_generated(self):
-        (self.daemon.engine("acme", self.run_id).run_dir / "backlog.json").unlink()
+        self.backlog_file().unlink()
         body = self.get(self.run_path(self.run_id) + "/backlog")
         self.assertEqual((body["state"], body["epics"]), ("not_generated", []))
 
@@ -771,7 +774,7 @@ class OperationCatalogTest(ApiCase):
         run_id = self.run_started()
         body = self.op("backlog.reorder", {"story_id": "S-2", "position": 0}, run_id=run_id, expect=409)
         self.assertEqual(body["error"]["code"], "illegal_transition")
-        (self.daemon.engine("acme", run_id).run_dir / "backlog.json").write_text(json.dumps(
+        self.backlog_file().write_text(json.dumps(
             {**BACKLOG, "epics": [{**BACKLOG["epics"][0], "features": [{**BACKLOG["epics"][0]["features"][0], "stories": [
                 {"story_id": "S-1", "title": "a", "wave": 1, "unit_ids": [], "pr": None, "depends_on": []},
                 {"story_id": "S-2", "title": "b", "wave": 1, "unit_ids": [], "pr": None, "depends_on": []}]}]}]}))
@@ -781,7 +784,7 @@ class OperationCatalogTest(ApiCase):
     def test_backlog_add_bug(self):
         run_id = self.run_started()
         body = self.op("backlog.add_bug", {"title": "It broke", "severity": "high"}, run_id=run_id)
-        self.assertEqual(body["result"]["story_id"], "BUG-1")
+        self.assertEqual(body["result"]["story_id"], f"BUG-{time.strftime('%Y', time.gmtime())}-1")
         epics = self.get(self.run_path(run_id) + "/backlog")["epics"]
         self.assertEqual(epics[-1]["features"][0]["stories"][0]["title"], "It broke")
 
@@ -790,9 +793,36 @@ class OperationCatalogTest(ApiCase):
         self.op("backlog.answer_unknown", {"unknown_id": "UK-1", "answer": "EUR"}, run_id=run_id)
         self.assertEqual(self.get(self.run_path(run_id) + "/backlog")["unknowns"][0]["answer"], "EUR")
 
+    def test_backlog_close_and_reopen_a_story(self):
+        run_id = self.run_started()
+        body = self.op("backlog.close_story", {"story_id": "S-2", "note": "shipped by hand"}, run_id=run_id)
+        self.assertEqual((body["result"]["closed"]["source"], body["result"]["closed"]["note"]), ("human", "shipped by hand"))
+        story = self.features(run_id)[0]["stories"][1]
+        self.assertEqual((story["story_id"], story["column"], story["closed"]["source"]), ("S-2", "done", "human"))
+        self.op("backlog.reopen_story", {"story_id": "S-2"}, run_id=run_id)
+        story = self.features(run_id)[0]["stories"][1]
+        self.assertEqual((story["column"], story.get("closed")), ("ready", None))
+        self.op("backlog.close_story", {"story_id": "S-9"}, run_id=run_id, expect=404)
+
+    def test_a_polish_run_puts_its_issue_on_the_project_backlog(self):
+        run_id = self.confirmed("run.start", {"base_version": self.version, "lane": "polish",
+                                              "issue": "The footer link is broken on the About page"})["result"]["run_id"]
+        brief = json.loads((self.daemon.engine("acme", run_id).run_dir / "run-brief.json").read_text())["content"]
+        year = time.strftime("%Y", time.gmtime())
+        self.assertEqual((brief["lane"], brief["story_ids"]), ("polish", [f"BUG-{year}-1"]))
+        view = self.get(self.run_path(run_id) + "/backlog")
+        polish = next(f for e in view["epics"] for f in e["features"] if f["feature_id"] == "F-POLISH")
+        story = polish["stories"][0]
+        self.assertEqual((view["run_id"], story["story_id"], story["in_run"], story["work_type"]),
+                         (run_id, f"BUG-{year}-1", True, "bug"))
+        self.assertEqual(story["title"], "The footer link is broken on the About page")
+
     def test_a_backlog_operation_before_generation_is_refused(self):
         run_id = self.start()
-        self.op("backlog.add_bug", {"title": "x"}, run_id=run_id, expect=409)
+        self.op("backlog.reorder", {"story_id": "S-1", "position": 0}, run_id=run_id, expect=409)
+        # Filing a bug is the exception: it gives a project with no PM artifact yet its board.
+        self.op("backlog.add_bug", {"title": "x"}, run_id=run_id)
+        self.assertEqual(self.get(self.run_path(run_id) + "/backlog")["state"], "generated")
 
     def test_provisioning_set_secret_records_no_value_anywhere(self):
         run_id = self.start()
@@ -836,6 +866,8 @@ COVERAGE = {
     "backlog.restore_feature": "test_backlog_defer_and_restore_keep_the_feature_in_the_graph",
     "backlog.reorder": "test_backlog_reorder_refuses_to_break_a_dependency", "backlog.add_bug": "test_backlog_add_bug",
     "backlog.answer_unknown": "test_backlog_answer_unknown",
+    "backlog.close_story": "test_backlog_close_and_reopen_a_story",
+    "backlog.reopen_story": "test_backlog_close_and_reopen_a_story",
     "provisioning.set_secret": "test_provisioning_set_secret_records_no_value_anywhere",
     "config.set_role_model": "test_config_set_role_model", "config.set_gate_channels": "test_config_set_gate_channels",
     "run.note": "test_run_note_reaches_the_next_session_of_each_open_unit",

@@ -14,7 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..check.critique import critique
-from ..common import read_json, write_json
+from ..common import iso, read_json, write_json
 from ..errors import (ConfirmationInvalid, CritiqueErrors, IllegalTransition, InvalidArgs, NotAllowedForActor,
                       UnknownOperation)
 from ..state.backlog import BacklogStore
@@ -136,6 +136,11 @@ class AnswerUnknown(Args):
     answer: str
 
 
+class StoryRef(Args):
+    story_id: str
+    note: str | None = None
+
+
 class SetSecret(Args):
     item_id: str
     value: str = Field(min_length=1)
@@ -178,7 +183,7 @@ class Context:
 
     @property
     def backlog(self):
-        return BacklogStore(self.engine.run_dir)
+        return BacklogStore(self.daemon.project_path(self.project))
 
     def scope_review_open(self):
         return any(g["content"]["checkpoint_type"] == "scope-review" for g in self.engine.gates.open_gates())
@@ -424,6 +429,16 @@ def answer_unknown(c):
     return {}
 
 
+def close_story(c):
+    return {"closed": c.backlog.close_story(c.args.story_id, "human", iso(c.daemon.now()), note=c.args.note,
+                                            by=c.actor)}
+
+
+def reopen_story(c):
+    c.backlog.reopen_story(c.args.story_id)
+    return {}
+
+
 def set_secret(c):
     items = None
     for run_id in reversed(c.daemon.run_ids(c.project)):
@@ -535,6 +550,9 @@ CATALOG = {op.type: op for op in [
     Operation("backlog.reorder", Reorder, reorder, "Reorders within a wave.", scope="run"),
     Operation("backlog.add_bug", AddBug, add_bug, "Adds a bug to the backlog.", scope="run"),
     Operation("backlog.answer_unknown", AnswerUnknown, answer_unknown, "Records the answer.", scope="run"),
+    Operation("backlog.close_story", StoryRef, close_story,
+              "Closes the story by hand. Its column is done from then on, whatever its units do.", scope="run"),
+    Operation("backlog.reopen_story", StoryRef, reopen_story, "Drops the closed record.", scope="run"),
     Operation("provisioning.set_secret", SetSecret, set_secret,
               "Stores the value in the OS keyring. The value is never logged, returned, or recorded.",
               chat=False, secret_fields=("value",)),
