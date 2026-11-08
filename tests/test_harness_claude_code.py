@@ -440,6 +440,26 @@ class RestackTest(unittest.TestCase):
         tree, _ = self.trees.claim("U-0001", "main")
         self.assertFalse((tree / "runs" / "_config-unlock.json").exists())
 
+    def test_a_worktree_gets_the_project_node_modules_when_the_lockfile_matches(self):
+        """git carries no node_modules, so every session of a polish run either ran npm ci
+        or failed its checks with tsc not found and was redispatched."""
+        self.commit(self.project, {".gitignore": "node_modules/\n", "package-lock.json": '{"v": 1}\n'})
+        (self.project / "node_modules" / ".bin").mkdir(parents=True)
+        (self.project / "node_modules" / ".bin" / "tsc").write_text("#!/bin/sh\n")
+        tree, _ = self.trees.claim("U-0001", "main")
+        self.assertTrue((tree / "node_modules" / ".bin" / "tsc").is_file())
+        self.assertFalse((tree / "node_modules").is_symlink(), "a copy the unit can change without touching the person's")
+        self.assertEqual(self.git(tree, "status", "--porcelain").stdout, "")
+
+    def test_a_different_lockfile_leaves_the_install_to_the_session(self):
+        self.commit(self.project, {".gitignore": "node_modules/\n", "package-lock.json": '{"v": 1}\n'})
+        (self.project / "node_modules").mkdir()
+        self.git(self.project, "switch", "-qc", "deps")
+        self.commit(self.project, {"package-lock.json": '{"v": 2}\n'})
+        self.git(self.project, "switch", "-q", "main")
+        tree, _ = self.trees.claim("U-0001", "deps")
+        self.assertFalse((tree / "node_modules").exists())
+
     def test_the_carried_rulings_never_keep_a_worktree_but_a_session_s_work_does(self):
         """Every reference-run worktree was kept because the rulings copy sat untracked in it."""
         self.commit(self.project, {"f.txt": "a\n"})

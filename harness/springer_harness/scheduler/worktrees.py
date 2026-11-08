@@ -71,6 +71,7 @@ class Worktrees:
             # Fast-forward only, so no work is ever lost.
             _git(path, "merge", "--ff-only", "--quiet", base)
             self._carry_rulings(path)
+            self._provide_node_modules(path)
             return path, branch
         _git(self.project, "worktree", "prune")
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -81,7 +82,30 @@ class Worktrees:
         if done.returncode:
             raise OSError(f"git worktree add failed for {unit_id}: {done.stderr.strip()}")
         self._carry_rulings(path)
+        self._provide_node_modules(path)
         return path, branch
+
+    def _provide_node_modules(self, path):
+        """git carries no node_modules, so a fresh worktree cannot build, test, or run a
+        product check, and each session either installed them or failed on it. When the
+        worktree's lockfile is the project's and the project has them installed, they
+        are cloned in (a copy-on-write clone on APFS, a few seconds for hundreds of MB).
+        A different lockfile, or a failed clone, leaves the install to the session.
+        Returns True when the worktree has them."""
+        target, source = Path(path) / "node_modules", self.project / "node_modules"
+        if target.exists():
+            return True
+        lock, project_lock = Path(path) / "package-lock.json", self.project / "package-lock.json"
+        if not (source.is_dir() and lock.is_file() and project_lock.is_file()) \
+                or lock.read_bytes() != project_lock.read_bytes():
+            return False
+        clone = ["cp", "-cR"] if sys.platform == "darwin" else ["cp", "-R", "--reflink=auto"]
+        done = subprocess.run([*clone, str(source), str(target)], capture_output=True, text=True)
+        if done.returncode:
+            shutil.rmtree(target, ignore_errors=True)
+            sys.stderr.write(f"could not clone node_modules into {path}: {done.stderr.strip()[:300]}\n")
+            return False
+        return True
 
     def _carry_rulings(self, path):
         """The config-unlock rulings live in the project's run store, which git does not
