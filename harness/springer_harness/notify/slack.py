@@ -448,13 +448,23 @@ def _units(daemon, words):
     return "\n".join(lines[:60]) or "No run in progress."
 
 
+# Slack and macOS turn typed quotes curly, and shlex knows only straight ones.
+CURLY = str.maketrans({"\u201c": '"', "\u201d": '"', "\u2018": "'", "\u2019": "'"})
+
+
+def _words(text):
+    """The command's words, with a quoted issue as one word whichever quotes it came in."""
+    text = (text or "").translate(CURLY)
+    try:
+        return shlex.split(text)
+    except ValueError:
+        return text.split()
+
+
 def handle_command(text, daemon, operations, user, allowed_user):
     """/springer. Returns the reply, shown only to the person who typed it: text, or a
     dict with text and blocks when it asks for a confirmation."""
-    try:
-        words = shlex.split(text or "")
-    except ValueError:
-        words = (text or "").split()
+    words = _words(text)
     verb = words[0].lower() if words else "status"
     rest = words[1:]
     if verb in ("status", "gates"):

@@ -717,6 +717,14 @@ class ControlPlaneTest(NotifyCase):
         self.daemon.home.save_project("acme", {**record, "adopted": False})
         self.assertTrue(self.confirm(handle_command("build acme", self.daemon, self.ops, ME, ME)).startswith("Started"))
 
+    def test_a_curly_quoted_issue_reaches_the_run_without_its_quotes(self):
+        """Slack sent \u201cDEFERRED-2: ...\u201d, so the issue kept its quotes and did not
+        carry the backlog item it named."""
+        from springer_harness.notify.slack import _words
+        self.assertEqual(_words("polish acme \u201cDEFERRED-2: the issue\u2019s words\u201d"),
+                         ["polish", "acme", "DEFERRED-2: the issue's words"])
+        self.assertEqual(_words('polish acme "unbalanced'), ["polish", "acme", '"unbalanced'])
+
     def test_a_refused_start_lists_the_brief_errors(self):
         from springer_harness.errors import HarnessError
         from springer_harness.notify.slack import _refusal
