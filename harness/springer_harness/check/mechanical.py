@@ -64,7 +64,7 @@ def needs_gating(result):
     return result.outcome == "pr" or not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths)
 
 
-def run_gating(commands, out, cwd, warnings=None):
+def run_gating(commands, out, cwd, warnings=None, baseline=None):
     """Run each gating command at the worktree's head through receipt.py, writing the
     receipts under out, in order. None when every one passes, else the defect detail
     naming the first that did not, with the tail of its output. A product command is
@@ -73,7 +73,13 @@ def run_gating(commands, out, cwd, warnings=None):
 
     A test command that exits 0 with a count receipt.py cannot read is the plan's
     command shape, not the session's work, so it costs no retry. It passes with a
-    line appended to warnings, and the caller holds the merge for a person."""
+    line appended to warnings, and the caller holds the merge for a person.
+
+    A command that fails here and fails on the unit's base too is the base's failure,
+    which no retry of this change can fix: the reference run spent eight sessions on a
+    contrast failure main already had. baseline(command) gives the base's output tail
+    when the command fails there, and such a command passes with a warning, so the
+    merge waits on a person who sees both outputs."""
     script = Path(cwd) / SCRIPTS / "receipt.py"
     if not script.exists():
         return "receipt.py is missing from the worktree"
@@ -99,6 +105,14 @@ def run_gating(commands, out, cwd, warnings=None):
                 warnings.append(f"{name} ({command['command']}) exited 0 but printed no test count the harness "
                                 f"can read, so the merge waits on a person")
                 continue
+        if body.get("result") == "fail" and baseline is not None and warnings is not None:
+            base_tail = baseline(command)
+            if base_tail is not None:
+                tail = (body.get("output_tail") or "").strip()[-OUTPUT_SHOWN // 2:]
+                warnings.append(f"{name} ({command['command']}) fails on the base too, so it is not this "
+                                f"change's defect and the merge waits on a person. Here its output ends: {tail} "
+                                f"On the base it ends: {base_tail.strip()[-OUTPUT_SHOWN // 2:]}")
+                continue
         if body.get("result") != "pass":
             why = {"unknown-count": "printed no test count the harness can read. Use a runner that reports one, "
                                     "or give the command a count_regex",
@@ -107,6 +121,28 @@ def run_gating(commands, out, cwd, warnings=None):
             tail = (body.get("output_tail") or "").strip()[-OUTPUT_SHOWN:]
             return f"gating command {name} ({command['command']}) {why}. Its output ends: {tail}"
     return None
+
+
+def fails_at(command, out, cwd):
+    """The command's output tail when it runs to a plain failure in cwd, else None: a
+    pass, a timeout, or a command that could not run there says nothing about the base."""
+    script = Path(cwd) / SCRIPTS / "receipt.py"
+    if not script.exists():
+        return None
+    timeout = command.get("timeout") or GATING_TIMEOUT
+    args = [script, "run", out, "--name", command["name"], "--kind",
+            "check" if command["kind"] == "product" else command["kind"], "--cwd", cwd, "--timeout", str(timeout)]
+    if command.get("count_regex"):
+        args += ["--count-regex", command["count_regex"]]
+    try:
+        _run([*args, "--", command["command"]], cwd, timeout=timeout + 60)
+    except subprocess.TimeoutExpired:
+        return None
+    try:
+        body = json.loads((Path(out) / "receipts" / f"{command['name']}.json").read_text())
+    except (OSError, ValueError):
+        return None
+    return (body.get("output_tail") or "") if body.get("result") == "fail" else None
 
 
 HARNESS_OWNED = ("CYCLE-", "G-", "E-")  # the daemon writes these, never a session
@@ -149,7 +185,7 @@ def hold_for_person(result, warnings):
 
 
 def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch, require_receipts=True,
-                     gating=None):
+                     gating=None, baseline=None):
     """A CheckResult for one returned session. The order is the in-session loop's:
     the result the session left, then the gating commands (or, for a unit with none,
     the session's receipts), then the artifacts it wrote."""
@@ -169,7 +205,7 @@ def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch,
         # Run in place, for a caller with no tick to protect. The daemon runs them off
         # the tick through GatingRuns and passes none here.
         warnings = []
-        problem = run_gating(gating, session_dir / "check", cwd, warnings)
+        problem = run_gating(gating, session_dir / "check", cwd, warnings, baseline)
         if problem:
             return replace(result, status="fail", failure_class="defect", detail=problem)
         result = hold_for_person(result, warnings)

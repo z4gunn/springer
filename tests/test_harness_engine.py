@@ -269,10 +269,28 @@ class GatingOffTheTickTest(EngineCase):
         (session / "check" / "receipts").mkdir(parents=True)
         (session / "check" / "receipts" / "unit.json").write_text(json.dumps({"name": "unit", "result": "pass"}))
         restarted = self.engine([])  # a new daemon: no thread knows the run, no verdict is on disk
+        restarted._baseline = lambda unit_id: None  # the command fails anywhere, and this is about the restart
         self.wait_out(restarted)
         self.assertEqual(counter.read_text(), "x", "the restarted daemon ran the command once")
         history = [h["reason"] for h in restarted.units.state("U-0001")["history"] if h["state"] == "retry"]
         self.assertIn("failed with exit 4", history[0], "the half-written pass receipt was not taken")
+
+    def test_a_check_that_fails_on_main_too_waits_for_a_person_not_a_retry(self):
+        """Run 8 of the reference instance retried eight sessions on a failure main had."""
+        counter = self.root / "ran.txt"
+        engine = self.gated(f"python3 -c \"open(r'{counter}', 'a').write('x'); raise SystemExit(4)\"", kind="check")
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "checking")
+        self.wait_out(engine)
+        self.assertEqual(self.states(engine)["U-0001"], "gated")
+        self.assertEqual(counter.read_text(), "xx", "once at the head, once on the base")
+        risk = json.loads((engine.units.unit_dir("U-0001") / "risk.json").read_text())
+        self.assertEqual(risk["level"], "L2")
+        self.assertIn("fails on the base too", risk["findings"][-1]["detail"])
+        self.assertEqual([p.name for p in engine.worktrees.root.iterdir() if p.name.startswith("_base-")], [],
+                         "the scratch tree is gone")
+        command = engine._spec("U-0001")["gating_commands"][0]
+        self.assertIsNotNone(engine._baseline("U-0001")(command))
+        self.assertEqual(counter.read_text(), "xx", "the base's verdict is kept, so it runs once per base commit")
 
     def test_a_product_gating_command_counts_as_a_product_check(self):
         """The reference run's product checks ran as gating commands, and the outcome

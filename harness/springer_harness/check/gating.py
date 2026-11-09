@@ -29,7 +29,7 @@ class GatingRuns:
         self._threads = {}
         self._lock = threading.Lock()
 
-    def poll(self, key, commands, session_dir, cwd):
+    def poll(self, key, commands, session_dir, cwd, baseline=None):
         """None while the run is going (starting it when nothing is), else the verdict:
         an empty string when every command passed, or the defect detail."""
         found = read_json(Path(session_dir) / "check" / VERDICT)
@@ -39,7 +39,7 @@ class GatingRuns:
             thread = self._threads.get(key)
             if thread and thread.is_alive():
                 return None
-            thread = threading.Thread(target=self._run, args=(list(commands), Path(session_dir), Path(cwd)),
+            thread = threading.Thread(target=self._run, args=(list(commands), Path(session_dir), Path(cwd), baseline),
                                       name=f"gating-{key}", daemon=True)
             self._threads[key] = thread
             thread.start()
@@ -55,11 +55,11 @@ class GatingRuns:
         thread = self._threads.get(key)
         return bool(thread and thread.is_alive())
 
-    def _run(self, commands, session_dir, cwd):
+    def _run(self, commands, session_dir, cwd, baseline=None):
         partial = session_dir / f".check-{uuid.uuid4().hex}"
         warnings = []
         try:
-            problem = run_gating(commands, partial, cwd, warnings)
+            problem = run_gating(commands, partial, cwd, warnings, baseline)
         except Exception as exc:  # noqa: BLE001, a crashed run is a verdict, never a hang
             problem = f"the gating run failed: {exc}"
         write_json(partial / VERDICT, {"problem": problem, "warnings": warnings, "at": time.time()})

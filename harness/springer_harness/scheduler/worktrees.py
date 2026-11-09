@@ -107,6 +107,23 @@ class Worktrees:
             return False
         return True
 
+    def scratch_at(self, sha):
+        """A detached worktree at sha with the project's node_modules, for running a
+        gating command on a unit's base. None when git refuses it."""
+        path = self.root / f"_base-{sha[:12]}"
+        if not self._intact(path):
+            _git(self.project, "worktree", "prune")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if _git(self.project, "worktree", "add", "--quiet", "--detach", str(path), sha).returncode:
+                return None
+        self._provide_node_modules(path)
+        return path
+
+    def drop_scratch(self, path):
+        """A scratch tree holds only the base's code and what a command built in it."""
+        _git(self.project, "worktree", "remove", "--force", str(path))
+        shutil.rmtree(path, ignore_errors=True)
+
     def _carry_rulings(self, path):
         """The config-unlock rulings live in the project's run store, which git does not
         carry, and the protection hook reads them from the session's own tree. Without

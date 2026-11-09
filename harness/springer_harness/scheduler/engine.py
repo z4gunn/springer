@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ..check import review
 from ..check.gating import GatingRuns
-from ..check.mechanical import hold_for_person, mechanical_check, needs_gating
+from ..check.mechanical import fails_at, hold_for_person, mechanical_check, needs_gating
 from ..check.risk import LEVELS, triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
 from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
@@ -366,7 +366,7 @@ class RunEngine:
             # product check can take minutes. None leaves the unit in checking.
             if said.status == "pass" and needs_gating(said):
                 verdict = self.gating_runs.poll((unit_id, state["sessions"][-1]), gating, session_dir,
-                                                self.worktrees.path(unit_id))
+                                                self.worktrees.path(unit_id), self._baseline(unit_id))
                 if verdict is None:
                     return None
                 self._record_product_checks(unit_id, gating, session_dir)
@@ -928,6 +928,34 @@ class RunEngine:
                   for i, command in enumerate(self.settings().get("project_checks") or [], 1)
                   if command.strip() not in named]
         return planned + checks
+
+    def _baseline(self, unit_id):
+        """What fails_at says for a gating command on the unit's base, kept per base
+        commit so a retry or a sibling unit does not run a slow check twice. None when
+        the base cannot be resolved, and then a failure is the unit's, as before."""
+        done = subprocess.run(["git", "-C", str(self.project_path), "rev-parse", "--verify", "--quiet",
+                               f"{self._base_for(unit_id)}^{{commit}}"], capture_output=True, text=True)
+        sha = done.stdout.strip()
+        if done.returncode or not sha:
+            return None
+        cache = self.worktrees.root / "_base" / f"{sha}.json"
+        worktrees = self.worktrees
+
+        def at_base(command):
+            known = read_json(cache)
+            known = known if isinstance(known, dict) else {}
+            key = command["command"]
+            if key not in known:
+                path = worktrees.scratch_at(sha)
+                if path is None:
+                    return None
+                try:
+                    known[key] = fails_at(command, cache.parent / sha / command["name"], path)
+                finally:
+                    worktrees.drop_scratch(path)
+                write_json(cache, known)
+            return known[key]
+        return at_base
 
     def _lands_nothing(self, unit_id, result):
         """True for a unit that is not a pull request and has no commits past its base."""

@@ -202,9 +202,9 @@ class MechanicalCheckTest(FakeBinCase):
         self.run_dir = self.project / "runs" / "acme-1"
         (self.run_dir / "artifacts").mkdir(parents=True)
 
-    def check(self, gating=None):
+    def check(self, gating=None, baseline=None):
         return mechanical_check(self.session, self.project, self.run_dir, self.project, "U-0001", time.time() - 60,
-                                gating=gating)
+                                gating=gating, baseline=baseline)
 
     PR = {"status": "pass", "outcome": "pr", "pr": {"number": 3, "branch": "unit/U-0001", "base": "main"},
           "touched_paths": ["src/app.ts"]}
@@ -251,6 +251,38 @@ class MechanicalCheckTest(FakeBinCase):
         counted = self.check([{"name": "unit", "command": "python3 -c \"print('ok 7 checks')\"", "kind": "test",
                                "count_regex": r"ok (\d+) checks"}])
         self.assertEqual(counted.status, "pass")
+
+    def test_a_failure_the_base_shares_holds_the_merge_instead_of_a_retry(self):
+        """Run 8 of the reference instance spent eight sessions on a print contrast failure
+        that main already had. A command that fails on the base too is not the change's
+        defect, so it passes raised to L2 with both outputs, and a person decides."""
+        from springer_harness.check.mechanical import fails_at
+        from springer_harness.scheduler.worktrees import Worktrees
+        self.write(**self.PR)
+        contrast = {"name": "a11y", "kind": "product",
+                    "command": "python3 -c \"import sys; t = open('page.css').read(); print(t); sys.exit('grey' in t)\""}
+        (self.project / "page.css").write_text("grey on grey")
+        subprocess.run(["git", "-C", str(self.project), "add", "."], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(self.project), "commit", "-qm", "base"], check=True, capture_output=True)
+        base = subprocess.run(["git", "-C", str(self.project), "rev-parse", "HEAD"], capture_output=True,
+                              text=True).stdout.strip()
+        worktrees = Worktrees(self.root / "home", "acme", self.project, "acme-1")
+        scratch = worktrees.scratch_at(base)
+
+        def at_base(command):
+            return fails_at(command, self.root / "base-check", scratch)
+        held = self.check([contrast], baseline=at_base)
+        self.assertEqual((held.status, held.raised_level), ("pass", "L2"))
+        self.assertIn("fails on the base too", held.findings[-1]["detail"])
+        self.assertIn("grey on grey", held.findings[-1]["detail"])
+        (scratch / "page.css").write_text("black on white")
+        failed = self.check([contrast], baseline=at_base)
+        self.assertEqual((failed.status, failed.failure_class), ("fail", "defect"),
+                         "a failure only this change has is its own defect")
+        worktrees.drop_scratch(scratch)
+        self.assertFalse(scratch.exists())
+        self.assertNotIn(str(scratch), subprocess.run(["git", "-C", str(self.project), "worktree", "list"],
+                                                      capture_output=True, text=True).stdout)
 
     def write(self, **result):
         (self.session / "result.json").write_text(json.dumps(result))
