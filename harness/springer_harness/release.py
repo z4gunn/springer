@@ -35,11 +35,13 @@ def _git(cwd, *args):
 
 
 def ready_to_ship(cwd, default_branch):
-    """(sha, None) when the checkout can ship, else (None, why not)."""
+    """(sha, None) when the checkout can ship, else (None, why not). A change under runs/
+    does not count: the harness writes the run store (the backlog closes, the gate answers)
+    while the run is open and commits it only when the run completes, after the release."""
     rc, branch = _git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
     if rc or branch != default_branch:
         return None, f"the project checkout is on {branch or 'no branch'}, not {default_branch}"
-    rc, dirty = _git(cwd, "status", "--porcelain", "--untracked-files=no")
+    rc, dirty = _git(cwd, "status", "--porcelain", "--untracked-files=no", "--", ".", ":(exclude)runs")
     if rc or dirty:
         return None, "the project checkout has uncommitted changes to tracked files"
     rc, sha = _git(cwd, "rev-parse", "HEAD")

@@ -46,6 +46,7 @@ When invoked:
 - An artifact-only or docs-only unit (a fold-in, a render, a version bump) is a haiku mechanical unit and never receives a Code Reviewer or vertical audit unit behind it.
 - Verticals are budgeted: at most two vertical units per PR, chosen by the paths the diff touches from the project's path-to-vertical table, Security first. A third concern is a follow-up issue, never a unit. A vertical finding holds a merge only when it is Critical in that vertical's own domain. See Vertical budget in the reference.
 - Keep the WIP board and artifact inventory accurate at all times.
+- Never route a production deploy as a unit and never open a production-release gate. The harness opens that gate after the last merge and runs the project's release command, set with `/springer release-command`, on the person's go. A headless unit cannot answer a deploy script's terminal prompt.
 - You are a single agent that delegates. Sub-roles return artifacts, not nested agent calls. Encode every cross-agent handoff as an artifact contract.
 
 ## Escalation

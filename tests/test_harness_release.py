@@ -94,6 +94,20 @@ class ReadyToShipTest(unittest.TestCase):
             git(repo, "checkout", "-q", "--", "a.txt")
             self.assertIsNone(ready_to_ship(repo, "main")[1], "an untracked file does not block a release")
 
+    def test_an_open_run_store_does_not_block_a_release(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            git(repo, "init", "-q", "-b", "main")
+            (repo / "runs").mkdir()
+            (repo / "runs" / "_backlog.json").write_text("{}\n")
+            (repo / "a.txt").write_text("1\n")
+            git(repo, "add", ".")
+            git(repo, "commit", "-q", "-m", "one")
+            (repo / "runs" / "_backlog.json").write_text('{"closed": 1}\n')
+            self.assertIsNone(ready_to_ship(repo, "main")[1], "the harness's own run records do not block")
+            (repo / "a.txt").write_text("2\n")
+            self.assertIn("uncommitted", ready_to_ship(repo, "main")[1])
+
 
 if __name__ == "__main__":
     unittest.main()
