@@ -469,22 +469,26 @@ class AdoptDialog(Dialog):
 
 
 class StartDialog(Dialog):
-    """Start a run on a product that exists: polish one issue, or build a delta.
-    Returns {"lane", "issue"} or None."""
+    """Start a run on a product that exists: polish one issue, burn down backlog items,
+    or build a delta. Returns {"lane", "issue"}, {"lane", "burndown", "story_ids"}, or None."""
 
-    BINDINGS = [Binding("ctrl+s", "polish", "Polish", priority=True), Binding("ctrl+b", "build", "Build", priority=True)]
+    BINDINGS = [Binding("ctrl+s", "polish", "Polish", priority=True),
+                Binding("ctrl+d", "burndown", "Burn down", priority=True),
+                Binding("ctrl+b", "build", "Build", priority=True)]
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog form"):
             yield Static("Start a run", classes="dialog-title", markup=False)
-            yield Static("Polish takes one issue in your words to one pull request. Build changes the product's "
-                         "brief: describe the delta in the brief first.", markup=False)
-            yield Label("The issue", classes="form-label")
+            yield Static("Polish takes one issue in your words to one pull request. Burn down builds open "
+                         "backlog items, one pull request each: name their ids, or leave the field empty for the "
+                         "open items above the MVP line. Build changes the product's brief: describe the delta in "
+                         "the brief first.", markup=False)
+            yield Label("The issue, or item ids", classes="form-label")
             yield TextArea("", id="start-issue", compact=True, classes="form-text",
                            placeholder="e.g. The contact link in the footer opens the wrong address")
             yield Static("", id="form-error", markup=False)
-            yield Static(keys(("ctrl+s", "polish this issue"), ("ctrl+b", "build a delta"), ("esc", "cancel")),
-                         classes="hint")
+            yield Static(keys(("ctrl+s", "polish this issue"), ("ctrl+d", "burn down"), ("ctrl+b", "build a delta"),
+                              ("esc", "cancel")), classes="hint")
 
     def action_polish(self):
         issue = self.query_one("#start-issue", TextArea).text.strip()
@@ -492,6 +496,10 @@ class StartDialog(Dialog):
             self.query_one("#form-error", Static).update("Write the issue first, or press ctrl+b to build.")
             return
         self.dismiss({"lane": "polish", "issue": issue})
+
+    def action_burndown(self):
+        words = self.query_one("#start-issue", TextArea).text.replace(",", " ").split()
+        self.dismiss({"lane": "polish", "burndown": True, "story_ids": words})
 
     def action_build(self):
         self.dismiss({"lane": "build", "issue": None})

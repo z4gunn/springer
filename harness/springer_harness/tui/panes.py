@@ -618,7 +618,8 @@ class BriefPane(Pane):
             return
         args = {"base_version": self.version}
         project = await self.client.get(f"/v1/projects/{self.app.project}")
-        if project.get("adopted"):
+        if project.get("adopted") or project.get("lane") == "polish":
+            # A product that exists: polish, burn down, or build a delta.
             choice = await self.app.push_screen_wait(StartDialog())
             if choice is None:
                 return
@@ -682,7 +683,7 @@ class BacklogPane(Pane):
     BINDINGS = [Binding("v", "view", "view"), Binding("m", "move_line", "move line"), Binding("d", "defer", "defer"),
                 Binding("J", "down", "later"), Binding("K", "up", "earlier"), Binding("plus", "add_bug", "add bug"),
                 Binding("u", "unknown", "unknowns"), Binding("o", "open_pr", "open PR"),
-                Binding("x", "close", "close/reopen"),
+                Binding("x", "close", "close/reopen"), Binding("B", "burndown", "burn down"),
                 Binding("space", "toggle", "fold"), Binding("l", "runs", "runs")]
 
     def __init__(self, **kwargs):
@@ -803,6 +804,20 @@ class BacklogPane(Pane):
         story = next((s for s in self._stories() if s["story_id"] == story_id), None)
         self._op("backlog.reopen_story" if story and story.get("closed") else "backlog.close_story",
                  {"story_id": story_id})
+
+    def action_burndown(self):
+        """Burn down the story under the cursor, or the open items above the line when the
+        cursor is on a feature."""
+        self.app.spawn(self._burndown(self._selected("story")))
+
+    async def _burndown(self, story_id):
+        brief = await self.client.get(f"/v1/projects/{self.app.project}/brief")
+        outcome = await self.app.apply("run.start", {"base_version": brief["version"], "lane": "polish",
+                                                     "burndown": True, "story_ids": [story_id] if story_id else []},
+                                       project=self.app.project, busy="Starting the burndown.")
+        if outcome and outcome.get("result", {}).get("run_id"):
+            self.app.select_run(outcome["result"]["run_id"])
+            self.app.show("run")
 
     def action_view(self):
         self.view_name = VIEWS[(VIEWS.index(self.view_name) + 1) % len(VIEWS)]

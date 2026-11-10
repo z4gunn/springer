@@ -339,6 +339,25 @@ class AdoptedProjectTest(TuiCase):
             self.assertEqual((brief["lane"], brief["issue"]), ("polish", "The footer link opens the wrong address."))
             self.assertEqual(len(brief["pinned_rulings"]), 3)
 
+    async def test_start_burns_down_the_item_ids_typed_in_the_field(self):
+        from springer_harness.state.backlog import BacklogStore
+        bug = BacklogStore(self.shop).add_bug("Print contrast", "", "low")
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            await self.adopted(pilot)
+            await pilot.press("down")
+            await pilot.press("enter")
+            await self.see(pilot, "brief  v")
+            await pilot.press("s")
+            await self.dialog(pilot, StartDialog)
+            self.app.screen.query_one("#start-issue", TextArea).load_text(f"{bug},")
+            await pilot.press("ctrl+d")
+            await self.dialog(pilot, ConfirmDialog)
+            await self.see(pilot, "burndown: True")
+            await pilot.press("y")
+            await self.until(pilot, lambda: self.daemon.run_ids("shop"))
+            brief = json.loads((self.shop / "runs" / self.daemon.run_ids("shop")[0] / "run-brief.json").read_text())
+            self.assertEqual([i["story_id"] for i in brief["content"]["items"]], [bug])
+
     async def test_the_design_page_serves_the_existing_mockups(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
             await self.adopted(pilot)
@@ -774,6 +793,19 @@ class BacklogScreenTest(TuiCase):
             self.assertIn("done", next(line for line in self.text().splitlines() if "S-2 Send" in line))
             await pilot.press("x")
             await self.until(pilot, lambda: "closed by human" not in self.text())
+
+    async def test_burn_down_the_story_under_the_cursor(self):
+        async with self.app.run_test(size=self.SIZE) as pilot:
+            run_id = await self.backlog_screen(pilot)
+            self.engine(run_id).cancel_run("test")
+            await self.select(pilot, "story:S-2")
+            await pilot.press("B")
+            await self.dialog(pilot, ConfirmDialog)
+            await self.see(pilot, "story_ids: ['S-2']")
+            await pilot.press("y")
+            await self.until(pilot, lambda: len(self.daemon.run_ids("acme")) > 1)
+            brief = json.loads((self.engine(self.daemon.run_ids("acme")[-1]).run_dir / "run-brief.json").read_text())
+            self.assertEqual(brief["content"]["story_ids"], ["S-2"])
 
     async def test_a_refused_reorder_shows_the_reason(self):
         async with self.app.run_test(size=self.SIZE) as pilot:
