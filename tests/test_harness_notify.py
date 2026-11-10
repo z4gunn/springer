@@ -725,6 +725,21 @@ class ControlPlaneTest(NotifyCase):
                          ["polish", "acme", "DEFERRED-2: the issue's words"])
         self.assertEqual(_words('polish acme "unbalanced'), ["polish", "acme", '"unbalanced'])
 
+    def test_burndown_starts_a_polish_run_over_the_named_items(self):
+        self.confirmed("run.cancel", run_id=self.run_id)
+        self.assertIn("Which project?", handle_command("burndown", self.daemon, self.ops, ME, ME))
+        from springer_harness.state.backlog import BacklogStore
+        bug = BacklogStore(self.daemon.project_path("acme")).add_bug("Broken link", "", "low")
+        reply = handle_command("burndown acme", self.daemon, self.ops, ME, ME)
+        self.assertIn("Confirm run.start", reply["text"])
+        done = self.confirm(reply)
+        run_id = self.daemon.active_run("acme")
+        self.assertEqual(done, f"Started {run_id} on {bug}, one PR each. Its progress thread opens in this DM.")
+        self.confirmed("run.cancel", run_id=run_id)
+        BacklogStore(self.daemon.project_path("acme")).close_story(bug, "human", "2026-11-10T00:00:00Z")
+        refused = self.confirm(handle_command(f"burndown acme {bug},", self.daemon, self.ops, ME, ME))
+        self.assertIn(f"{bug} is closed already", refused)
+
     def test_a_refused_start_lists_the_brief_errors(self):
         from springer_harness.errors import HarnessError
         from springer_harness.notify.slack import _refusal

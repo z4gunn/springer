@@ -131,7 +131,7 @@ choice is a defaults-ledger line like an inferred profile.
 | Lane | Fits | Intake | Unit of work | Ceremony |
 |------|------|--------|--------------|----------|
 | build | a product that does not exist yet | the problem statement | the profile's phase set and stories | the profile's |
-| polish | a product that exists and is deployed: a gap a human saw, a port from a reference, a fix, a visible improvement | one issue in the human's own words, from `/springer polish` in Slack, `springer polish` in a terminal, or the statement | one PR per issue, or per batch of file-disjoint issues | code review, the verticals the diff touches under the vertical budget, and the product check |
+| polish | a product that exists and is deployed: a gap a human saw, a port from a reference, a fix, a visible improvement | one issue in the human's own words, from `/springer polish` in Slack, `springer polish` in a terminal, or the statement, or open backlog items from `/springer burndown` | one PR per issue or item, file-disjoint items side by side | code review, the verticals the diff touches under the vertical budget, and the product check |
 
 Under polish there is no PRD, story, criteria, test-plan, or ADR artifact.
 The dispatch brief carries the human's words, the files the implementer
@@ -193,7 +193,10 @@ records and shown for every run. A build run's PM artifact merges into it
 by id: new items append, a done item stays done, and a not-done item the
 artifact leaves out becomes deferred with a note. A polish issue is one
 TASK or BUG item under a Polish feature with a daemon-allocated id, which
-the run names so its unit carries the story. A story closes by its units,
+the run names so its unit carries the story. A burndown is a polish run over
+the items a person names, or with none named the open items above the MVP
+line in board order, at most eight: each item is its own unit and PR, and its
+merge closes it. A story closes by its units,
 by a trailer, or by a person on the board, and the column rule is the
 closed record first, then the units, then ready. A polish asked while a run
 is active is offered as a bug on the board instead of refused.

@@ -865,6 +865,20 @@ class OperationCatalogTest(ApiCase):
                          (run_id, f"BUG-{year}-1", True, "bug"))
         self.assertEqual(story["title"], "The footer link is broken on the About page")
 
+    def test_a_burndown_run_takes_the_named_items_one_change_each(self):
+        bug = self.confirmed("run.start", {"base_version": self.version, "lane": "polish",
+                                           "issue": "The footer link is broken"})["result"]["run_id"]
+        self.confirmed("run.cancel", {}, run_id=bug)
+        year = time.strftime("%Y", time.gmtime())
+        out = self.confirmed("run.start", {"base_version": self.version, "lane": "polish", "burndown": True,
+                                           "story_ids": [f"BUG-{year}-1"]})["result"]
+        brief = json.loads((self.daemon.engine("acme", out["run_id"]).run_dir / "run-brief.json").read_text())
+        brief = brief["content"]
+        self.assertEqual(out["story_ids"], [f"BUG-{year}-1"])
+        self.assertEqual((brief["lane"], brief["issue"], [i["story_id"] for i in brief["items"]]),
+                         ("polish", None, [f"BUG-{year}-1"]))
+        self.assertEqual(brief["items"][0]["title"], "The footer link is broken")
+
     def test_a_backlog_operation_before_generation_is_refused(self):
         run_id = self.start()
         self.op("backlog.reorder", {"story_id": "S-1", "position": 0}, run_id=run_id, expect=409)

@@ -119,6 +119,13 @@ Rules for the schema:
   story, criteria, or ADR artifact unless the change is on the gate list. The implementing
   unit's story_ids is run_brief.story_ids, the issue's item on the project backlog. Every
   ruling in run_brief.pinned_rulings binds.
+- When the polish run brief has items (a burndown), each item is its own polish change:
+  one implementing unit per item, its story_ids that one item's id, ending in its own pull
+  request. Never fold two items into one unit. Route every item whose declared paths do
+  not overlap another's in the same batch, so they run side by side. An item that must
+  touch paths another item's unit declares, or that depends_on another item, depends_on
+  that unit's key and stacks on its branch. done is true once every item's unit is done or
+  cancelled.
 - A unit in blocked, gated, or planned behind a gate is waiting on a person, and the
   answer resumes that same unit. Never route its work again under a new key.
 - A unit whose PR is open (state gated) is not a reason to wait. Work that builds on it

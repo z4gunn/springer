@@ -185,6 +185,31 @@ class BacklogFromArtifactTest(unittest.TestCase):
         self.assertEqual(self.store.add_issue("acme-5", "Tidy up after STORY-2026-001"), f"TASK-{YEAR}-3",
                          "only an id the issue opens with counts")
 
+    def test_a_burndown_claims_the_open_items_above_the_line_or_the_ones_named(self):
+        """Polish built one hand-typed issue per run, so the backlog never burned down."""
+        from springer_harness.errors import IllegalTransition
+        self.write("prioritized-backlog-x.json", artifact(
+            [item(1, feature_id="FEAT-1"), item(2, feature_id="FEAT-1"), item(3, feature_id="FEAT-2"),
+             item(4, feature_id="FEAT-3")],
+            features=[{"feature_id": f"FEAT-{n}", "epic_id": "EPIC-1", "name": f"F{n}", "outcome": "o"}
+                      for n in (1, 2, 3)]))
+        self.store.sync()
+        self.store.move_mvp_line("FEAT-2")
+        self.store.set_deferred("FEAT-2", True)
+        self.store.close_story("STORY-2026-002", "human", "2026-11-08T00:00:00Z")
+        items = self.store.claim("acme-2")
+        self.assertEqual([i["story_id"] for i in items], ["STORY-2026-001"],
+                         "closed, deferred, and below-the-line items stay")
+        self.assertEqual(self.store.story(self.store.load(), "STORY-2026-001")["run_id"], "acme-2")
+        named = self.store.claim("acme-3", ["STORY-2026-004", "STORY-2026-003", "STORY-2026-004"])
+        self.assertEqual([i["story_id"] for i in named], ["STORY-2026-004", "STORY-2026-003"],
+                         "named items are taken as given, once each, whatever the line")
+        with self.assertRaisesRegex(IllegalTransition, "STORY-2026-002 is closed"):
+            self.store.claim("acme-4", ["STORY-2026-002"])
+        self.store.close_story("STORY-2026-001", "human", "2026-11-08T00:00:00Z")
+        with self.assertRaisesRegex(IllegalTransition, "nothing is open"):
+            self.store.claim("acme-5")
+
     def test_a_story_takes_its_column_from_the_unit_that_builds_it(self):
         self.write("prioritized-backlog-x.json", artifact([item(1), item(2), item(3)]))
         units = Units({"U-0001": {"story_ids": ["STORY-2026-001"], "expected_outcome": "x"},

@@ -40,7 +40,8 @@ UNIT_ID = re.compile(r"^(?:([A-Za-z0-9][A-Za-z0-9._-]*):)?(U-\d{4})$")
 TIERS = ("haiku", "sonnet", "opus")
 LOG_CHARS = 1800
 ONLY_YOU = "Only the person this app was set up for can do that."
-USAGE = ("status | gates | units [project] | polish <project> <issue> | build <project> | release <project> | "
+USAGE = ("status | gates | units [project] | polish <project> <issue> | burndown <project> [item...] | "
+         "build <project> | release <project> | "
          "release-command <project> <command> [word] | checks <project> [command...] | pause <project> | "
          "resume <project> | reconcile <project> <change> <option> [text] | "
          "redispatch <unit> [tier] | cancel <unit> | log <unit> | ruling [project] <text> | "
@@ -473,7 +474,7 @@ def handle_command(text, daemon, operations, user, allowed_user):
         return _units(daemon, rest)
     if verb == "help":
         return f"/springer {USAGE}"
-    if verb not in ("polish", "build", "release", "release-command", "checks", "pause", "resume", "redispatch", "cancel",
+    if verb not in ("polish", "burndown", "build", "release", "release-command", "checks", "pause", "resume", "redispatch", "cancel",
                     "log", "ruling", "unlock", "reconcile", "restart"):
         return f"Try /springer {USAGE}"
     if user != allowed_user:
@@ -481,6 +482,8 @@ def handle_command(text, daemon, operations, user, allowed_user):
     try:
         if verb in ("polish", "build"):
             return _start(daemon, operations, verb, rest)
+        if verb == "burndown":
+            return _start(daemon, operations, "burndown", rest)
         if verb in ("release", "release-command"):
             return _release(daemon, operations, verb, rest)
         if verb == "checks":
@@ -531,8 +534,9 @@ def handle_command(text, daemon, operations, user, allowed_user):
 def _start(daemon, operations, lane, rest):
     """polish <project> <issue> or build <project>: start a run, after a Confirm tap."""
     if not rest:
-        return (f'Which project? /springer polish <project> "the issue in your words"' if lane == "polish"
-                else "Which project? /springer build <project>")
+        return {"polish": 'Which project? /springer polish <project> "the issue in your words"',
+                "burndown": "Which project? /springer burndown <project> [DEFERRED-1 BUG-2026-1 ...]"}.get(
+            lane, "Which project? /springer build <project>")
     slug = rest[0]
     with daemon.lock:
         try:
@@ -546,6 +550,12 @@ def _start(daemon, operations, lane, rest):
     if running:
         return f"{slug} already has {running} in progress. Wait for it to finish or cancel it first."
     args = {"base_version": front["brief_version"], "lane": lane}
+    if lane == "burndown":
+        args.update(lane="polish", burndown=True, story_ids=[w.strip(",:") for w in rest[1:]])
+        return _apply(operations, "run.start", slug, None, args,
+                      lambda outcome: f"Started {outcome['result']['run_id']} on "
+                                      f"{', '.join(outcome['result'].get('story_ids') or []) or 'the open items'}, "
+                                      f"one PR each. Its progress thread opens in this DM.")
     if lane == "polish":
         issue = " ".join(rest[1:]).strip()
         if not issue:

@@ -27,6 +27,8 @@ OWN_FEATURES = (BUG_FEATURE, DEFERRED_FEATURE, POLISH_FEATURE)  # items no artif
 STORY_ID = re.compile(r"\b(?:STORY|TASK|BUG)-[0-9]{4}-[0-9]+\b")
 # An issue that opens with a backlog id, e.g. "DEFERRED-2:" or "STORY-2026-046 -".
 NAMED_STORY = re.compile(r"\s*([A-Z][A-Z0-9]*(?:-\d+)+)\b")
+# How many open items a burndown takes when the person names none.
+BURNDOWN_CAP = 8
 BUG_WORDS = re.compile(r"\b(bug|broken|breaks|fix|wrong|error|crash|fails?|404)\b", re.I)
 COLUMNS = {"planned": "ready", "ready": "ready", "retry": "in_progress", "redispatch": "in_progress",
            "running": "in_progress", "abandoned": "in_progress", "returned": "in_review", "checking": "in_review",
@@ -198,6 +200,28 @@ class BacklogStore:
                                    "pr": None, "depends_on": []})
         self.save(backlog)
         return story_id
+
+    def claim(self, run_id, story_ids=None, cap=BURNDOWN_CAP):
+        """The items a burndown run builds, each marked as the run's. Named ids are taken
+        as given and must be open. With none, the open items above the MVP line and not
+        deferred, in board order, up to cap. Returns what the planner needs of each."""
+        backlog = self.require()
+        if story_ids:
+            picked = [self.story(backlog, story_id) for story_id in dict.fromkeys(story_ids)]
+            closed = [s["story_id"] for s in picked if s.get("closed")]
+            if closed:
+                raise IllegalTransition(f"{', '.join(closed)} {'is' if len(closed) == 1 else 'are'} closed already")
+        else:
+            picked = [s for f in self.features(backlog) if f.get("mvp", True) and not f.get("deferred")
+                      for s in f["stories"] if not s.get("closed")][:cap]
+        if not picked:
+            raise IllegalTransition("nothing is open above the MVP line to burn down")
+        for story in picked:
+            story["run_id"] = run_id
+        self.save(backlog)
+        return [{"story_id": s["story_id"], "title": s.get("title") or s["story_id"],
+                 "detail": s.get("description") or s.get("note") or "", "depends_on": list(s.get("depends_on") or ())}
+                for s in picked]
 
     def close_story(self, story_id, source, at, pr=None, note=None, **extra):
         """A story is done by the units that built it, by a pull request that names it,

@@ -63,6 +63,8 @@ class RunStart(Args):
     base_version: int
     lane: Literal["build", "polish"] | None = None  # the brief's lane when absent
     issue: str | None = Field(default=None, max_length=4000)  # the one issue a polish run takes
+    burndown: bool = False  # a polish run over open backlog items instead of one issue
+    story_ids: list[str] = []  # the items a burndown takes, or none for the open ones above the MVP line
 
 
 class RunPause(Args):
@@ -310,6 +312,10 @@ def run_start(c):
     front, sections = c.brief.load()
     if c.daemon.active_run(c.project):
         raise IllegalTransition(f"{c.project} already has a run in progress")
+    if c.args.lane == "polish" and c.args.burndown:
+        run_id = c.daemon.start_run(c.project, "build", lane="polish", burndown=True, story_ids=c.args.story_ids)
+        brief = c.daemon.run_brief(c.project, run_id).get("content", {})
+        return {"run_id": run_id, "story_ids": brief.get("story_ids", [])}
     if c.args.lane == "polish":
         # A polish run takes one issue in the person's words. The brief describes a
         # product that already exists, so it is context, not a gate on the start.

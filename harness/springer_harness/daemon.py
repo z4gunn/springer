@@ -410,7 +410,7 @@ class Daemon:
         """Runs from before the daemon, imported at adoption, newest last."""
         return read_json(self.home.root / "index" / f"{slug}.json", {"runs": [], "learnings": []})
 
-    def start_run(self, slug, kind, sections=None, lane=None, issue=None):
+    def start_run(self, slug, kind, sections=None, lane=None, issue=None, burndown=False, story_ids=None):
         source = self._prepare(slug, kind)
         path = self.project_path(slug)
         front, _ = BriefStore(path).load()
@@ -420,10 +420,13 @@ class Daemon:
         derived = derive(front)
         lane = lane or derived["lane"]
         # A polish run's issue is one item on the project backlog, which its unit carries.
-        story_ids = [BacklogStore(path).add_issue(run_id, issue)] if lane == "polish" and issue else []
+        # A burndown is a polish run over several open items, each its own change.
+        items = BacklogStore(path).claim(run_id, story_ids) if lane == "polish" and burndown else None
+        story_ids = [i["story_id"] for i in items] if items else \
+            [BacklogStore(path).add_issue(run_id, issue)] if lane == "polish" and issue else []
         doc = artifact_header(f"run-brief-{run_id}", "run-brief", "run_brief", "v1", self.now())
         doc["content"] = {"run_id": run_id, "profile": derived["profile"], "kind": kind, "lane": lane,
-                          "issue": issue, "story_ids": story_ids,
+                          "issue": issue, "story_ids": story_ids, **({"items": items} if items else {}),
                           "brief_version": front.get("brief_version", 1), "brief_source": source, "sections": sections,
                           "pinned_rulings": list(front.get("pinned_rulings") or [])}
         write_json(path / "runs" / run_id / "run-brief.json", doc)
