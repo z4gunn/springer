@@ -136,7 +136,9 @@ class GateRequestTest(EngineCase):
         engine.check()
         self.assertEqual(len(engine.gates.all()), 1)
 
-    def test_a_malformed_request_is_a_defect_not_a_gate(self):
+    def test_a_malformed_request_goes_back_with_the_fix_and_spends_no_retry(self):
+        """The reference run's unit used its last retry on a gate request it wrote in the
+        wrong shape, and that opened an L3 gate a person had to answer with retry."""
         for bad in ({"checkpoint_type": "made-up", "decision_prompt": "x", "options": [{"option": "a", "consequence": "b"}]},
                     {"checkpoint_type": "scope-change", "decision_prompt": "x", "options": []},
                     {"checkpoint_type": "scope-change", "decision_prompt": "x", "options": [{"option": "a"}]},
@@ -146,8 +148,23 @@ class GateRequestTest(EngineCase):
                 engine = self.run_until_blocked(bad)
                 self.tick_until(engine, lambda: len(engine.units.state("U-0001")["sessions"]) > 1)
                 self.assertEqual(engine.gates.all(), [])
-                self.assertEqual(engine.units.state("U-0001")["retries_spent"], 1, "refused is a defect, not a pass")
+                self.assertEqual(engine.units.state("U-0001")["retries_spent"], 0, "a shape slip costs no retry")
                 self.assertIn("gate-request.json was refused", self.provider.spawned[-1].brief)
+
+    def test_a_gate_whose_units_are_all_cancelled_is_retired(self):
+        """A cancelled unit left its merge gate open in Slack, inviting a merge of a PR
+        nobody wanted any more."""
+        engine = self.run_until_blocked()
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")
+        self.assertEqual(len(engine.gates.open_gates()), 1)
+        engine.cancel_unit("U-0001", "test")
+        engine.tick()
+        self.assertEqual(engine.gates.open_gates(), [])
+        gate = engine.gates.all()[0]["content"]
+        self.assertTrue(gate["context"]["retired"])
+        self.assertEqual(len(self.events(engine, "gate_retired")), 1)
+        engine.tick()
+        self.assertEqual(len(self.events(engine, "gate_retired")), 1, "retired once")
 
     def test_an_unlock_request_records_the_ruling_when_approved(self):
         """The reference run's scaffold needed two locked config files and the rulings

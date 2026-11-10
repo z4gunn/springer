@@ -30,7 +30,7 @@ SSE_POLL_SECONDS = 0.2
 HEARTBEAT_SECONDS = 15
 DESIGN_CODE_SECONDS = 60
 DESIGN_COOKIE_SECONDS = 8 * 3600
-FAILURE_CLASSES = ("defect", "transient", "environment", "context", "question", "blocked")
+FAILURE_CLASSES = ("defect", "transient", "environment", "context", "question", "blocked", "request")
 
 
 def _host(header):

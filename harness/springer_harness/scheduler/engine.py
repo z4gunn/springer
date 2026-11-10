@@ -302,7 +302,7 @@ class RunEngine:
         if requested:
             # A session that asked for a person and was refused must not pass silently:
             # its question would be lost and the work would go on as if answered.
-            self._on_failure(unit_id, state, CheckResult(status="fail", failure_class="defect", detail=requested))
+            self._on_failure(unit_id, state, CheckResult(status="fail", failure_class="request", detail=requested))
             return
         result = self._result(unit_id, state, session_dir)
         if result is None:
@@ -546,6 +546,9 @@ class RunEngine:
         action = POLICY.get(cause, RETRY)
         if cause in ADDENDA:
             self._append_note(unit_id, ADDENDA[cause])
+        if cause == "request":
+            # The refusal says how to write the request, and the next session needs it.
+            self._append_note(unit_id, f"Check sent the last session back: {result.detail[:RETRY_NOTE_CHARS]}")
         if action == REDISPATCH and self._repeats(state, cause) >= MAX_REDISPATCHES - 1:
             # A redispatch spends no retry, so a cause that does not go away would
             # loop forever. The third in a row asks a person instead.
@@ -604,6 +607,7 @@ class RunEngine:
 
     def resolve_gates(self):
         self._apply_answers()
+        self._retire_orphan_gates()
         for state in self.units.by_state("gated"):
             unit_id = state["unit_id"]
             # Opened here rather than at Check, so a crash between the two is repaired
@@ -623,6 +627,17 @@ class RunEngine:
                 elif gates[-1]["content"]["response"] and \
                         gates[-1]["content"]["response"]["option"] == "approve":
                     self._merge(unit_id, state, level)
+
+    def _retire_orphan_gates(self):
+        """An open gate that holds only units already done or cancelled asks a question
+        nobody is waiting on: a cancelled unit left its merge gate in Slack. Retired on
+        the tick, so a cancel from any channel, or one before this existed, clears it."""
+        for gate in self.gates.open_gates():
+            holds = gate["content"]["holds"]
+            if holds and all(u in self.units.ids() and self.units.state(u)["state"] in ("done", "cancelled")
+                             for u in holds):
+                self.gates.retire(gate, "harness", "nothing left to hold")
+                self.ledger.append("gate_retired", gate_id=gate["content"]["checkpoint_id"], holds=holds)
 
     def _autopilot(self):
         """Only autopilot merges a low-risk PR on review alone. Under standard and

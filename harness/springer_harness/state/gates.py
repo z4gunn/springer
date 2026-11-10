@@ -78,11 +78,15 @@ class GateStore:
     def close_for_cancelled_run(self, by):
         """A cancelled run has no decisions left to take."""
         for gate in self.open_gates():
-            gate["content"]["response"] = {"option": "run cancelled", "free_text": None, "rule_change": None,
-                                           "by": by, "at": iso(self.now())}
-            gate["content"]["pipeline_status"] = "resumed"
-            gate["content"]["context"]["retired"] = True
-            write_json(self.path(gate["content"]["checkpoint_id"]), gate)
+            self.retire(gate, by, "run cancelled")
+
+    def retire(self, gate, by, why):
+        """Close an open gate whose question no longer has anyone to answer it for."""
+        gate["content"]["response"] = {"option": why, "free_text": None, "rule_change": None,
+                                       "by": by, "at": iso(self.now())}
+        gate["content"]["pipeline_status"] = "resumed"
+        gate["content"]["context"]["retired"] = True
+        write_json(self.path(gate["content"]["checkpoint_id"]), gate)
 
     def open_gates(self):
         return [g for g in self.all() if g["content"]["response"] is None]

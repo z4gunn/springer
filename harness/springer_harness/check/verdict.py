@@ -16,7 +16,10 @@ RETRY = "retry"
 REDISPATCH = "redispatch"
 BLOCK = "blocked"
 POLICY = {"defect": RETRY, "transient": REDISPATCH, "environment": REDISPATCH, "context": REDISPATCH,
-          "question": REDISPATCH, "blocked": BLOCK}
+          "question": REDISPATCH, "blocked": BLOCK,
+          # A gate request the harness refused for its shape. The work may be sound, and
+          # the refusal names the fix, so it costs no retry. Three in a row ask a person.
+          "request": REDISPATCH}
 ADDENDA = {
     "question": "Do not stop to ask. Take the reversible default, log it, and continue.",
     "context": "The last session ran out of context. Stay inside the declared paths and read less.",
