@@ -83,6 +83,8 @@
       "Bash(git rebase:*)",
       "Bash(git rev-parse:*)",
       "Bash(git show:*)",
+      "Bash(git merge-tree:*)",
+      "Bash(python3 -m http.server --bind 127.0.0.1:*)",
       "Bash(gh pr list:*)",
       "Bash(gh pr comment:*)",
       "Bash(git rm:*)",

@@ -106,17 +106,23 @@ def permissions(cwd):
     return expand_directories(cwd, found.get("allow") or []), list(found.get("deny") or [])
 
 
+SCRIPT_SUFFIXES = {"python3": (".py",), "python": (".py",), "bash": (".sh",), "sh": (".sh",),
+                   "node": (".js", ".mjs", ".cjs"), "npx": (".js", ".mjs", ".ts")}
+
+
 def expand_directories(cwd, rules):
     """A Bash prefix rule matches whole words, so `Bash(python3 dir/:*)` never matches
-    `python3 dir/script.py`. Each such rule becomes one rule per file in the directory."""
+    `python3 dir/script.py`. Each such rule becomes one rule per script in the directory
+    that the interpreter runs (a .py for python3, a .sh for bash), not one per data file."""
     import re
     out = []
     for rule in rules:
         found = re.fullmatch(r"Bash\((\S+) (\S+/):\*\)", rule)
         folder = Path(cwd) / found.group(2) if found else None
         if folder and folder.is_dir():
+            suffixes = SCRIPT_SUFFIXES.get(found.group(1))
             out += [f"Bash({found.group(1)} {found.group(2)}{p.name}:*)" for p in sorted(folder.iterdir())
-                    if p.is_file() and not p.name.startswith(".")]
+                    if p.is_file() and not p.name.startswith(".") and (suffixes is None or p.suffix in suffixes)]
         else:
             out.append(rule)
     return out
