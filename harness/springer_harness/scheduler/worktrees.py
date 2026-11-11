@@ -8,6 +8,10 @@ RULINGS = "runs/_config-unlock.json"
 # What an artifact unit may land with no PR: the run store, rendered docs, and design
 # variants. Anything else is code, and code reaches the default branch only through a gate.
 ARTIFACT_PATHS = ("runs/", "docs/", "design/")
+# Git-ignored project state a unit reads but git does not carry, e.g. the impeccable
+# surface notes the design and frontend briefs cite. Copied in, never linked, so a unit
+# cannot change the person's copy.
+CARRIED_IGNORED = (".impeccable",)
 
 import shutil
 import subprocess
@@ -72,6 +76,7 @@ class Worktrees:
             _git(path, "merge", "--ff-only", "--quiet", base)
             self._carry_rulings(path)
             self._provide_node_modules(path)
+            self._provide_local_state(path)
             return path, branch
         _git(self.project, "worktree", "prune")
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -83,7 +88,38 @@ class Worktrees:
             raise OSError(f"git worktree add failed for {unit_id}: {done.stderr.strip()}")
         self._carry_rulings(path)
         self._provide_node_modules(path)
+        self._provide_local_state(path)
         return path, branch
+
+    def _provide_local_state(self, path):
+        """A unit's tree gets .venv, linked to the harness's own venv (jsonschema for
+        schemas/validate.py), so `.venv/bin/python` resolves as the runtime says it does,
+        and a copy of each git-ignored CARRIED_IGNORED path the project has. A linked .venv
+        shows as untracked even where .venv/ is ignored, so the shared exclude names it."""
+        path, venv, harness_venv = Path(path), Path(path) / ".venv", self.base / ".venv"
+        if not venv.exists() and not venv.is_symlink() and (harness_venv / "bin" / "python").exists():
+            self._exclude("/.venv")
+            venv.symlink_to(harness_venv)
+        for rel in CARRIED_IGNORED:
+            source, target = self.project / rel, path / rel
+            if not source.exists() or target.exists() or _git(self.project, "check-ignore", "-q", rel).returncode:
+                continue
+            clone = ["cp", "-cR"] if sys.platform == "darwin" else ["cp", "-R", "--reflink=auto"]
+            done = subprocess.run([*clone, str(source), str(target)], capture_output=True, text=True)
+            if done.returncode:
+                shutil.rmtree(target, ignore_errors=True)
+                sys.stderr.write(f"could not copy {rel} into {path}: {done.stderr.strip()[:300]}\n")
+
+    def _exclude(self, pattern):
+        """Add a pattern to the repository's shared info/exclude, once."""
+        common = _git(self.project, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()
+        if not common:
+            return
+        exclude = Path(common) / "info" / "exclude"
+        lines = exclude.read_text().splitlines() if exclude.exists() else []
+        if pattern not in lines:
+            exclude.parent.mkdir(parents=True, exist_ok=True)
+            exclude.write_text("\n".join([*lines, pattern]) + "\n")
 
     def _provide_node_modules(self, path):
         """git carries no node_modules, so a fresh worktree cannot build, test, or run a
