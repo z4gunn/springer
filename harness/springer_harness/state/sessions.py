@@ -40,7 +40,9 @@ class SessionStore:
         write_json(self.dir(record["session_id"]) / "usage.json", record)
 
     def all(self):
-        return [self.get(s) for s in self.ids()]
+        """Every session with a record. The folder exists before usage.json (the brief is
+        written into it first), so a session being spawned is skipped, not None."""
+        return [r for r in (self.get(s) for s in self.ids()) if r is not None]
 
     def finish(self, record, state, outcome, code=None):
         record.update(state=state, outcome=outcome, exit_code=code, ended_at=iso(self.now()))

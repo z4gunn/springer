@@ -1111,6 +1111,12 @@ class FullRunTest(ApiCase):
         metrics = self.get(run + "/metrics")
         self.assertEqual(metrics["dispatches"], len(units))
         self.assertGreater(metrics["list_price_spend_usd"], 0)
+        # A session folder with only its brief, before usage.json lands, does not break the sum.
+        spawning = self.daemon.engine("acme", run_id).sessions(units[0]["unit_id"]).dir("S-0099")
+        spawning.mkdir(parents=True)
+        (spawning / "brief.md").write_text("brief")
+        self.assertEqual(self.get(run + "/metrics")["list_price_spend_usd"], metrics["list_price_spend_usd"])
+        self.get(f"{run}/units/{units[0]['unit_id']}")
 
 
 def free_port():
