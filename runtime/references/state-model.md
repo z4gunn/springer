@@ -162,7 +162,7 @@ A human intervention is recorded as operation_applied rather than as a cycle rec
 
 Changes from v1: checkpoint_type gains discovery-go-no-go, structure-confirmation, scope-review, taste-review, production-release, provisioning-required, and routine-decision, level (L0, L1, L2, L3) is added, holds narrows from phase names and ids to the unit ids whose merge or start waits and becomes required, options stay as they are and are ordered recommended first, digest (true when the gate is informational and closes on view) is added, channel_refs (where it was sent) is added, response (option chosen, free text, rule change, by, at) is added. A gate with holds empty and level L1 is a digest entry, not a pause, so a digest gate records pipeline_status resumed.
 
-A run whose project has a release command and that merged work opens one production-release gate (L3, holds empty, options go and no_go) when its last unit is terminal, and completes only after the answer. Go starts the release command in the project checkout on a pseudo-terminal, typing the configured confirm word at its prompt, and the run completes when the command exits. No_go completes the run and ships nothing.
+A run whose project has a release command and that merged work opens one production-release gate (L3, holds empty, options go and no_go, context.command set) when its last unit is terminal. Only the harness opens this gate: a plan or a unit gate request naming it is refused. The run completes only after the answer. Go starts the release command in the project checkout on a pseudo-terminal, typing the configured confirm word at its prompt, and the run completes when the command exits. No_go completes the run and ships nothing.
 
 ## Gate requests
 

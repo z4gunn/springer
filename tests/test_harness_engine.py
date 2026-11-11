@@ -140,6 +140,7 @@ class GateRequestTest(EngineCase):
         """The reference run's unit used its last retry on a gate request it wrote in the
         wrong shape, and that opened an L3 gate a person had to answer with retry."""
         for bad in ({"checkpoint_type": "made-up", "decision_prompt": "x", "options": [{"option": "a", "consequence": "b"}]},
+                    {**self.REQUEST, "checkpoint_type": "production-release"},
                     {"checkpoint_type": "scope-change", "decision_prompt": "x", "options": []},
                     {"checkpoint_type": "scope-change", "decision_prompt": "x", "options": [{"option": "a"}]},
                     {**self.REQUEST, "decisions": [{"decision_id": "D1", "kind": "nope", "prompt": "x"}]}):
@@ -1016,11 +1017,16 @@ class CannedRunTest(EngineCase):
         if HAVE_JSONSCHEMA:
             self.assertEqual(schema_errors("pdca-cycle-v1", engine.cycles.all()[0]), [])
 
-    def release_run(self, answer):
+    def release_run(self, answer, foreign_gate=False):
         """Drive to the release gate, answering every other gate with its first option."""
         started = []
         engine = self.engine(canned_batches())
         engine.settings = lambda: {"ci_signal": "receipts", "release_command": "npm run deploy"}
+        if foreign_gate:
+            # Run ecg-10's plan opened its own production-release gate, answered in its own words.
+            own = engine.gates.open("production-release", "L3", [], "Redeploy?",
+                                    [{"option": "Go: redeploy main", "consequence": "Ships."}])["content"]
+            engine.gates.answer(own["checkpoint_id"], "Go: redeploy main", "channel:slack")
         out_dir = self.project / "release-out"
         engine.release = lambda by, gate_id: (started.append((by, gate_id)), (out_dir, None))[1]
         for _ in range(80):
@@ -1049,6 +1055,12 @@ class CannedRunTest(EngineCase):
         out_dir.mkdir()
         (out_dir / "result.json").write_text(json.dumps({"exit_code": 0}))
         self.assertEqual(engine.tick(), "complete")
+
+    def test_a_release_gate_the_harness_did_not_open_is_not_the_release(self):
+        engine, gate_id, started, _ = self.release_run("go", foreign_gate=True)
+        self.assertEqual(engine.tick(), "ticked")
+        self.assertEqual(started, [("channel:slack", gate_id)])
+        self.assertEqual(self.events(engine, "release_declined"), [])
 
     def test_no_go_completes_the_run_and_ships_nothing(self):
         engine, gate_id, started, _ = self.release_run("no_go")

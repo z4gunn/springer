@@ -17,7 +17,7 @@ from pathlib import Path
 
 from ..common import read_json, write_json
 from ..providers.claude_code import run_once
-from .engine import GATE_TYPES
+from .engine import REQUESTABLE_GATE_TYPES
 from .plan import GateDraft, PlanBatch, UnitDraft
 
 TIERS = ("haiku", "sonnet", "opus")
@@ -301,8 +301,9 @@ class OrchestratorPlanner:
                 found.append(f"{unit['key']} writes code but names no test gating command. The walking-skeleton "
                              "or scaffold story sets up the test runner")
         for gate in output.get("gates", []):
-            if gate["checkpoint_type"] not in GATE_TYPES:
-                found.append(f"{gate['checkpoint_type']} is not a gate type ({', '.join(GATE_TYPES)})")
+            if gate["checkpoint_type"] not in REQUESTABLE_GATE_TYPES:
+                found.append(f"{gate['checkpoint_type']} is not a gate a plan may open "
+                             f"({', '.join(REQUESTABLE_GATE_TYPES)})")
         return found
 
     def _to_batch(self, output):

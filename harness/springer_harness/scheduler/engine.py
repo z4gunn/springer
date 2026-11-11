@@ -47,6 +47,9 @@ def gating_note(commands):
 GATE_TYPES = ("direction-review", "architecture-options-selection", "architecture-confirmation", "prd-approval",
               "design-direction-selection", "pr-merge", "security-compliance-flag", "scope-change", "discovery-go-no-go",
               "structure-confirmation", "scope-review", "taste-review", "production-release", "provisioning-required")
+# Gates only the harness opens. A plan or a unit asking for one is told to ask again:
+# the production release is the harness's own gate, run on the project's release command.
+REQUESTABLE_GATE_TYPES = tuple(t for t in GATE_TYPES if t != "production-release")
 DECISION_KINDS = ("question", "prd-approval", "architecture-options-selection", "design-direction-selection",
                   "default-review")
 MAX_REDISPATCHES = 3
@@ -505,8 +508,9 @@ class RunEngine:
                        if isinstance(o, dict) else o for o in options]
         decisions = request.get("decisions") or []
         problem = None
-        if request.get("checkpoint_type") not in GATE_TYPES:
-            problem = f"checkpoint_type {request.get('checkpoint_type')!r} is not one of {sorted(GATE_TYPES)}"
+        if request.get("checkpoint_type") not in REQUESTABLE_GATE_TYPES:
+            problem = (f"checkpoint_type {request.get('checkpoint_type')!r} is not one of "
+                       f"{sorted(REQUESTABLE_GATE_TYPES)}")
         elif not request.get("decision_prompt"):
             problem = "it has no decision_prompt"
         elif not options or not all(isinstance(o, dict) and o.get("option") and o.get("consequence") for o in options):
@@ -1105,7 +1109,10 @@ class RunEngine:
         command = self.settings().get("release_command")
         if not command or self.release is None:
             return False
-        gates = [g for g in self.gates.all() if g["content"]["checkpoint_type"] == "production-release"]
+        # Only the gate the harness opened, which carries the command. A production-release
+        # gate from an older plan answers in its own words and is not the release.
+        gates = [g for g in self.gates.all() if g["content"]["checkpoint_type"] == "production-release"
+                 and (g["content"].get("context") or {}).get("command")]
         if not gates:
             merged = sum(1 for e in self.ledger.read() if e.line.get("event") == "merge")
             if not merged:
