@@ -72,6 +72,8 @@ session directory {session_dir}:
     "detail": "<one line>"}}
   A review unit also sets "verdict", "findings", and "code_review", as its brief says.
 - return.txt, your fifteen-line return.
+- result.md, the full unit result: the files written, every obligation you could not meet
+  quoted with the reason, and every default taken. /springer log shows it to the person.
 - handoff.md only if you are stopping before the work is done, saying where to continue.
 
 Your shell already starts in your worktree, which is the repository you work in. Run
@@ -81,7 +83,7 @@ denied command is a failed unit. Validate with `python3 schemas/validate.py <pat
 
 Use {session_dir} as the unit directory for receipt.py. The harness runs the gating
 commands your brief lists at your branch head after you return, and those runs are the
-evidence, so commit all your work before you return. Write run artifacts to
+evidence, so commit all your work before you return and take no receipt for them. Write run artifacts to
 {run_dir}/artifacts/ by that absolute path, and do not commit copies of anything under
 runs/ in your worktree. Write and amend your artifacts there, including a decision-log
 line on an ADR. Never edit a cycle (CYCLE-), gate (G-), or escalation (E-) record, which

@@ -823,3 +823,17 @@ class ControlPlaneTest(NotifyCase):
         self.assertFalse(self.engine.paused())
         self.assertFalse((Path(self.daemon.home.root) / "restart.json").exists())
 
+
+
+class LogCommandTest(NotifyCase):
+    def test_a_unit_that_skipped_result_md_still_shows_its_return(self):
+        """Four units of run ecg-10 wrote return.txt but no result.md."""
+        from springer_harness.notify.slack import _log
+        unit = self.tick_to_unit(self.run_id)
+        session = self.engine.units.state(unit["unit_id"])["sessions"][-1]
+        session_dir = self.engine.sessions(unit["unit_id"]).dir(session)
+        session_dir.mkdir(parents=True, exist_ok=True)
+        (session_dir / "return.txt").write_text("DONE_WITH_CONCERNS\nno capture taken")
+        self.assertIn("no capture taken", _log(self.daemon, unit["unit_id"]))
+        (session_dir / "result.md").write_text("full result")
+        self.assertIn("full result", _log(self.daemon, unit["unit_id"]))

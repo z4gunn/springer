@@ -429,6 +429,9 @@ def _log(daemon, ref):
         session_dir = engine.sessions(unit_id).dir(state["sessions"][-1])
     path = session_dir / "result.md"
     if not path.exists():
+        # A session that skipped result.md still left its fifteen-line return.
+        path = session_dir / "return.txt"
+    if not path.exists():
         return f"{unit_id} {state['sessions'][-1]} left no result.md. It is {state['state']}."
     body = _clean_log(path.read_text(), daemon.project_path(slug), Path.home())
     if len(body) > LOG_CHARS:
