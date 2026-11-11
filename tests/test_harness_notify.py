@@ -91,6 +91,8 @@ class GateMessageTest(NotifyCase):
         posted = [view for kind, view in self.channel.sent if kind == "gate" and view["gate_id"] == gate_id]
         self.assertEqual(len(posted), 1)
         self.assertEqual(posted[0]["review"], "approve")
+        self.assertEqual(self.engine.gates.get(gate_id)["content"]["channel_refs"], ["slack:D1/1"],
+                         "the committed gate record names the thread it was posted to")
         payload = {"user": {"id": ME}, "actions": [{"action_ts": "1.1", "value": json.dumps(
             {"p": "acme", "r": self.run_id, "g": gate_id, "o": "approve"})}]}
         self.assertIsNone(handle_action(payload, self.app.state.operations, ME))

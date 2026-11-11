@@ -43,6 +43,16 @@ class GateStore:
         self.ledger.append("gate_opened", gate_id=gate_id, level=level, holds=holds)
         return gate
 
+    def add_channel_ref(self, gate_id, ref):
+        """Where the gate was sent, e.g. slack:D1/1794.02, so the committed record names
+        the thread. The notifier keeps its own copy for closing and reminding."""
+        gate = self.get(gate_id)
+        refs = gate["content"].setdefault("channel_refs", [])
+        if ref not in refs:
+            refs.append(ref)
+            write_json(self.path(gate_id), gate)
+        return gate
+
     def answer(self, gate_id, option, by, free_text=None, rule_change=None, decisions=None):
         gate = self.get(gate_id)
         content = gate["content"]

@@ -370,6 +370,7 @@ class Notifier:
                 ref = self.channel.post_gate(view)
                 state["gates"][view["key"]] = {"ref": ref, "posted_at": now, "reminded": False, "closed": False}
                 sent.append(("gate", view["gate_id"]))
+                self._record_ref(view, ref)
             elif closed and not record["closed"]:
                 self.channel.close_gate(record["ref"], view)
                 record["closed"] = True
@@ -383,6 +384,19 @@ class Notifier:
                 record["reminded"] = True
                 sent.append(("reminder", view["gate_id"]))
         return sent
+
+    def _record_ref(self, view, ref):
+        """Write the post's address into the gate record, under the daemon lock like every
+        other run-state write. A miss costs only the record line, never the post."""
+        if isinstance(ref, dict) and ref.get("channel") and ref.get("ts"):
+            ref = f"slack:{ref['channel']}/{ref['ts']}"
+        if not isinstance(ref, str) or not ref:
+            return
+        try:
+            with self.daemon.lock:
+                self.daemon.engine(view["project"], view["run_id"]).gates.add_channel_ref(view["gate_id"], ref)
+        except Exception as exc:  # noqa: BLE001, the post already went out
+            sys.stderr.write(f"springer notifications: could not record {view['key']}: {exc}\n")
 
     def _send_escalations(self, state, escalations):
         sent = []
