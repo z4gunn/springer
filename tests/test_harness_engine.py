@@ -530,6 +530,21 @@ class MergePolicyTest(EngineCase):
         self.assertEqual((closed["source"], closed["unit_ids"], closed["pr"]), ("unit", ["U-0001"], 1))
         self.assertRegex(closed["at"], r"^\d{4}-\d\d-\d\dT", "a time, not a ledger cursor")
 
+    def test_a_story_unit_s_brief_quotes_its_acceptance_criteria(self):
+        """Run ecg-10's unit for a story built it without two checks its criteria named,
+        because the brief only pointed at an artifact the unit could not read."""
+        artifacts = self.project / "runs" / "earlier-run" / "artifacts"
+        artifacts.mkdir(parents=True)
+        (artifacts / "acceptance-criteria-demo.json").write_text(json.dumps({"content": {"criteria": [
+            {"ac_id": "AC-1", "story_ref": "STORY-1", "then": "an open row looks open.",
+             "check": "python3 verification/check.py (LC-OPEN-STATE)"},
+            {"ac_id": "AC-2", "story_ref": "STORY-2", "then": "someone else's story."}]}}))
+        engine = self.engine([batch(unit("a", story_ids=("STORY-1",)))])
+        self.tick_until(engine, lambda: self.provider.spawned)
+        brief = self.provider.spawned[0].brief
+        self.assertIn("AC-1: an open row looks open. Check: python3 verification/check.py (LC-OPEN-STATE)", brief)
+        self.assertNotIn("AC-2", brief)
+
     def actions_engine(self):
         engine = self.engine([batch(unit("a", agent="routine"))])
         engine.settings = lambda: {"ci_signal": "self-hosted-actions"}

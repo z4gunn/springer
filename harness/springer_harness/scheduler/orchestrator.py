@@ -82,8 +82,9 @@ its own git worktree off the default branch, checks it mechanically, and asks yo
 once nothing is in flight. A session sees only its brief, so each unit's brief must name
 the files to read in order (docs/brief.md, the artifacts under runs/{run_id}/artifacts/,
 docs/), the skills to follow, and whether the outcome is run artifacts and docs
-(committed to its branch, which the harness merges itself) or a pull request (pushed and
-opened with spgr-create-pr, then gated by risk). The gating commands go in the unit's
+(committed to its branch, which the harness merges itself) or a pull request (opened as the
+session's output contract says, then gated by risk). Do not tell the unit to push or open
+the PR: the contract names that per source host. The gating commands go in the unit's
 gating_commands, not only in the brief: the harness runs them itself at the branch head
 after the session returns, and their result is the evidence the merge reads.
 

@@ -44,6 +44,30 @@ def gating_note(commands):
             "yourself while you work so you return green. A test command must print a count of tests run.\n"
             + lines)
 
+def criteria_note(project_path, story_ids):
+    """The acceptance criteria of the unit's stories, quoted into its brief. A pointer to
+    the criteria artifact was not enough: a unit that could not read it built a story
+    without two of its named checks. The newest run's criteria for a story win."""
+    if not story_ids:
+        return ""
+    found = {}
+    paths = sorted(Path(project_path).glob("runs/*/artifacts/acceptance-criteria*.json"),
+                   key=lambda p: p.stat().st_mtime)
+    for path in paths:
+        for item in ((read_json(path) or {}).get("content") or {}).get("criteria") or []:
+            if isinstance(item, dict) and item.get("story_ref") in story_ids and item.get("ac_id"):
+                found.setdefault(item["story_ref"], {})[item["ac_id"]] = item
+    if not found:
+        return ""
+    lines = []
+    for story in story_ids:
+        for item in (found.get(story) or {}).values():
+            check = f" Check: {item['check']}" if item.get("check") else ""
+            lines.append(f"- {item['ac_id']}: {item.get('then') or item.get('when') or ''}{check}")
+    return ("\n\nAcceptance criteria. Every one must hold when you return, and every check a criterion "
+            "names must exist and pass, even when the brief above does not repeat it.\n" + "\n".join(lines))
+
+
 GATE_TYPES = ("direction-review", "architecture-options-selection", "architecture-confirmation", "prd-approval",
               "design-direction-selection", "pr-merge", "security-compliance-flag", "scope-change", "discovery-go-no-go",
               "structure-confirmation", "scope-review", "taste-review", "production-release", "provisioning-required")
@@ -468,7 +492,7 @@ class RunEngine:
         if result.verdict == "request_changes" and len(reviewed.get("reviews", [])) < review.MAX_REVIEWS:
             findings = "; ".join(f"{f.get('severity', '')} {f.get('file', '')}: {f.get('detail', '')}".strip()
                                  for f in result.findings if isinstance(f, dict))
-            self._append_note(unit_id, f"The code review requested changes. Fix these and push to the same branch: "
+            self._append_note(unit_id, f"The code review requested changes. Fix these and commit to the same branch (push only when your output contract says to): "
                                        f"{findings or result.detail}")
             self.units.transition(unit_id, "retry", "defect: the code review requested changes",
                                   retries_spent=reviewed["retries_spent"] + 1)
@@ -734,7 +758,7 @@ class RunEngine:
         if mergeable == "conflicting":
             self._append_note(unit_id, f"PR {number} conflicts with {base} after other work merged. Merge {base} "
                                        f"into your branch, resolve every conflict keeping the intent of both sides, "
-                                       f"run the tests, and push to the same branch. Do not open a new PR.")
+                                       f"run the tests, and commit to the same branch (push only when your output contract says to). Do not open a new PR.")
             self.units.transition(unit_id, "retry", f"defect: PR {number} conflicts with {base}",
                                   retries_spent=state["retries_spent"] + 1)
         else:
@@ -1008,7 +1032,8 @@ class RunEngine:
         store = self.sessions(unit_id)
         tier = self._tier(unit_id, state)
         session_id = next_id("S", store.ids())
-        brief = spec["brief"] + gating_note(self._gating(unit_id))
+        brief = spec["brief"] + gating_note(self._gating(unit_id)) + \
+            criteria_note(self.project_path, spec.get("story_ids") or ())
         notes = self._notes(unit_id)
         if notes:
             brief += "\n\n" + notes
