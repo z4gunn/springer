@@ -41,7 +41,8 @@ def gating_note(commands):
     lines = "\n".join(f"- {c['name']} ({c['kind']}): {c['command']}" for c in commands)
     return ("\n\nGating commands. The harness runs these itself at your branch head after you return, and "
             "their result is the evidence the merge reads. Commit all your work before you return. Run them "
-            "yourself while you work so you return green. A test command must print a count of tests run.\n"
+            "yourself while you work so you return green, and take no receipt for them: the harness's run is "
+            "the receipt. A test command must print a count of tests run.\n"
             + lines)
 
 def criteria_note(project_path, story_ids):
