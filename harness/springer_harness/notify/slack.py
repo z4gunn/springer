@@ -42,7 +42,8 @@ LOG_CHARS = 1800
 ONLY_YOU = "Only the person this app was set up for can do that."
 USAGE = ("status | gates | units [project] | polish <project> <issue> | burndown <project> [item...] | "
          "build <project> | release <project> | "
-         "release-command <project> <command> [word] | checks <project> [command...] | pause <project> | "
+         "release-command <project> <command> [word] | checks <project> [command...] | carry <project> [path...] | "
+         "pause <project> | "
          "resume <project> | reconcile <project> <change> <option> [text] | "
          "redispatch <unit> [tier] | cancel <unit> | log <unit> | ruling [project] <text> | "
          "unlock [project] <path> <reason> | restart")
@@ -477,7 +478,7 @@ def handle_command(text, daemon, operations, user, allowed_user):
         return _units(daemon, rest)
     if verb == "help":
         return f"/springer {USAGE}"
-    if verb not in ("polish", "burndown", "build", "release", "release-command", "checks", "pause", "resume", "redispatch", "cancel",
+    if verb not in ("polish", "burndown", "build", "release", "release-command", "checks", "carry", "pause", "resume", "redispatch", "cancel",
                     "log", "ruling", "unlock", "reconcile", "restart"):
         return f"Try /springer {USAGE}"
     if user != allowed_user:
@@ -491,6 +492,8 @@ def handle_command(text, daemon, operations, user, allowed_user):
             return _release(daemon, operations, verb, rest)
         if verb == "checks":
             return _checks(daemon, operations, rest)
+        if verb == "carry":
+            return _carry(daemon, operations, rest)
         if verb in ("pause", "resume"):
             return _pause(daemon, operations, verb, rest)
         if verb == "log":
@@ -630,6 +633,27 @@ def _checks(daemon, operations, rest):
     return _apply(operations, "project.set_checks", slug, None, {"commands": commands},
                   lambda _: (f"{slug} runs on every code change: " + "; ".join(commands)) if commands
                   else f"{slug} has no project checks now.")
+
+
+def _carry(daemon, operations, rest):
+    """carry <project>: show the paths. carry <project> <path>...: set them. carry <project> none: clear."""
+    if not rest:
+        return "Which project? /springer carry <project> tests/fixtures/local"
+    slug = rest[0]
+    with daemon.lock:
+        try:
+            daemon.home.project(slug)
+        except HarnessError:
+            return f"No project named {slug}."
+        current = daemon.settings(slug).get("carried_ignored") or []
+    always = ".env and .impeccable"
+    if len(rest) == 1:
+        return (f"{slug} units get {always}, and: " + ", ".join(current)) if current else \
+            f"{slug} units get {always}. Add more: /springer carry {slug} tests/fixtures/local"
+    paths = [] if rest[1:] == ["none"] else rest[1:]
+    return _apply(operations, "project.set_carried", slug, None, {"paths": paths},
+                  lambda _: (f"{slug} units get {always}, and: " + ", ".join(paths)) if paths
+                  else f"{slug} units get {always} only now.")
 
 
 def _pause(daemon, operations, verb, rest):

@@ -690,6 +690,15 @@ class OperationCatalogTest(ApiCase):
             self.app.state.operations.apply(op_id(), "project.set_checks", "acme", None, {"commands": []}, None,
                                             "chat")
 
+    def test_project_set_carried_sets_and_clears_the_carried_paths(self):
+        self.confirmed("project.set_carried", {"paths": ["tests/fixtures/local/", "  "]})
+        self.assertEqual(self.daemon.settings("acme")["carried_ignored"], ["tests/fixtures/local"])
+        self.confirmed("project.set_carried", {"paths": []})
+        self.assertEqual(self.daemon.settings("acme")["carried_ignored"], [])
+        for bad in ("/etc", "~/secrets", "../outside", ".git/config"):
+            self.op("project.set_carried", {"paths": [bad]}, expect=400)
+        self.op("project.set_carried", {"paths": ["a"] * 11}, expect=400)
+
     def test_daemon_restart_pauses_the_runs_and_drains_before_it_restarts(self):
         run_id = self.run_started()
         engine = self.daemon.engine("acme", run_id)
@@ -939,6 +948,7 @@ COVERAGE = {
     "project.set_release": "test_project_release_needs_a_command_a_run_and_a_clean_checkout",
     "project.release": "test_project_release_needs_a_command_a_run_and_a_clean_checkout",
     "project.set_checks": "test_project_set_checks_sets_and_clears_the_project_checks",
+    "project.set_carried": "test_project_set_carried_sets_and_clears_the_carried_paths",
 }
 
 

@@ -8,10 +8,11 @@ RULINGS = "runs/_config-unlock.json"
 # What an artifact unit may land with no PR: the run store, rendered docs, and design
 # variants. Anything else is code, and code reaches the default branch only through a gate.
 ARTIFACT_PATHS = ("runs/", "docs/", "design/")
-# Git-ignored project state a unit reads but git does not carry, e.g. the impeccable
-# surface notes the design and frontend briefs cite. Copied in, never linked, so a unit
-# cannot change the person's copy.
-CARRIED_IGNORED = (".impeccable",)
+# Git-ignored project state a unit reads but git does not carry: the impeccable surface
+# notes the design and frontend briefs cite, and the local environment file tests and
+# product checks read. Copied in, never linked, so a unit cannot change the person's
+# copy. A project names more in its carried_ignored setting (e.g. real test fixtures).
+CARRIED_IGNORED = (".impeccable", ".env", ".env.local")
 
 import shutil
 import subprocess
@@ -26,7 +27,7 @@ def _git(cwd, *args):
 
 
 class Worktrees:
-    def __init__(self, home, project_slug, project_path, run_id=None):
+    def __init__(self, home, project_slug, project_path, run_id=None, carried=None):
         # Unit ids restart at U-0001 in every run, so a run's branches and worktrees are
         # named for the run. Without it a later run's U-0001 could pick up the branch an
         # earlier run's U-0001 left behind.
@@ -34,6 +35,9 @@ class Worktrees:
         self.root = self.base / run_id if run_id else self.base
         self.project = Path(project_path)
         self.run_id = run_id
+        # The project's own carried_ignored setting, read at each claim so a change
+        # reaches the next unit without a restart.
+        self.carried = carried or (lambda: [])
 
     def path(self, unit_id):
         return self.root / unit_id
@@ -94,21 +98,38 @@ class Worktrees:
     def _provide_local_state(self, path):
         """A unit's tree gets .venv, linked to the harness's own venv (jsonschema for
         schemas/validate.py), so `.venv/bin/python` resolves as the runtime says it does,
-        and a copy of each git-ignored CARRIED_IGNORED path the project has. A linked .venv
-        shows as untracked even where .venv/ is ignored, so the shared exclude names it."""
+        and the carried git-ignored files. A linked .venv shows as untracked even where
+        .venv/ is ignored, so the shared exclude names it."""
         path, venv, harness_venv = Path(path), Path(path) / ".venv", self.base / ".venv"
         if not venv.exists() and not venv.is_symlink() and (harness_venv / "bin" / "python").exists():
             self._exclude("/.venv")
             venv.symlink_to(harness_venv)
-        for rel in CARRIED_IGNORED:
-            source, target = self.project / rel, path / rel
-            if not source.exists() or target.exists() or _git(self.project, "check-ignore", "-q", rel).returncode:
-                continue
-            clone = ["cp", "-cR"] if sys.platform == "darwin" else ["cp", "-R", "--reflink=auto"]
-            done = subprocess.run([*clone, str(source), str(target)], capture_output=True, text=True)
-            if done.returncode:
-                shutil.rmtree(target, ignore_errors=True)
-                sys.stderr.write(f"could not copy {rel} into {path}: {done.stderr.strip()[:300]}\n")
+        self._carry_ignored(path)
+
+    def carried_paths(self):
+        """CARRIED_IGNORED plus the project's own, each repository-relative. A path that
+        is absolute or climbs out of the repository is dropped."""
+        extra = [str(p).strip() for p in (self.carried() or []) if str(p).strip()]
+        return [p for p in dict.fromkeys([*CARRIED_IGNORED, *extra])
+                if not Path(p).is_absolute() and ".." not in Path(p).parts]
+
+    def _carry_ignored(self, path):
+        """Copy each git-ignored file under a carried path into the tree, file by file,
+        so a directory git half tracks (a .gitkeep beside ignored fixtures) still gets
+        its ignored files. A tracked file is never listed, and a file the tree already
+        has is kept, so a retry never undoes what the unit changed."""
+        clone = ["cp", "-c"] if sys.platform == "darwin" else ["cp", "--reflink=auto"]
+        for rel in self.carried_paths():
+            listed = _git(self.project, "ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--", rel)
+            for name in filter(None, listed.stdout.split("\0")):
+                source, target = self.project / name, Path(path) / name
+                if target.exists() or target.is_symlink() or not source.is_file():
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                done = subprocess.run([*clone, str(source), str(target)], capture_output=True, text=True)
+                if done.returncode:
+                    target.unlink(missing_ok=True)
+                    sys.stderr.write(f"could not copy {name} into {path}: {done.stderr.strip()[:300]}\n")
 
     def _exclude(self, pattern):
         """Add a pattern to the repository's shared info/exclude, once."""
@@ -125,27 +146,44 @@ class Worktrees:
         """git carries no node_modules, so a fresh worktree cannot build, test, or run a
         product check, and each session either installed them or failed on it. When the
         worktree's lockfile is the project's and the project has them installed, they
-        are cloned in (a copy-on-write clone on APFS, a few seconds for hundreds of MB).
+        are cloned in (a copy-on-write clone on APFS, a few seconds for hundreds of MB):
+        the root folder and each workspace package's own, such as packages/web/node_modules,
+        which a workspace install leaves beside the package when versions conflict.
         A different lockfile, or a failed clone, leaves the install to the session.
-        Returns True when the worktree has them."""
-        target, source = Path(path) / "node_modules", self.project / "node_modules"
-        if target.exists():
-            return True
-        lock, project_lock = Path(path) / "package-lock.json", self.project / "package-lock.json"
-        if not (source.is_dir() and lock.is_file() and project_lock.is_file()) \
-                or lock.read_bytes() != project_lock.read_bytes():
-            return False
+        Returns True when the worktree has the root folder."""
+        path = Path(path)
+        lock, project_lock = path / "package-lock.json", self.project / "package-lock.json"
+        if not (lock.is_file() and project_lock.is_file()) or lock.read_bytes() != project_lock.read_bytes():
+            return (path / "node_modules").exists()
         clone = ["cp", "-cR"] if sys.platform == "darwin" else ["cp", "-R", "--reflink=auto"]
-        done = subprocess.run([*clone, str(source), str(target)], capture_output=True, text=True)
-        if done.returncode:
-            shutil.rmtree(target, ignore_errors=True)
-            sys.stderr.write(f"could not clone node_modules into {path}: {done.stderr.strip()[:300]}\n")
-            return False
-        return True
+        for rel in [Path("node_modules"), *self._package_node_modules()]:
+            source, target = self.project / rel, path / rel
+            if target.exists() or not source.is_dir() or not target.parent.is_dir():
+                continue
+            done = subprocess.run([*clone, str(source), str(target)], capture_output=True, text=True)
+            if done.returncode:
+                shutil.rmtree(target, ignore_errors=True)
+                sys.stderr.write(f"could not clone {rel} into {path}: {done.stderr.strip()[:300]}\n")
+        return (path / "node_modules").exists()
+
+    def _package_node_modules(self):
+        """The project's node_modules folders one or two levels down (web/, packages/web/),
+        outside hidden folders and outside node_modules itself. A folder whose package the
+        worktree does not have is skipped by the caller."""
+        found = []
+        for pattern in ("*/node_modules", "*/*/node_modules"):
+            for source in sorted(self.project.glob(pattern)):
+                rel = source.relative_to(self.project)
+                if source.is_dir() and not any(part.startswith(".") or part == "node_modules"
+                                               for part in rel.parts[:-1]):
+                    found.append(rel)
+        return found
 
     def scratch_at(self, sha):
-        """A detached worktree at sha with the project's node_modules, for running a
-        gating command on a unit's base. None when git refuses it."""
+        """A detached worktree at sha with the project's node_modules and carried ignored
+        files, for running a gating command on a unit's base. Without the same files the
+        unit had, the base fails for a reason the unit's change did not cause, and that
+        failure would mask a real one. None when git refuses it."""
         path = self.root / f"_base-{sha[:12]}"
         if not self._intact(path):
             _git(self.project, "worktree", "prune")
@@ -153,6 +191,7 @@ class Worktrees:
             if _git(self.project, "worktree", "add", "--quiet", "--detach", str(path), sha).returncode:
                 return None
         self._provide_node_modules(path)
+        self._carry_ignored(path)
         return path
 
     def drop_scratch(self, path):

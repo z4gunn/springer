@@ -783,6 +783,15 @@ class ControlPlaneTest(NotifyCase):
         self.assertEqual(self.confirm(handle_command("checks acme none", self.daemon, self.ops, ME, ME)),
                          "acme has no project checks now.")
 
+    def test_carry_from_slack(self):
+        self.assertIn("Add more", handle_command("carry acme", self.daemon, self.ops, ME, ME))
+        reply = handle_command("carry acme tests/fixtures/local", self.daemon, self.ops, ME, ME)
+        self.assertEqual(self.confirm(reply), "acme units get .env and .impeccable, and: tests/fixtures/local")
+        self.assertIn("tests/fixtures/local", handle_command("carry acme", self.daemon, self.ops, ME, ME))
+        self.assertIn("Only the person", handle_command("carry acme none", self.daemon, self.ops, SOMEONE, ME))
+        self.assertEqual(self.confirm(handle_command("carry acme none", self.daemon, self.ops, ME, ME)),
+                         "acme units get .env and .impeccable only now.")
+
     def test_a_ruling_pins_through_the_brief_and_opens_its_gate(self):
         reply = handle_command('ruling "R-2001: keep the 2:1 hero"', self.daemon, self.ops, ME, ME)
         done = self.confirm(reply)

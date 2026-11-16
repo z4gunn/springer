@@ -9,6 +9,7 @@ import hashlib
 import json
 import secrets as stdlib_secrets
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -117,6 +118,19 @@ class SetRelease(Args):
 
 class SetChecks(Args):
     commands: list[str] = Field(max_length=5)  # each a project command judged by its exit code; empty clears
+
+
+class SetCarried(Args):
+    paths: list[str] = Field(max_length=10)  # repository-relative git-ignored paths; empty clears
+
+    @field_validator("paths")
+    @classmethod
+    def _inside_the_repository(cls, value):
+        paths = [p.strip().rstrip("/") for p in value if p.strip().rstrip("/")]
+        for rel in paths:
+            if len(rel) > 200 or rel.startswith(("/", "~")) or ".." in Path(rel).parts or rel.split("/")[0] == ".git":
+                raise ValueError(f"{rel} is not a path inside the repository")
+        return paths
 
 
 class MarkViewed(Args):
@@ -402,6 +416,10 @@ def set_checks(c):
     return {"settings": c.daemon.save_settings(c.project, project_checks=commands)}
 
 
+def set_carried(c):
+    return {"settings": c.daemon.save_settings(c.project, carried_ignored=c.args.paths)}
+
+
 def project_release(c):
     """A release a person asked for, outside a run's release gate. The confirm on this
     operation is the go."""
@@ -560,6 +578,10 @@ CATALOG = {op.type: op for op in [
     Operation("project.set_checks", SetChecks, set_checks,
               "Sets the checks the harness runs on every unit that changes code, after the plan's own gating "
               "commands. A failing check sends the unit back like a failing test.",
+              confirm=True, confirm_rule="yes", chat=False),
+    Operation("project.set_carried", SetCarried, set_carried,
+              "Sets the git-ignored paths copied into every unit's worktree beside .env and .impeccable, "
+              "such as local test fixtures a product check reads. Only ignored files are copied.",
               confirm=True, confirm_rule="yes", chat=False),
     Operation("project.release", NoArgs, project_release,
               "Deploys the project's default branch head to production with its release command, now.",
