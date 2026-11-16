@@ -573,6 +573,7 @@ class MergePolicyTest(EngineCase):
         for _ in range(3):
             engine.tick()
         self.assertEqual((self.states(engine)["U-0001"], self.events(engine, "tick_failed")), ("gated", []))
+        engine.recover()  # a daemon restart crash-looped on the missing number
         self.host.open = lambda project, branch, base, title="": 9
         self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
         self.assertEqual(self.host.merged, [9])

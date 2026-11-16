@@ -1256,7 +1256,10 @@ class RunEngine:
                 self.units.transition(unit_id, "redispatch", "abandoned, no retry spent")
         for state in self.units.by_state("gated"):
             unit_id = state["unit_id"]
-            pr_state = self.source_host.pr_state(self.project_slug, state["pr"]["number"])
+            number = (state.get("pr") or {}).get("number")
+            if number is None:
+                continue  # never opened, so resolve_gates opens it on the next tick
+            pr_state = self.source_host.pr_state(self.project_slug, number)
             if pr_state == "merged":
                 self.units.transition(unit_id, "done", "merged while the daemon was down")
             elif pr_state == "closed":
