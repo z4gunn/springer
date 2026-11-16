@@ -545,6 +545,39 @@ class MergePolicyTest(EngineCase):
         self.assertIn("AC-1: an open row looks open. Check: python3 verification/check.py (LC-OPEN-STATE)", brief)
         self.assertNotIn("AC-2", brief)
 
+    def test_a_pr_reported_without_a_number_is_opened_by_the_host(self):
+        """A docs unit on a GitHub project returned outcome pr with only a branch, never
+        having pushed or opened it, and every later tick failed on KeyError 'number'."""
+        opened = []
+
+        def open_change(project, branch, base, title=""):
+            opened.append((branch, base))
+            return 7
+        self.host.open = open_change
+        self.provider.script["unopened"] = [Attempt(result=pr_result(None, branch="unit/U-0001",
+                                                                     touched=("docs/x.md",)))]
+        engine = self.engine([batch(unit("a", agent="unopened"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertEqual(engine.units.state("U-0001")["pr"]["number"], 7)
+        self.assertEqual(self.host.merged, [7])
+        self.assertEqual(opened[0][0], "unit/U-0001")
+        self.assertEqual(self.events(engine, "tick_failed"), [])
+
+    def test_a_unit_gated_without_a_pr_number_is_repaired_once_the_host_can_open(self):
+        """The unit stuck under the host that could not open stays gated without failing
+        the tick, and is opened and merged on the first tick after the host can."""
+        self.provider.script["unopened"] = [Attempt(result=pr_result(None, branch="unit/U-0001",
+                                                                     touched=("docs/x.md",)))]
+        engine = self.engine([batch(unit("a", agent="unopened"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "gated")
+        for _ in range(3):
+            engine.tick()
+        self.assertEqual((self.states(engine)["U-0001"], self.events(engine, "tick_failed")), ("gated", []))
+        self.host.open = lambda project, branch, base, title="": 9
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertEqual(self.host.merged, [9])
+        self.assertEqual([e["pr"] for e in self.events(engine, "pr_opened")], [9])
+
     def actions_engine(self):
         engine = self.engine([batch(unit("a", agent="routine"))])
         engine.settings = lambda: {"ci_signal": "self-hosted-actions"}

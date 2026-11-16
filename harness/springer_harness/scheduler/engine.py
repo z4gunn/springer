@@ -639,6 +639,18 @@ class RunEngine:
         self._retire_orphan_gates()
         for state in self.units.by_state("gated"):
             unit_id = state["unit_id"]
+            if (state.get("pr") or {}).get("number") is None:
+                # A session that reported a PR without opening it, gated before the host
+                # could open one. Open it now, or try again next tick.
+                try:
+                    state = {**state, "pr": self._opened(unit_id, state.get("pr") or {})}
+                except Exception as exc:
+                    self.ledger.append("pr_open_failed", unit_id=unit_id, detail=str(exc)[-300:])
+                    continue
+                if state["pr"].get("number") is None:
+                    continue
+                self.units.save(state)
+                self.ledger.append("pr_opened", unit_id=unit_id, pr=state["pr"]["number"])
             # Opened here rather than at Check, so a crash between the two is repaired
             # on the next tick, and a PR gated before reviews existed gets one too.
             if self._reviews() and not self._reviewed_head(state):

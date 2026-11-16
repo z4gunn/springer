@@ -36,6 +36,24 @@ class GitHubSourceHost:
         return self._gh(project, "pr", "create", "--base", base, "--head", branch, "--title", title,
                         "--body", body).strip().splitlines()[-1]
 
+    def open(self, project, branch, base, title=""):
+        """Push a branch and return the number of its open PR, opening one when the
+        session reported a PR outcome without opening it. A PR the branch already has
+        is reused, so a retry never opens a second."""
+        path = self.project_path_of(project)
+        pushed = _run(["git", "push", "--quiet", "-u", "origin", branch], path)
+        if pushed.returncode:
+            raise GitHubError(f"git push {branch} failed: {pushed.stderr.strip()[-400:]}")
+        found = json.loads(self._gh(project, "pr", "list", "--head", branch, "--state", "open",
+                                    "--json", "number") or "[]")
+        if found:
+            return int(found[0]["number"])
+        self._gh(project, "pr", "create", "--base", base, "--head", branch, "--title", title or branch,
+                 "--body", f"Opened by the Springer harness for {branch}: the session reported a pull "
+                           "request without opening one. The unit's result.md in the run store carries "
+                           "what changed and why.")
+        return int(json.loads(self._gh(project, "pr", "view", branch, "--json", "number"))["number"])
+
     def merge(self, project, number):
         self._gh(project, "pr", "merge", str(number), "--squash")
         sha = json.loads(self._gh(project, "pr", "view", str(number), "--json", "mergeCommit"))["mergeCommit"]["oid"]
