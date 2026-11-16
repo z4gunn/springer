@@ -284,6 +284,19 @@ class MechanicalCheckTest(FakeBinCase):
         self.assertNotIn(str(scratch), subprocess.run(["git", "-C", str(self.project), "worktree", "list"],
                                                       capture_output=True, text=True).stdout)
 
+    def test_a_check_that_cannot_run_on_the_base_either_is_called_broken(self):
+        """Run 9's YAML check imported a module the system python3 lacks. It failed on
+        main too, so it was held as main's failure, and nobody saw it tested nothing."""
+        from springer_harness.check.mechanical import fails_at
+        self.write(**self.PR)
+        broken = {"name": "yaml-valid", "kind": "check", "command": "python3 -c \"import springer_no_such_module\""}
+        result = self.check([broken], baseline=lambda c: fails_at(c, self.root / "base-check", self.project))
+        self.assertEqual((result.status, result.raised_level), ("pass", "L2"))
+        detail = result.findings[-1]["detail"]
+        self.assertIn("is a broken check", detail)
+        self.assertIn("No module named 'springer_no_such_module'", detail)
+        self.assertNotIn("fails on the base too", detail)
+
     def write(self, **result):
         (self.session / "result.json").write_text(json.dumps(result))
 

@@ -14,6 +14,7 @@ planned before they existed) keeps the old path: its session's receipts are veri
 """
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -109,6 +110,12 @@ def run_gating(commands, out, cwd, warnings=None, baseline=None):
             base_tail = baseline(command)
             if base_tail is not None:
                 tail = (body.get("output_tail") or "").strip()[-OUTPUT_SHOWN // 2:]
+                missing = cannot_run(body.get("exit_code"), tail) or cannot_run(None, base_tail)
+                if missing:
+                    warnings.append(f"{name} ({command['command']}) is a broken check: it cannot run here or on "
+                                    f"the base ({missing}), so it tested nothing. Fix the command or install what "
+                                    f"it needs. The merge waits on a person.")
+                    continue
                 warnings.append(f"{name} ({command['command']}) fails on the base too, so it is not this "
                                 f"change's defect and the merge waits on a person. Here its output ends: {tail} "
                                 f"On the base it ends: {base_tail.strip()[-OUTPUT_SHOWN // 2:]}")
@@ -121,6 +128,20 @@ def run_gating(commands, out, cwd, warnings=None, baseline=None):
             tail = (body.get("output_tail") or "").strip()[-OUTPUT_SHOWN:]
             return f"gating command {name} ({command['command']}) {why}. Its output ends: {tail}"
     return None
+
+
+# What a command prints when it never reached the thing it checks: a missing module,
+# package, or program. Exit 127 is the shell's command not found.
+MISSING = re.compile(r"(No module named '?[\w.]+'?|Cannot find module '?[^'\s]+'?|ERR_MODULE_NOT_FOUND"
+                     r"|command not found|sh: (?:\d+: )?[\w./-]+: not found|No such file or directory: '[^']+')")
+
+
+def cannot_run(exit_code, tail):
+    """What kept the command from running, quoted from its output, or None."""
+    found = MISSING.search(tail or "")
+    if found:
+        return found.group(1)
+    return "exit 127, command not found" if exit_code == 127 else None
 
 
 def fails_at(command, out, cwd):
