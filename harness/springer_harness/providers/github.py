@@ -93,18 +93,19 @@ class GitHubSourceHost:
         return self._gh(project, "pr", "diff", str(number))
 
     def sync(self, project):
-        """Fast-forward the main checkout's default branch, leaving a dirty one alone."""
-        path = self.project_path_of(project)
-        dirty = [l for l in _run(["git", "status", "--porcelain"], path).stdout.splitlines()
-                 if not l[3:].startswith(("runs/", ".worktrees/"))]
-        if not dirty:
-            _run(["git", "pull", "--ff-only", "--quiet"], path)
+        """Bring the main checkout's default branch up to origin after a merge, replaying
+        the daemon's own unpushed records, and leaving a dirty one alone."""
+        from ..scheduler.worktrees import catch_up
+        return catch_up(self.project_path_of(project))
 
     def publish(self, project, branch):
         """Push a branch the harness moved itself (e.g. an integrated artifact unit)."""
         path = self.project_path_of(project)
         if _run(["git", "remote", "get-url", "origin"], path).returncode == 0:
-            _run(["git", "push", "--quiet", "origin", branch], path)
+            if _run(["git", "push", "--quiet", "origin", branch], path).returncode and branch == "HEAD":
+                # Origin moved under a record commit: replay it onto origin, which pushes.
+                from ..scheduler.worktrees import catch_up
+                catch_up(path)
 
     def ensure_remote(self, project, private=True):
         """A project with no origin gets a GitHub repository of its own name. Returns

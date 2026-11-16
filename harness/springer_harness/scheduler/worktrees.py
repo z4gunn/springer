@@ -26,6 +26,41 @@ def _git(cwd, *args):
     return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
 
 
+# The identity the daemon commits its own records under. A commit on the default branch
+# that is not on origin and carries it is bookkeeping (a brief, a record, a reconcile),
+# safe to replay onto origin. Anyone else's is a person's, and is left alone.
+OWN_EMAIL = "springer@local"
+IDENTITY = ("-c", "user.name=Springer", "-c", f"user.email={OWN_EMAIL}")
+
+
+def catch_up(path):
+    """Fast-forward the checkout's default branch from origin. When the daemon's own
+    records were committed while origin moved (a merge on GitHub), so a fast-forward
+    is refused and every later push is rejected, replay them onto origin and push.
+    A checkout with changes outside the run store, or a person's commit that origin
+    lacks, is left alone. Returns None, or the reason it stayed behind."""
+    if _git(path, "remote", "get-url", "origin").returncode:
+        return None
+    branch = _git(path, "symbolic-ref", "--short", "HEAD").stdout.strip() or "main"
+    if _git(path, "fetch", "--quiet", "origin", branch).returncode:
+        return f"could not fetch {branch} from origin"
+    dirty = [l for l in _git(path, "status", "--porcelain").stdout.splitlines()
+             if not l[3:].startswith(("runs/", ".worktrees/"))]
+    if dirty:
+        return f"the checkout has uncommitted changes, so {branch} was not updated"
+    if _git(path, "merge", "--ff-only", "--quiet", f"origin/{branch}").returncode == 0:
+        return None
+    authors = _git(path, "log", "--format=%ae", f"origin/{branch}..{branch}").stdout.split()
+    if any(a != OWN_EMAIL for a in authors):
+        return f"{branch} has diverged from origin with commits that are not the daemon's, so it was not updated"
+    if _git(path, *IDENTITY, "rebase", "--quiet", "--autostash", f"origin/{branch}").returncode:
+        _git(path, "rebase", "--abort")
+        return f"{branch} has diverged from origin and the daemon's records did not replay onto it"
+    if _git(path, "push", "--quiet", "origin", branch).returncode:
+        return f"{branch} caught up with origin but the daemon's records could not be pushed"
+    return None
+
+
 class Worktrees:
     def __init__(self, home, project_slug, project_path, run_id=None, carried=None):
         # Unit ids restart at U-0001 in every run, so a run's branches and worktrees are
@@ -333,20 +368,9 @@ class Worktrees:
         return deleted
 
     def sync_default(self):
-        """Fast-forward the checkout's default branch from origin, so a run never starts
-        on a stale base. A checkout with changes outside the run store, or one that has
-        diverged, is left alone and the reason returned."""
-        if _git(self.project, "remote", "get-url", "origin").returncode:
-            return None
-        branch = self.default_branch()
-        if _git(self.project, "fetch", "--quiet", "origin", branch).returncode:
-            return f"could not fetch {branch} from origin"
-        dirty = [l for l in _git(self.project, "status", "--porcelain").stdout.splitlines()
-                 if not l[3:].startswith(("runs/", ".worktrees/"))]
-        if dirty:
-            return f"the checkout has uncommitted changes, so {branch} was not updated"
-        done = _git(self.project, "merge", "--ff-only", "--quiet", f"origin/{branch}")
-        return None if done.returncode == 0 else f"{branch} has diverged from origin, so it was not updated"
+        """Bring the checkout's default branch up to origin, so a run never starts on a
+        stale base. The reason is returned when it could not be."""
+        return catch_up(self.project)
 
     def claimed(self):
         """Unit worktrees only. The shared .venv and a restack scratch tree live here too."""

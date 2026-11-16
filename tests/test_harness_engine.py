@@ -940,6 +940,41 @@ class RecoveryTest(EngineCase):
         fresh.check()
         self.assertEqual(self.states(fresh)["U-0001"], "done")
 
+    def _artifact_committed_then_checking(self):
+        self.provider.default = Attempt(ticks=50)
+        engine = self.engine([batch(unit("a"))])
+        engine.tick()
+        tree = engine.worktrees.path("U-0001")
+        (tree / "docs").mkdir(exist_ok=True)
+        (tree / "docs" / "dictionary.md").write_text("v1.7\n")
+        for args in (["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "docs: v1.7"]):
+            subprocess.run(["git", "-C", str(tree), *args], check=True, capture_output=True)
+        engine.units.transition("U-0001", "returned", "session returned")
+        engine.units.transition("U-0001", "checking", "check began")
+        store = engine.sessions("U-0001")
+        store.finish(store.get("S-0001"), "exited", "return", code=0)
+        (store.dir("S-0001") / "result.json").write_text(
+            json.dumps({"status": "pass", "outcome": "artifact", "touched_paths": ["docs/dictionary.md"]}))
+        return engine
+
+    def test_a_restart_mid_check_keeps_the_worktree_and_lands_the_artifact(self):
+        """A daemon restart released a checking unit's worktree, and the integration
+        then skipped silently: the unit read done and its commit never reached main."""
+        engine = self._artifact_committed_then_checking()
+        fresh = self.restart(engine)
+        self.assertTrue(fresh.worktrees.path("U-0001").exists())
+        fresh.check()
+        self.assertEqual(self.states(fresh)["U-0001"], "done")
+        self.assertEqual((self.project / "docs" / "dictionary.md").read_text(), "v1.7\n")
+
+    def test_an_artifact_lands_from_its_branch_when_the_worktree_is_gone(self):
+        engine = self._artifact_committed_then_checking()
+        subprocess.run(["git", "-C", str(self.project), "worktree", "remove", "--force",
+                        str(engine.worktrees.path("U-0001"))], check=True, capture_output=True)
+        engine._integrate("U-0001")
+        self.assertEqual((self.project / "docs" / "dictionary.md").read_text(), "v1.7\n")
+        self.assertEqual([e["unit_id"] for e in self.events(engine, "artifact_integrated")], ["U-0001"])
+
     def _gated(self):
         self.provider.script["risky"] = [Attempt(result=pr_result(9, touched=("src/auth/a.ts",)))]
         engine = self.engine([batch(unit("a", agent="risky"))])

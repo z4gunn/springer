@@ -504,7 +504,12 @@ class RunEngine:
         default branch at once, so the docs and the design page read them before the
         gate that needs them. Check sends a branch that changes code to a PR instead,
         so nothing here is code and it needs no review."""
-        if not self.worktrees.path(unit_id).exists():
+        # The merge reads the unit's branch, not its worktree, so a worktree released
+        # early (a restart mid-check) never drops the work. A missing branch is reported.
+        if subprocess.run(["git", "-C", str(self.project_path), "rev-parse", "--verify", "--quiet",
+                           self.worktrees.branch(unit_id)], capture_output=True).returncode:
+            self.ledger.append("worktree_kept", unit_id=unit_id, path=str(self.worktrees.path(unit_id)),
+                               reason="not integrated: the unit's branch is gone")
             return
         reason = self.worktrees.integrate(unit_id)
         if reason is None:
@@ -769,6 +774,10 @@ class RunEngine:
         self._retire_merge_gates(unit_id)
         base = state["pr"]["base"]
         if mergeable == "conflicting":
+            # The retry merges the local default branch, so bring it up to origin first,
+            # or the session resolves against the same stale base and conflicts again.
+            if hasattr(self.source_host, "sync"):
+                self.source_host.sync(self.project_slug)
             self._append_note(unit_id, f"PR {number} conflicts with {base} after other work merged. Merge {base} "
                                        f"into your branch, resolve every conflict keeping the intent of both sides, "
                                        f"run the tests, and commit to the same branch (push only when your output contract says to). Do not open a new PR.")
@@ -1264,7 +1273,9 @@ class RunEngine:
                 self.units.transition(unit_id, "done", "merged while the daemon was down")
             elif pr_state == "closed":
                 self._block(unit_id, state, "the PR was closed unmerged")
-        keep = {s["unit_id"] for s in self.units.by_state("running", "retry", "redispatch", "ready")}
+        # A returned or checking unit's worktree is still read by its Check and its
+        # integration, so a restart mid-check keeps it.
+        keep = {s["unit_id"] for s in self.units.by_state("running", "retry", "redispatch", "ready", "returned", "checking")}
         for unit_id in self.worktrees.claimed():
             if unit_id not in keep:
                 self._release(unit_id)

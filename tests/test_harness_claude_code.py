@@ -545,6 +545,42 @@ class RestackTest(unittest.TestCase):
         self.assertIsNone(self.trees.sync_default(), "the run store does not block it")
         self.assertTrue((self.project / "pushed.txt").exists())
 
+    def test_the_daemon_s_own_records_replay_onto_a_moved_origin(self):
+        """A record commit made while a PR merged on GitHub left the clone's main ahead
+        and behind for good: the push was refused, the fast-forward was refused, and
+        every later run started from a base without the merged work."""
+        origin = Path(self.tmp.name) / "origin.git"
+        subprocess.run(["git", "clone", "-q", "--bare", str(self.project), str(origin)], check=True)
+        self.git(self.project, "remote", "add", "origin", str(origin))
+        self.git(self.project, "fetch", "-q", "origin")
+        other = Path(self.tmp.name) / "other"
+        subprocess.run(["git", "clone", "-q", str(origin), str(other)], check=True)
+        self.commit(other, {"merged.txt": "a PR merged on the host\n"})
+        self.git(other, "push", "-q", "origin", "main")
+        (self.project / "runs").mkdir(exist_ok=True)
+        (self.project / "runs" / "_reconcile.jsonl").write_text("{}\n")
+        self.git(self.project, "add", "runs")
+        self.git(self.project, "-c", "user.name=Springer", "-c", "user.email=springer@local",
+                 "commit", "-qm", "chore(runs): reconcile")
+        self.assertIsNone(self.trees.sync_default())
+        self.assertTrue((self.project / "merged.txt").exists())
+        self.git(self.project, "fetch", "-q", "origin")
+        self.assertEqual(self.git(self.project, "rev-list", "--count", "main...origin/main").stdout.strip(), "0",
+                         "the record is on origin and nothing is left behind")
+
+    def test_a_person_s_unpushed_commit_is_never_replayed(self):
+        origin = Path(self.tmp.name) / "origin.git"
+        subprocess.run(["git", "clone", "-q", "--bare", str(self.project), str(origin)], check=True)
+        self.git(self.project, "remote", "add", "origin", str(origin))
+        other = Path(self.tmp.name) / "other"
+        subprocess.run(["git", "clone", "-q", str(origin), str(other)], check=True)
+        self.commit(other, {"merged.txt": "a PR merged on the host\n"})
+        self.git(other, "push", "-q", "origin", "main")
+        self.commit(self.project, {"mine.txt": "a person's local work\n"})
+        before = self.git(self.project, "rev-parse", "HEAD").stdout
+        self.assertIn("not the daemon's", self.trees.sync_default())
+        self.assertEqual(self.git(self.project, "rev-parse", "HEAD").stdout, before)
+
     def test_each_run_names_its_own_branches_and_worktrees(self):
         """Unit ids restart at U-0001 in every run, and a later run's U-0001 shared the
         earlier run's branch and worktree."""
