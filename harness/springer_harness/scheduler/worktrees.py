@@ -62,7 +62,7 @@ def catch_up(path):
 
 
 class Worktrees:
-    def __init__(self, home, project_slug, project_path, run_id=None, carried=None):
+    def __init__(self, home, project_slug, project_path, run_id=None, carried=None, local=None):
         # Unit ids restart at U-0001 in every run, so a run's branches and worktrees are
         # named for the run. Without it a later run's U-0001 could pick up the branch an
         # earlier run's U-0001 left behind.
@@ -73,6 +73,10 @@ class Worktrees:
         # The project's own carried_ignored setting, read at each claim so a change
         # reaches the next unit without a restart.
         self.carried = carried or (lambda: [])
+        # Where installed dependencies and git-ignored files come from. A hosted project
+        # runs in the daemon's own clone, which never had an install or a .env, so they
+        # come from the person's checkout. A local project is its own source.
+        self.local = Path(local) if local else self.project
 
     def path(self, unit_id):
         return self.root / unit_id
@@ -155,9 +159,9 @@ class Worktrees:
         has is kept, so a retry never undoes what the unit changed."""
         clone = ["cp", "-c"] if sys.platform == "darwin" else ["cp", "--reflink=auto"]
         for rel in self.carried_paths():
-            listed = _git(self.project, "ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--", rel)
+            listed = _git(self.local, "ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--", rel)
             for name in filter(None, listed.stdout.split("\0")):
-                source, target = self.project / name, Path(path) / name
+                source, target = self.local / name, Path(path) / name
                 if target.exists() or target.is_symlink() or not source.is_file():
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -187,12 +191,12 @@ class Worktrees:
         A different lockfile, or a failed clone, leaves the install to the session.
         Returns True when the worktree has the root folder."""
         path = Path(path)
-        lock, project_lock = path / "package-lock.json", self.project / "package-lock.json"
+        lock, project_lock = path / "package-lock.json", self.local / "package-lock.json"
         if not (lock.is_file() and project_lock.is_file()) or lock.read_bytes() != project_lock.read_bytes():
             return (path / "node_modules").exists()
         clone = ["cp", "-cR"] if sys.platform == "darwin" else ["cp", "-R", "--reflink=auto"]
         for rel in [Path("node_modules"), *self._package_node_modules()]:
-            source, target = self.project / rel, path / rel
+            source, target = self.local / rel, path / rel
             if target.exists() or not source.is_dir() or not target.parent.is_dir():
                 continue
             done = subprocess.run([*clone, str(source), str(target)], capture_output=True, text=True)
@@ -207,8 +211,8 @@ class Worktrees:
         worktree does not have is skipped by the caller."""
         found = []
         for pattern in ("*/node_modules", "*/*/node_modules"):
-            for source in sorted(self.project.glob(pattern)):
-                rel = source.relative_to(self.project)
+            for source in sorted(self.local.glob(pattern)):
+                rel = source.relative_to(self.local)
                 if source.is_dir() and not any(part.startswith(".") or part == "node_modules"
                                                for part in rel.parts[:-1]):
                     found.append(rel)

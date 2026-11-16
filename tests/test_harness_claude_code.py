@@ -496,6 +496,23 @@ class RestackTest(unittest.TestCase):
         self.assertFalse((tree / "node_modules").is_symlink(), "a copy the unit can change without touching the person's")
         self.assertEqual(self.git(tree, "status", "--porcelain").stdout, "")
 
+    def test_a_hosted_project_s_worktree_gets_installs_and_env_from_the_person_s_checkout(self):
+        """A hosted project runs in the daemon's own clone, which never had an install or
+        a .env, so a polish unit's worktree had neither and could not lint, compile, or
+        test, while the person's checkout had both."""
+        self.commit(self.project, {".gitignore": "node_modules/\n.env\n", "package-lock.json": '{"v": 1}\n'})
+        clone = Path(self.tmp.name) / "clone"
+        subprocess.run(["git", "clone", "-q", str(self.project), str(clone)], check=True)
+        (self.project / "node_modules" / ".bin").mkdir(parents=True)
+        (self.project / "node_modules" / ".bin" / "tsc").write_text("#!/bin/sh\n")
+        (self.project / ".env").write_text("API_URL=http://localhost\n")
+        from springer_harness.scheduler.worktrees import Worktrees
+        trees = Worktrees(Path(self.tmp.name) / "home2", "acme", clone, local=self.project)
+        tree, _ = trees.claim("U-0001", "main")
+        self.assertTrue((tree / "node_modules" / ".bin" / "tsc").is_file())
+        self.assertEqual((tree / ".env").read_text(), "API_URL=http://localhost\n")
+        self.assertFalse((clone / "node_modules").exists(), "the clone itself is left alone")
+
     def test_a_different_lockfile_leaves_the_install_to_the_session(self):
         self.commit(self.project, {".gitignore": "node_modules/\n", "package-lock.json": '{"v": 1}\n'})
         (self.project / "node_modules").mkdir()

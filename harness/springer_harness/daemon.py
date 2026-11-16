@@ -312,7 +312,8 @@ class Daemon:
     def _new_engine(self, slug, path, run_id, kind):
         return RunEngine(slug, path, run_id, self.provider, self.planner_factory(slug, run_id, kind), ProjectHost(self, slug),
                          Worktrees(self.home.root, slug, path, None if _legacy_names(path, run_id) else run_id,
-                                   carried=lambda: self.settings(slug).get("carried_ignored") or []),
+                                   carried=lambda: self.settings(slug).get("carried_ignored") or [],
+                                   local=self.checkout_path(slug)),
                          self.window, self.owner, self.now,
                          in_flight_total=self._in_flight_total, settings=lambda: self.settings(slug),
                          release=lambda by, gate_id: self.release(slug, by, run_id, reason=gate_id))
