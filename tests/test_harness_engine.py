@@ -975,6 +975,19 @@ class RecoveryTest(EngineCase):
         self.assertEqual((self.project / "docs" / "dictionary.md").read_text(), "v1.7\n")
         self.assertEqual([e["unit_id"] for e in self.events(engine, "artifact_integrated")], ["U-0001"])
 
+    def test_clean_up_keeps_the_branch_of_a_done_unit_whose_work_never_landed(self):
+        """A done artifact unit whose integration was skipped had its branch deleted here
+        and on origin, leaving its commit only as a loose object in the clone."""
+        engine = self._artifact_committed_then_checking()
+        engine.units.transition("U-0001", "done", "artifact confirmed")
+        branch = engine.worktrees.branch("U-0001")
+        result = engine.clean_up()
+        self.assertEqual((result["branches"], result["unlanded"]), ([], [branch]))
+        self.assertTrue(subprocess.run(["git", "-C", str(self.project), "rev-parse", "--verify", "--quiet", branch],
+                                       capture_output=True).returncode == 0)
+        engine._integrate("U-0001")
+        self.assertEqual(engine.clean_up()["branches"], [branch], "deleted once it landed")
+
     def _gated(self):
         self.provider.script["risky"] = [Attempt(result=pr_result(9, touched=("src/auth/a.ts",)))]
         engine = self.engine([batch(unit("a", agent="risky"))])
@@ -1168,7 +1181,8 @@ class CannedRunTest(EngineCase):
         self.assertEqual(engine.worktrees.claimed(), [])
         self.assertEqual(branches(), [], done)
         self.assertEqual(self.events(engine, "cleaned_up")[-1]["kept"], [])
-        self.assertEqual(engine.clean_up(), {"released": [], "kept": [], "branches": []}, "safe to repeat")
+        self.assertEqual(engine.clean_up(), {"released": [], "kept": [], "branches": [], "unlanded": []},
+                         "safe to repeat")
 
     def test_repeated_crashes_still_complete_with_no_retry_spent(self):
         """A crash every fourth tick, because a session needs a tick to spawn and a

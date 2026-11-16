@@ -1128,18 +1128,35 @@ class RunEngine:
         that merged deleted here and on origin. A stacked child replays its own commits
         off its parent's branch, so branches go only once nothing is left to merge. A
         cancelled unit's branch is its unmerged work and stays. Safe to repeat."""
-        released, kept, deleted = [], [], []
+        released, kept, deleted, unlanded = [], [], [], []
+        integrated = {e.line.get("unit_id") for e in self.ledger.read() if e.line.get("event") == "artifact_integrated"}
         for unit_id in self.units.ids():
             state = self.units.state(unit_id)
             if self.worktrees.path(unit_id).exists():
                 reason = self.worktrees.release(unit_id)
                 (kept if reason else released).append(unit_id)
             branch = (state.get("pr") or {}).get("branch") or self.worktrees.branch(unit_id)
-            if state["state"] == "done":
+            if state["state"] != "done":
+                continue
+            if self._landed(unit_id, state, branch, integrated):
                 deleted += self.worktrees.delete_branch(branch)
-        if released or kept or deleted:
-            self.ledger.append("cleaned_up", released=released, kept=kept, branches=deleted)
-        return {"released": released, "kept": kept, "branches": deleted}
+            else:
+                unlanded.append(branch)
+        if released or kept or deleted or unlanded:
+            self.ledger.append("cleaned_up", released=released, kept=kept, branches=deleted, unlanded=unlanded)
+        return {"released": released, "kept": kept, "branches": deleted, "unlanded": unlanded}
+
+    def _landed(self, unit_id, state, branch, integrated):
+        """A done unit's branch goes only once its work is on the default branch. A PR
+        unit is done only when its PR merged (a squash, so its commits are not ancestors).
+        An artifact unit landed when it was integrated, or when its branch is already in
+        the default branch. Otherwise the branch is the only copy of the work and stays."""
+        if (state.get("pr") or {}).get("number") is not None or unit_id in integrated:
+            return True
+        def git(*args):
+            return subprocess.run(["git", "-C", str(self.project_path), *args], capture_output=True).returncode == 0
+        ref = next((r for r in (branch, f"origin/{branch}") if git("rev-parse", "--verify", "--quiet", r)), None)
+        return ref is None or git("merge-base", "--is-ancestor", ref, self.worktrees.default_branch())
 
     # --- the production release ---
 
