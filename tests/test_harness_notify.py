@@ -374,8 +374,10 @@ class SlackHandlerTest(NotifyCase):
         self.assertIsNone(note)
         inputs = [b["block_id"] for b in form["blocks"] if b["type"] == "input"]
         self.assertEqual(inputs, ["option", "d:D-1", "d:D-2", "notes"])
-        pick = form["blocks"][2]["element"]
-        self.assertEqual(pick["initial_option"]["value"], "0", "the recommended option is preselected")
+        option = form["blocks"][2]
+        self.assertNotIn("initial_option", option["element"],
+                         "a person typed OPT-1 into a decision while the preselected OPT-3 went in as the option")
+        self.assertIn("the decision wins", option["hint"]["text"])
         self.assertEqual(open_form(self.tap(gate_id, SOMEONE), self.daemon, ME)[1][:15], "Only the person")
 
     def test_the_form_answers_the_gate_with_its_decisions_and_notes(self):

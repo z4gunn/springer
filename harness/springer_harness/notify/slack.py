@@ -150,13 +150,20 @@ def form_view(target, content):
                for n, o in enumerate(options, 1)]
     pick = {"type": "static_select", "action_id": "pick", "options": choices[:100],
             "placeholder": {"type": "plain_text", "text": "Pick an option"}}
+    decided = bool(content.get("decisions"))
     recommended = next((c for c, o in zip(choices, options) if o.get("recommended_because")), None)
-    if recommended:
+    if recommended and not decided:
+        # A gate with decisions is not pre-filled: a person typed OPT-1 into a decision
+        # while the pre-selected recommendation, OPT-3, went in as the option.
         pick["initial_option"] = recommended
+    option_input = {"type": "input", "block_id": "option", "label": {"type": "plain_text", "text": "Option"},
+                    "element": pick}
+    if decided:
+        option_input["hint"] = {"type": "plain_text",
+                                "text": "Your answer to each decision below is what the run follows. "
+                                        "Where the option says otherwise, the decision wins."}
     blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": trim(content["decision_prompt"], 2900)}},
-              {"type": "section", "text": {"type": "mrkdwn", "text": listing[:3000]}},
-              {"type": "input", "block_id": "option", "label": {"type": "plain_text", "text": "Option"},
-               "element": pick}]
+              {"type": "section", "text": {"type": "mrkdwn", "text": listing[:3000]}}, option_input]
     for decision in content.get("decisions") or []:
         blocks.append({"type": "input", "block_id": f"d:{decision['decision_id']}",
                        "label": {"type": "plain_text", "text": decision["prompt"][:2000]},

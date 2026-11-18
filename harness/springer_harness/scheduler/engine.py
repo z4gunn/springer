@@ -862,11 +862,19 @@ class RunEngine:
 
     def _answer_note(self, content, response):
         """What the next session's brief says about the gate this unit asked for."""
-        parts = [f"The human answered: {content['decision_prompt']} Answer: {response['option']}."]
+        answered = [d for d in content.get("decisions", []) if d.get("response")]
+        if not answered:
+            parts = [f"The human answered: {content['decision_prompt']} Answer: {response['option']}."]
+        else:
+            # The option is a bundle the requesting agent wrote, and it can disagree with
+            # the answers. Put first, it once overrode a person's answers in a brief.
+            parts = [f"The human answered gate {content['checkpoint_id']} decision by decision. Follow each "
+                     f"decision's answer. The option they also picked (\"{response['option']}\") is a summary "
+                     "only, and where it differs from a decision's answer, the decision's answer wins."]
+            parts += [f"Decision {d['decision_id']}: {d['prompt']} Answer: {d['response']}" for d in answered]
         if response.get("free_text"):
             parts.append(f"Notes: {response['free_text']}")
-        parts += [f"{d['prompt']} {d['response']}" for d in content.get("decisions", []) if d.get("response")]
-        return " ".join(parts)
+        return "\n".join(parts)
 
     def _last_gate(self, unit_id):
         gates = self.gates.holding(unit_id)

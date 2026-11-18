@@ -125,8 +125,26 @@ class GateRequestTest(EngineCase):
                             decisions=[{"decision_id": "D1", "response": "CSV"}])
         self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
         brief = self.provider.spawned[-1].brief
-        for needle in ("Drop the export feature?", "keep", "Users asked for it.", "Which format? CSV"):
+        for needle in ("keep", "Users asked for it.", "Decision D1: Which format? Answer: CSV"):
             self.assertIn(needle, brief)
+
+    def test_an_option_that_contradicts_a_decision_loses_in_the_brief_and_the_record(self):
+        """A person answered "No" to a decision while the bundled option they also picked
+        said "Accept all recommended", and the unit's brief put the option first."""
+        engine = self.run_until_blocked()
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")
+        gate_id = engine.gates.open_gates()[0]["content"]["checkpoint_id"]
+        engine.gates.answer(gate_id, "drop", "human", decisions=[{"decision_id": "D1", "response": "No export at all"}])
+        content = engine.gates.get(gate_id)["content"]
+        self.assertEqual(content["response"]["authoritative"], "decisions")
+        answered = [e for e in self.events(engine, "gate_answered")][-1]
+        self.assertEqual((answered["decisions"], answered["authoritative"]), ({"D1": "No export at all"}, "decisions"))
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+        brief = self.provider.spawned[-1].brief
+        self.assertIn("the decision's answer wins", brief)
+        self.assertLess(brief.index("decision by decision"), brief.index("Decision D1"))
+        if HAVE_JSONSCHEMA:
+            self.assertEqual(schema_errors("hil-checkpoint-v2", engine.gates.get(gate_id), registry()), [])
 
     def test_check_running_again_after_a_crash_opens_one_gate(self):
         engine = self.run_until_blocked()

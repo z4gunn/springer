@@ -810,6 +810,16 @@
         "by": {
           "type": "string",
           "minLength": 1
+        },
+        "decisions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The person's answer to each decision, by decision_id. When present, these are the answer and response is a summary only."
+        },
+        "authoritative": {
+          "const": "decisions"
         }
       }
     },

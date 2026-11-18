@@ -285,6 +285,10 @@
                 "null"
               ]
             },
+            "authoritative": {
+              "const": "decisions",
+              "description": "Set when the person answered the gate's decisions. Each decision's response is the answer, and option is a summary only that loses where they differ."
+            },
             "by": {
               "type": "string",
               "minLength": 1

@@ -404,6 +404,19 @@ class OrchestratorTest(FakeBinCase):
                 return self.planner.next_batch(snapshot)
         self.fail("the plan call never finished")
 
+    def test_the_plan_reads_decisions_as_the_answer_and_the_option_as_a_summary(self):
+        artifacts = self.project / "runs/acme-1/artifacts"
+        artifacts.mkdir(parents=True)
+        decided = {"checkpoint_type": "direction-review", "decision_prompt": "Pick", "holds": [],
+                   "response": {"option": "Accept all recommended", "authoritative": "decisions"},
+                   "decisions": [{"decision_id": "ARCH", "prompt": "Which option?", "response": "OPT-1"}]}
+        plain = {**decided, "response": {"option": "approve"}, "decisions": []}
+        (artifacts / "G-0001.json").write_text(json.dumps({"content": decided}))
+        (artifacts / "G-0002.json").write_text(json.dumps({"content": plain}))
+        first, second = self.planner.state()["gates"]
+        self.assertIn("summary only", first["answer_rule"])
+        self.assertNotIn("answer_rule", second)
+
     def test_the_orchestrator_names_the_batch(self):
         self.plan_file.write_text(json.dumps(self.PLAN))
         batch = self.ask()

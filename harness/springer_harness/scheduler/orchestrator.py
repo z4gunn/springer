@@ -228,7 +228,10 @@ class OrchestratorPlanner:
             gates.append({"type": content.get("checkpoint_type"), "prompt": content.get("decision_prompt"),
                           "response": content.get("response"), "holds": content.get("holds"),
                           "decisions": [{"prompt": d.get("prompt"), "response": d.get("response")}
-                                        for d in content.get("decisions") or []]})
+                                        for d in content.get("decisions") or []],
+                          **({"answer_rule": "Each decision's response is the person's answer. The response "
+                                             "option is a summary only and loses where they differ."}
+                             if any(d.get("response") for d in content.get("decisions") or []) else {})})
         artifacts = sorted(p.name for p in (self.run_dir / "artifacts").glob("*.json") if not p.name.startswith("G-"))
         return {"run_brief": brief.get("content", brief), "keys_used": read_json(self.run_dir / "unit-keys.json", {}),
                 "units": units, "gates": gates, "artifacts": artifacts,

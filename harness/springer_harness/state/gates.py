@@ -69,9 +69,14 @@ class GateStore:
                 raise InvalidArgs(f"{gate_id} has no decisions {sorted(unknown)}")
             for decision in known:
                 decision["response"] = answers.get(decision["decision_id"], decision.get("response"))
-        self.ledger.append("gate_answered", gate_id=gate_id, response=option, by=by)
+        answered = {d["decision_id"]: d["response"] for d in content.get("decisions", []) if d.get("response")}
+        # With decisions answered, they are the answer and the option is a summary only.
+        self.ledger.append("gate_answered", gate_id=gate_id, response=option, by=by,
+                           **({"decisions": answered, "authoritative": "decisions"} if answered else {}))
         content["response"] = {"option": option, "free_text": free_text, "rule_change": rule_change,
                                "by": by, "at": iso(self.now())}
+        if answered:
+            content["response"]["authoritative"] = "decisions"
         content["pipeline_status"] = "resumed"
         write_json(self.path(gate_id), gate)
         return gate
