@@ -484,6 +484,18 @@ class SchedulingTest(EngineCase):
         self.assertEqual(self.provider.spawned[-1].model_tier, "opus")
         self.assertEqual(engine.units.state("U-0001")["retries_spent"], 0)
 
+    def test_a_unit_never_runs_below_its_agent_s_declared_model(self):
+        """A plan ran the Auth sign-off on sonnet, though the agent declares opus."""
+        agents = self.project / ".claude" / "agents"
+        agents.mkdir(parents=True)
+        (agents / "spgr-agent-auth.md").write_text("---\nname: spgr-agent-auth\nmodel: opus\n---\nbody\n")
+        (agents / "spgr-agent-qa-tester.md").write_text("---\nname: spgr-agent-qa-tester\nmodel: haiku\n---\n")
+        engine = self.engine([batch(unit("a", agent="spgr-agent-auth", model_tier="sonnet"),
+                                    unit("b", agent="spgr-agent-qa-tester", model_tier="sonnet"))])
+        self.tick_until(engine, lambda: len(self.provider.spawned) >= 2)
+        tiers = {r.agent: r.model_tier for r in self.provider.spawned}
+        self.assertEqual(tiers, {"spgr-agent-auth": "opus", "spgr-agent-qa-tester": "sonnet"})
+
 
 def brief_with_autonomy(project, autonomy):
     """A low-risk PR merges alone only under autopilot, so a test of that path says so."""

@@ -168,10 +168,30 @@ class RunEngine:
         path = self.units.unit_dir(unit_id) / "redispatch-notes.txt"
         return path.read_text() if path.exists() else ""
 
+    def _declared_tier(self, unit_id):
+        """The model the unit's agent declares in its frontmatter, or None. A plan once ran
+        the Auth, Security and Compliance sign-offs on sonnet, though each declares opus
+        because its finding blocks a checkpoint."""
+        ref = self._spec(unit_id).get("role_prompt_ref")
+        try:
+            text = (Path(self.project_path) / ref).read_text() if ref else ""
+        except OSError:
+            return None
+        front = text.split("---", 2)[1] if text.startswith("---") and text.count("---") >= 2 else ""
+        for line in front.splitlines():
+            key, _, value = line.partition(":")
+            if key.strip() == "model" and value.strip() in TIERS:
+                return value.strip()
+        return None
+
     def _tier(self, unit_id, state):
-        """The spec's tier, one up on the second retry, or the tier a human raised to."""
+        """The spec's tier, never below the agent's declared model, one up on the second
+        retry, or the tier a human raised to."""
         spec_tier = self._spec(unit_id)["model_tier"]
         index = TIERS.index(spec_tier)
+        declared = self._declared_tier(unit_id)
+        if declared:
+            index = max(index, TIERS.index(declared))
         if state["retries_spent"] >= 2:
             index = min(index + 1, len(TIERS) - 1)
         for entry in self.ledger.read():
