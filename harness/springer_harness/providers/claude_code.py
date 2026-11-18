@@ -24,11 +24,37 @@ from pathlib import Path
 
 from .coding_agent import SessionExit, SpawnRequest, Usage
 
-CONTEXT_TOKENS = 200_000
+# The context window a session runs in. The stream names it only in the final result's
+# modelUsage, so a running session is measured against the current models' window and
+# the figure is corrected when the result arrives.
+CONTEXT_TOKENS = 1_000_000
 # List price in dollars per million tokens: input, output, cache write, cache read. The
 # CLI reports a session's cost only when it ends, so a running session's cost is
 # estimated from these and replaced by the CLI's own figure at the end.
 PRICES = {"opus": (4.0, 20.0, 5.0, 0.20), "sonnet": (2.0, 10.0, 2.5, 0.20), "haiku": (0.10, 0.50, 0.125, 0.01)}
+
+
+def reference_dir(cwd):
+    """The brief's reference implementation as a directory outside the worktree, or None."""
+    from ..state.brief import parse
+    path = Path(cwd) / "docs" / "brief.md"
+    try:
+        front, _ = parse(path.read_text())
+    except Exception:
+        return None
+    reference = front.get("reference") if isinstance(front, dict) else None
+    if not isinstance(reference, str) or not reference.strip():
+        return None
+    target = (Path(cwd) / Path(reference).expanduser()).resolve()
+    root = Path(cwd).resolve()
+    if not target.is_dir() or target == root or root in target.parents:
+        return None
+    return target
+
+
+def context_percent(context, window):
+    """The share of the window a message's context fills, never above 100."""
+    return min(100.0, round(100 * context / window, 1))
 
 
 def estimate_cost(model, usage):
@@ -181,6 +207,8 @@ class ClaudeSession:
         self._lock = threading.Lock()
         self._usage = Usage()
         self._estimate = 0.0
+        self._context = 0
+        self._window = CONTEXT_TOKENS
         self._final = None
         self._on_signal = on_signal
         out = Path(request.session_dir)
@@ -223,7 +251,8 @@ class ClaudeSession:
                 context = sum(usage.get(k, 0) for k in ("input_tokens", "cache_read_input_tokens",
                                                         "cache_creation_input_tokens"))
                 if context:
-                    self._usage.context_percent = round(100 * context / CONTEXT_TOKENS, 1)
+                    self._context = context
+                    self._usage.context_percent = context_percent(context, self._window)
                 self._usage.input_tokens += usage.get("input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
                 self._usage.output_tokens += usage.get("output_tokens", 0)
                 self._estimate += estimate_cost(self.model, usage)
@@ -235,6 +264,12 @@ class ClaudeSession:
                         self._events.append({"type": "text", "text": block["text"][:2000]})
             elif kind == "result":
                 self._final = event
+                windows = [m.get("contextWindow") for m in (event.get("modelUsage") or {}).values()]
+                windows = [w for w in windows if isinstance(w, int) and w > 0]
+                if windows:
+                    self._window = max(windows)
+                    if self._context:
+                        self._usage.context_percent = context_percent(self._context, self._window)
                 self._usage.cost_usd = round(event.get("total_cost_usd") or 0, 4)
                 self._events.append({"type": "result", "subtype": event.get("subtype"),
                                      "is_error": event.get("is_error", False)})
@@ -324,6 +359,12 @@ class ClaudeCodeProvider:
             # The brief, the session directory, and the run artifacts live in the run
             # store in the main checkout, outside the worktree the session works in.
             command += ["--add-dir", str(Path(request.env["SPRINGER_PROJECT_DIR"]) / "runs" / request.env["SPRINGER_RUN_ID"])]
+        reference = reference_dir(request.cwd)
+        if reference:
+            # The reference implementation is the spec for parity, so a session reads it.
+            # It is another repository, so a session never writes there.
+            command += ["--add-dir", str(reference), "--disallowedTools",
+                        f"Edit(/{reference}/**)", f"Write(/{reference}/**)"]
         command += ["--allowedTools", *allow, *READ_ONLY]
         return command + list(self.extra_args)
 

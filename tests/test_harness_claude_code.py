@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -21,7 +22,7 @@ sys.path.insert(0, str(REPO / "harness"))
 
 from springer_harness.check.mechanical import mechanical_check  # noqa: E402
 from springer_harness.providers.claude_code import ClaudeCodeProvider, signal_from  # noqa: E402
-from springer_harness.providers.coding_agent import SpawnRequest  # noqa: E402
+from springer_harness.providers.coding_agent import SpawnRequest, Usage  # noqa: E402
 from springer_harness.providers.github import GitHubSourceHost  # noqa: E402
 from springer_harness.scheduler.orchestrator import OrchestratorPlanner  # noqa: E402
 from springer_harness.scheduler.plan import Snapshot  # noqa: E402
@@ -143,7 +144,7 @@ class ProviderTest(FakeBinCase):
         events = handle.poll()
         self.assertIn({"type": "tool_use", "name": "Edit"}, events)
         usage = handle.usage()
-        self.assertEqual((usage.context_percent, usage.cost_usd), (50.0, 0.31))
+        self.assertEqual((usage.context_percent, usage.cost_usd), (10.0, 0.31))
         self.assertEqual(handle.provider_session_id, "real-1")
         self.assertEqual(provider.usage_signal(), {"used_fraction": 0.42, "resets_at": "2026-11-02T17:20:00Z"})
         self.assertEqual((request.session_dir / "return.txt").read_text(), "DONE")
@@ -171,6 +172,26 @@ class ProviderTest(FakeBinCase):
         self.assertEqual(allow, ["Bash(python3 .claude/skills/spgr-run-harness/scripts/classify-failure.py:*)",
                                  "Bash(python3 .claude/skills/spgr-run-harness/scripts/receipt.py:*)", "Bash(npm:*)"])
 
+    def test_a_session_reads_the_brief_s_reference_and_never_writes_there(self):
+        """A PM session in the reference run could not read the POC the brief names as the parity spec."""
+        reference = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, reference)
+        (self.root / "docs").mkdir(exist_ok=True)
+        (self.root / "docs/brief.md").write_text(f"---\nname: acme\nreference: {reference}\n---\n\n## Problem\n\nx\n")
+        args = ClaudeCodeProvider(str(self.claude)).command(self.request())
+        target = str(reference.resolve())
+        self.assertIn(target, args)
+        self.assertEqual(args[args.index(target) - 1], "--add-dir")
+        self.assertIn(f"Edit(/{target}/**)", args)
+        self.assertIn(f"Write(/{target}/**)", args)
+
+    def test_no_reference_or_one_inside_the_worktree_adds_nothing(self):
+        (self.root / "docs").mkdir(exist_ok=True)
+        for front in ("name: acme", "name: acme\nreference: .", "name: acme\nreference: /no/such/dir"):
+            (self.root / "docs/brief.md").write_text(f"---\n{front}\n---\n")
+            args = ClaudeCodeProvider(str(self.claude)).command(self.request())
+            self.assertFalse(any(a.startswith("Edit(/") for a in args), front)
+
     def test_a_handoff_with_no_result_is_a_handoff(self):
         handle = ClaudeCodeProvider(str(self.claude)).spawn(self.request("handoff"))
         self.assertEqual(self.finish(handle).outcome, "handoff")
@@ -187,6 +208,32 @@ class CostEstimateTest(unittest.TestCase):
         self.assertAlmostEqual(estimate_cost("claude-sonnet-5-5", usage), 2.0 + 1.0 + 0.2)
         self.assertAlmostEqual(estimate_cost("claude-haiku-5-5", {"output_tokens": 1_000_000}), 0.5)
         self.assertAlmostEqual(estimate_cost(None, {"input_tokens": 1_000_000}), 4.0, msg="unknown prices as opus")
+
+
+class ContextPercentTest(unittest.TestCase):
+    """A 1M-token session was measured against 200k and read 122 percent."""
+
+    def session(self):
+        from springer_harness.providers.claude_code import ClaudeSession
+        handle = ClaudeSession.__new__(ClaudeSession)
+        handle._lock, handle._events, handle._estimate = threading.Lock(), [], 0.0
+        handle._usage, handle._context, handle._final, handle.model = Usage(), 0, None, "claude-opus-5-5"
+        handle._window = 1_000_000
+        return handle
+
+    def message(self, handle, context):
+        handle._take({"type": "assistant", "message": {"usage": {"input_tokens": 2, "cache_read_input_tokens": context - 2}}})
+
+    def test_a_running_session_is_measured_against_the_current_window(self):
+        handle = self.session()
+        self.message(handle, 244_000)
+        self.assertEqual(handle._usage.context_percent, 24.4)
+
+    def test_the_result_s_window_corrects_the_figure_and_it_never_passes_100(self):
+        handle = self.session()
+        self.message(handle, 244_000)
+        handle._take({"type": "result", "total_cost_usd": 1.0, "modelUsage": {"claude-opus-5-5": {"contextWindow": 200_000}}})
+        self.assertEqual(handle._usage.context_percent, 100.0)
 
 
 class MechanicalCheckTest(FakeBinCase):
