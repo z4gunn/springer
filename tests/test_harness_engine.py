@@ -625,6 +625,21 @@ class MergePolicyTest(EngineCase):
         self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
         self.assertEqual(self.host.merged, [1])
 
+    def test_a_paused_run_holds_a_merge_until_it_resumes(self):
+        """A restart cleared a wedged tick, and the paused run merged two PRs approved
+        before the pause, onto a main the person had paused it to protect."""
+        self.host.check_states = {1: ("pending", "checks still running")}
+        engine = self.actions_engine()
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "gated")
+        engine.ledger.append("operation_applied", op_id="1", type="run.pause", actor="tui", args={"reason": "t"})
+        self.host.check_states = {1: ("pass", "2 check(s) green")}
+        for _ in range(3):
+            engine.tick()
+        self.assertEqual((self.states(engine)["U-0001"], self.host.merged), ("gated", []))
+        engine.ledger.append("operation_applied", op_id="2", type="run.resume", actor="tui", args={})
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+        self.assertEqual(self.host.merged, [1])
+
     def test_a_failed_check_sends_the_unit_back_as_a_defect(self):
         self.host.check_states = {1: ("fail", "failed: conformance")}
         engine = self.actions_engine()

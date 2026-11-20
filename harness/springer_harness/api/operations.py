@@ -262,7 +262,8 @@ def project_configure(c):
     needs the github source host. The host does not change under a run in progress,
     whose open changes belong to the host they were opened on."""
     changes = {k: v for k, v in (("ci_signal", c.args.ci_signal), ("source_host", c.args.source_host)) if v}
-    merged = {**c.daemon.settings(c.project), **changes}
+    from ..daemon import settings_from
+    merged = settings_from({**(c.daemon.home.project(c.project).get("settings") or {}), **changes})
     if merged["ci_signal"] in ("self-hosted-actions", "both") and merged["source_host"] != "github":
         raise InvalidArgs("GitHub Actions as the CI signal needs the github source host")
     if "source_host" in changes and changes["source_host"] != c.daemon.settings(c.project)["source_host"] \

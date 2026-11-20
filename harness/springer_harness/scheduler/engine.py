@@ -666,6 +666,10 @@ class RunEngine:
     def resolve_gates(self):
         self._apply_answers()
         self._retire_orphan_gates()
+        # A pause holds merges too, an approval given before it included: a person pauses
+        # because something about the run is wrong, and a merge is the one step that
+        # lands it on main. The approval stands and the merge goes on resume.
+        paused = self.paused()
         for state in self.units.by_state("gated"):
             unit_id = state["unit_id"]
             if (state.get("pr") or {}).get("number") is None:
@@ -689,13 +693,14 @@ class RunEngine:
                 continue
             level = self._level(unit_id)
             if level in ("L0", "L1") and self._autopilot():
-                self._merge(unit_id, state, level)
+                if not paused:
+                    self._merge(unit_id, state, level)
             else:
                 gates = self.gates.holding(unit_id, "pr-merge")
                 if not gates:
                     self._open_merge_gate(unit_id, state, level)
                 elif gates[-1]["content"]["response"] and \
-                        gates[-1]["content"]["response"]["option"] == "approve":
+                        gates[-1]["content"]["response"]["option"] == "approve" and not paused:
                     self._merge(unit_id, state, level)
 
     def _retire_orphan_gates(self):

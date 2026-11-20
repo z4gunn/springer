@@ -58,6 +58,17 @@ SETTINGS_DEFAULT = {"ci_signal": "receipts", "source_host": "local"}
 HOSTED_SIGNALS = ("self-hosted-actions", "both")
 
 
+def settings_from(stored):
+    """The project's settings from what was set, with each default filled in. A
+    GitHub-hosted project reads its pull requests' checks unless the person chose
+    otherwise: receipts alone let a PR merge with its CI red, and a live-database
+    suite that runs only in CI was never seen."""
+    merged = {**SETTINGS_DEFAULT, **stored}
+    if "ci_signal" not in stored and merged["source_host"] == "github":
+        merged["ci_signal"] = "both"
+    return merged
+
+
 RUN_STORE_IGNORES = (
     "# --- Springer run store: working state. The daemon commits each run's records when it ends ---",
     "runs/_dashboard/", "runs/*/units/", "runs/*/plan/", "runs/*/release/", "runs/*/events.jsonl",
@@ -321,7 +332,8 @@ class Daemon:
     # --- per-project settings ---
 
     def settings(self, slug):
-        return {**SETTINGS_DEFAULT, **(self.home.project(slug).get("settings") or {})}
+        return settings_from(self.home.project(slug).get("settings") or {})
+
 
     def release(self, slug, by, run_id=None, reason=None):
         """Start the project's deploy command on a thread, after a person's go. Returns
@@ -359,7 +371,8 @@ class Daemon:
 
     def save_settings(self, slug, **changes):
         record = self.home.project(slug)
-        self.home.save_project(slug, {**record, "settings": {**self.settings(slug), **changes}})
+        # Only what was set is stored, so a default stays a default and can follow the host.
+        self.home.save_project(slug, {**record, "settings": {**(record.get("settings") or {}), **changes}})
         return self.settings(slug)
 
     def _in_flight_total(self):
