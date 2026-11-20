@@ -152,6 +152,26 @@ def stop_daemon(home):
     return True
 
 
+def store_secret(project, name, prompt=None, secrets=None):
+    """A project secret, such as the staging account a product check signs in with,
+    typed at a hidden prompt and kept in the OS keychain. It never reaches a file, the
+    terminal, or a session. project.set_check_env names which ones a check gets."""
+    import getpass
+    import re
+    from .providers.secrets import KeyringSecrets
+
+    if not re.match(r"^[A-Z_][A-Z0-9_]*$", name):
+        sys.stderr.write(f"springer: {name} is not an environment variable name\n")
+        return 1
+    value = (prompt or getpass.getpass)(f"{name} for {project} (hidden): ")
+    if not value:
+        sys.stderr.write("springer: nothing typed, nothing stored\n")
+        return 1
+    (secrets or KeyringSecrets()).set(project, name, value)
+    print(f"springer: {name} stored in the keychain for {project}.")
+    return 0
+
+
 def build_daemon(home):
     """Claude Code and GitHub once onboarded. Before that, the mock provider serves a
     canned run, so springer can be tried with no tokens spent."""
@@ -440,6 +460,9 @@ def main(argv=None):
     polish_cmd.add_argument("--as-bug", action="store_true", help="with a run in progress, file the issue as a bug")
     polish_cmd.add_argument("--no-follow", action="store_true", help="print the run id and return")
     polish_cmd.add_argument("--timeout", type=float, default=None, help="stop following after this many seconds")
+    secret_cmd = sub.add_parser("secret", help="store a project secret in the keychain, typed at a hidden prompt")
+    secret_cmd.add_argument("project")
+    secret_cmd.add_argument("name", help="an environment variable name, e.g. PRODUCT_CHECK_PASSWORD")
     tail_cmd = sub.add_parser("tail", help="follow a run's lines until it completes or a gate opens")
     tail_cmd.add_argument("run_id")
     tail_cmd.add_argument("--project", default=None)
@@ -471,6 +494,8 @@ def main(argv=None):
         except (RuntimeError, OSError, KeyError, ValueError) as exc:
             sys.stderr.write(f"springer: {exc}\n")
             return 1
+    if args.command == "secret":
+        return store_secret(args.project, args.name)
     if args.command == "stop":
         stopped = stop_daemon(home)
         print("springer: daemon stopped." if stopped else "springer: no daemon is running.")

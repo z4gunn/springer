@@ -7,6 +7,7 @@ docs/harness/api-contract.md.
 
 import hashlib
 import json
+import re
 import secrets as stdlib_secrets
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -422,6 +423,41 @@ def set_checks(c):
     return {"settings": c.daemon.save_settings(c.project, project_checks=commands)}
 
 
+ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+
+
+class SetCheckEnv(Args):
+    env: dict[str, str] = Field(default_factory=dict, max_length=20)  # plain values, e.g. a fixtures path
+    secrets: list[str] = Field(default_factory=list, max_length=10)  # names whose values live in the keychain
+
+    @field_validator("env")
+    @classmethod
+    def _env_names(cls, value):
+        bad = [k for k in value if not ENV_NAME.match(k)]
+        if bad:
+            raise ValueError(f"not environment variable names: {bad}")
+        return value
+
+    @field_validator("secrets")
+    @classmethod
+    def _secret_names(cls, value, info):
+        bad = [k for k in value if not ENV_NAME.match(k)]
+        if bad:
+            raise ValueError(f"not environment variable names: {bad}")
+        clash = sorted(set(value) & set(info.data.get("env") or {}))
+        if clash:
+            raise ValueError(f"{clash} is named both as a plain value and as a secret. A secret's value lives "
+                             "only in the keychain: springer secret <project> <NAME>")
+        return value
+
+
+def set_check_env(c):
+    settings = c.daemon.save_settings(c.project, product_check_env=dict(c.args.env),
+                                      product_check_secrets=list(c.args.secrets))
+    missing = [n for n in c.args.secrets if not c.daemon.secrets.has(c.project, n)]
+    return {"settings": settings, "secrets_missing": missing}
+
+
 def set_carried(c):
     return {"settings": c.daemon.save_settings(c.project, carried_ignored=c.args.paths)}
 
@@ -588,6 +624,11 @@ CATALOG = {op.type: op for op in [
     Operation("project.set_carried", SetCarried, set_carried,
               "Sets the git-ignored paths copied into every unit's worktree beside .env and .impeccable, "
               "such as local test fixtures a product check reads. Only ignored files are copied.",
+              confirm=True, confirm_rule="yes", chat=False),
+    Operation("project.set_check_env", SetCheckEnv, set_check_env,
+              "Sets the environment a product check runs with: plain values (a fixtures path) and the names of "
+              "secrets read from the keychain (a staging account). Only the harness's run of a product command "
+              "gets them, never a session.",
               confirm=True, confirm_rule="yes", chat=False),
     Operation("project.release", NoArgs, project_release,
               "Deploys the project's default branch head to production with its release command, now.",

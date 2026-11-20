@@ -296,6 +296,36 @@ class MechanicalCheckTest(FakeBinCase):
                               text=True).stdout.strip()
         self.assertEqual((receipt["tests_ran"], receipt["head"]), (3, head))
 
+    def test_only_a_product_check_gets_the_check_environment(self):
+        """The reference run's product check reported MISSING: it had no fixtures path and
+        no staging account, and nothing passed a project secret to a gating command."""
+        from springer_harness.check.mechanical import run_gating
+        probe = "python3 -c \"import os,sys; print(os.environ.get('PRODUCT_CHECK_EMAIL', 'none')); " \
+                "sys.exit(0 if os.environ.get('PRODUCT_CHECK_EMAIL') {} else 1)\""
+        gating = [{"name": "product", "command": probe.format("== 'qa@example.invalid'"), "kind": "product"},
+                  {"name": "lint", "command": probe.format("is None"), "kind": "check"}]
+        env = {"PRODUCT_CHECK_EMAIL": "qa@example.invalid"}
+        self.assertIsNone(run_gating(gating, self.root / "out", self.project, [], env=env))
+        for name in ("product", "lint"):
+            receipt = json.loads((self.root / "out" / "receipts" / f"{name}.json").read_text())
+            self.assertEqual(receipt["result"], "pass", name)
+
+    def test_the_base_run_of_a_product_check_gets_the_same_environment(self):
+        """A product check that failed at the head was run again on the base to tell a new
+        failure from an old one. Without the staging account the base run printed MISSING
+        and failed, so every real defect read as the base's failure and waited on a person."""
+        from springer_harness.check.mechanical import fails_at
+        probe = {"name": "product", "kind": "product",
+                 "command": "python3 -c \"import os,sys; sys.exit(0 if os.environ.get('PRODUCT_CHECK_EMAIL') else 1)\""}
+        env = {"PRODUCT_CHECK_EMAIL": "qa@example.invalid"}
+        self.assertIsNone(fails_at(probe, self.root / "base-ok", self.project, env),
+                          "with the account the base passes, so a head failure is the change's")
+        self.assertIsNotNone(fails_at(probe, self.root / "base-bare", self.project),
+                             "without it the base fails, which would hide the change's defect")
+        lint = {**probe, "name": "lint", "kind": "check"}
+        self.assertIsNotNone(fails_at(lint, self.root / "base-lint", self.project, env),
+                             "a build or test command never sees the check environment")
+
     def test_a_failing_gating_command_is_a_defect_that_names_it_and_its_output(self):
         self.write(**self.PR)
         gating = [{"name": "lint", "command": "python3 -c \"import sys; print('rule no-floating'); sys.exit(3)\"",
@@ -474,6 +504,27 @@ class MechanicalCheckTest(FakeBinCase):
         result = self.check()
         self.assertEqual(result.failure_class, "defect")
         self.assertIn("prd.json", result.detail)
+
+
+class CheckEnvTest(unittest.TestCase):
+    def test_the_engine_builds_the_check_environment_from_settings_and_the_keychain(self):
+        from springer_harness.scheduler.engine import RunEngine
+        engine = RunEngine.__new__(RunEngine)
+        engine.settings = lambda: {"product_check_env": {"PRODUCT_CHECK_FIXTURES": "tests/fixtures/mock"},
+                                   "product_check_secrets": ["PRODUCT_CHECK_EMAIL", "PRODUCT_CHECK_PASSWORD"]}
+        stored = {"PRODUCT_CHECK_EMAIL": "qa@example.invalid"}
+        engine.check_secret = stored.get
+        self.assertEqual(engine._product_check_env(), {"PRODUCT_CHECK_FIXTURES": "tests/fixtures/mock",
+                                                       "PRODUCT_CHECK_EMAIL": "qa@example.invalid"})
+
+    def test_a_secret_is_typed_hidden_and_stored_in_the_keychain(self):
+        from springer_harness.cli import store_secret
+        from springer_harness.providers.secrets import MemorySecrets
+        secrets = MemorySecrets()
+        self.assertEqual(store_secret("acme", "PRODUCT_CHECK_PASSWORD", prompt=lambda _: "s3cret", secrets=secrets), 0)
+        self.assertEqual(secrets.get("acme", "PRODUCT_CHECK_PASSWORD"), "s3cret")
+        self.assertEqual(store_secret("acme", "not a name", prompt=lambda _: "x", secrets=secrets), 1)
+        self.assertEqual(store_secret("acme", "EMPTY", prompt=lambda _: "", secrets=secrets), 1)
 
 
 class OrchestratorTest(FakeBinCase):

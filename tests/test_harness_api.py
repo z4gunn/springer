@@ -711,6 +711,19 @@ class OperationCatalogTest(ApiCase):
             self.op("project.set_carried", {"paths": [bad]}, expect=400)
         self.op("project.set_carried", {"paths": ["a"] * 11}, expect=400)
 
+    def test_project_set_check_env_names_values_and_keychain_secrets(self):
+        self.daemon.secrets.set("acme", "PRODUCT_CHECK_EMAIL", "qa@example.invalid")
+        out = self.confirmed("project.set_check_env", {"env": {"PRODUCT_CHECK_FIXTURES": "tests/fixtures/mock"},
+                                                       "secrets": ["PRODUCT_CHECK_EMAIL", "PRODUCT_CHECK_PASSWORD"]})
+        settings = self.daemon.settings("acme")
+        self.assertEqual((settings["product_check_env"], settings["product_check_secrets"]),
+                         ({"PRODUCT_CHECK_FIXTURES": "tests/fixtures/mock"},
+                          ["PRODUCT_CHECK_EMAIL", "PRODUCT_CHECK_PASSWORD"]))
+        self.assertNotIn("qa@example.invalid", json.dumps(settings), "a secret's value never lands in settings")
+        self.assertEqual(out["result"]["secrets_missing"], ["PRODUCT_CHECK_PASSWORD"])
+        self.op("project.set_check_env", {"env": {"bad name": "x"}}, expect=400)
+        self.op("project.set_check_env", {"env": {"A": "x"}, "secrets": ["A"]}, expect=400)
+
     def test_daemon_restart_pauses_the_runs_and_drains_before_it_restarts(self):
         run_id = self.run_started()
         engine = self.daemon.engine("acme", run_id)
@@ -961,6 +974,7 @@ COVERAGE = {
     "project.release": "test_project_release_needs_a_command_a_run_and_a_clean_checkout",
     "project.set_checks": "test_project_set_checks_sets_and_clears_the_project_checks",
     "project.set_carried": "test_project_set_carried_sets_and_clears_the_carried_paths",
+    "project.set_check_env": "test_project_set_check_env_names_values_and_keychain_secrets",
 }
 
 

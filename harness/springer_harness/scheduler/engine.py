@@ -120,7 +120,7 @@ HOSTED_CI_LABEL = "springer:hosted-ci"
 
 class RunEngine:
     def __init__(self, project_slug, project_path, run_id, provider, planner, source_host, worktrees, window, owner,
-                 now, in_flight_total=None, settings=None, release=None):
+                 now, in_flight_total=None, settings=None, release=None, check_secret=None):
         self.project_slug = project_slug
         self.project_path = Path(project_path)
         self.run_id = run_id
@@ -142,7 +142,8 @@ class RunEngine:
         self.handles = {}
         self.keys = self._load_keys()
         self.settings = settings or (lambda: {"ci_signal": "receipts"})
-        self.gating_runs = GatingRuns()
+        self.check_secret = check_secret
+        self.gating_runs = GatingRuns(env=self._product_check_env)
         self._warned = set()  # (unit, session, detail) already written, so a re-read verdict is not again
         # release(by, gate_id) starts the project's deploy and returns (out_dir, None),
         # or (None, why not). None when the daemon offers no releases (the tests' engines).
@@ -1223,6 +1224,18 @@ class RunEngine:
                   if command.strip() not in named]
         return planned + checks
 
+    def _product_check_env(self):
+        """The environment a product check runs with: the project's plain values, and
+        each named secret from the keychain. It goes to the harness's own run of a
+        product command only, never into a session's brief or environment."""
+        settings = self.settings()
+        env = {str(k): str(v) for k, v in (settings.get("product_check_env") or {}).items()}
+        for name in settings.get("product_check_secrets") or []:
+            value = self.check_secret(name) if self.check_secret else None
+            if value:
+                env[name] = value
+        return env
+
     def _baseline(self, unit_id):
         """What fails_at says for a gating command on the unit's base, kept per base
         commit so a retry or a sibling unit does not run a slow check twice. None when
@@ -1244,7 +1257,7 @@ class RunEngine:
                 if path is None:
                     return None
                 try:
-                    said = fails_at(command, cache.parent / sha / command["name"], path)
+                    said = fails_at(command, cache.parent / sha / command["name"], path, self._product_check_env())
                 finally:
                     worktrees.drop_scratch(path)
                 if said is not None and cannot_run(None, said):

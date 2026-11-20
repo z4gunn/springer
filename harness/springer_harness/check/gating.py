@@ -25,7 +25,9 @@ VERDICT = "verdict.json"
 
 
 class GatingRuns:
-    def __init__(self):
+    def __init__(self, env=None):
+        # A callable read at each run, so a secret set since the daemon started is used.
+        self.env = env
         self._threads = {}
         self._lock = threading.Lock()
 
@@ -65,7 +67,8 @@ class GatingRuns:
         partial = session_dir / f".check-{uuid.uuid4().hex}"
         warnings, reruns = [], []
         try:
-            problem = run_gating(commands, partial, cwd, warnings, baseline, changed, reruns)
+            problem = run_gating(commands, partial, cwd, warnings, baseline, changed, reruns,
+                                 env=self.env() if self.env else None)
         except Exception as exc:  # noqa: BLE001, a crashed run is a verdict, never a hang
             problem = f"the gating run failed: {exc}"
         write_json(partial / VERDICT, {"problem": problem, "warnings": warnings, "reruns": reruns, "at": time.time()})

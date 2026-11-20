@@ -16,6 +16,7 @@ planned before they existed) keeps the old path: its session's receipts are veri
 import json
 import re
 import shutil
+import os
 import subprocess
 import sys
 from dataclasses import replace
@@ -29,9 +30,9 @@ VALIDATE = Path("schemas/validate.py")
 LEDGER_ONLY = ("runs/", "docs/")
 
 
-def _run(args, cwd, timeout=300):
+def _run(args, cwd, timeout=300, env=None):
     return subprocess.run([sys.executable, *map(str, args)], cwd=str(cwd), capture_output=True, text=True,
-                          timeout=timeout)
+                          timeout=timeout, env={**os.environ, **env} if env else None)
 
 
 def classify(session_dir, cwd, run_dir, unit_id):
@@ -65,7 +66,7 @@ def needs_gating(result):
     return result.outcome == "pr" or not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths)
 
 
-def run_gating(commands, out, cwd, warnings=None, baseline=None, changed=None, reruns=None):
+def run_gating(commands, out, cwd, warnings=None, baseline=None, changed=None, reruns=None, env=None):
     """Run each gating command at the worktree's head through receipt.py, writing the
     receipts under out, in order. None when every one passes, else the defect detail
     naming the first that did not, with the tail of its output. A product command is
@@ -97,7 +98,7 @@ def run_gating(commands, out, cwd, warnings=None, baseline=None, changed=None, r
     shutil.rmtree(out, ignore_errors=True)
     for command in commands:
         name = command["name"]
-        body = _gate(script, command, out, cwd)
+        body = _gate(script, command, out, cwd, env)
         if isinstance(body, str):
             return body
         outside = outside_change(body, command, changed)
@@ -106,7 +107,7 @@ def run_gating(commands, out, cwd, warnings=None, baseline=None, changed=None, r
             kept = out / "first-run"
             kept.mkdir(parents=True, exist_ok=True)
             (out / "receipts" / f"{name}.json").replace(kept / f"{name}.json")
-            body = _gate(script, command, out, cwd)
+            body = _gate(script, command, out, cwd, env)
             if isinstance(body, str):
                 return body
             if body.get("result") == "pass":
@@ -145,16 +146,19 @@ def run_gating(commands, out, cwd, warnings=None, baseline=None, changed=None, r
     return None
 
 
-def _gate(script, command, out, cwd):
+def _gate(script, command, out, cwd, env=None):
     """Run one gating command through receipt.py. Its receipt body, or the defect
-    detail when it did not finish or left no receipt."""
+    detail when it did not finish or left no receipt. A product check alone gets the
+    project's check environment (a staging account, a fixtures path). A build or test
+    command never sees it."""
     name, kind = command["name"], "check" if command["kind"] == "product" else command["kind"]
     timeout = command.get("timeout") or GATING_TIMEOUT
     args = [script, "run", out, "--name", name, "--kind", kind, "--cwd", cwd, "--timeout", str(timeout)]
     if command.get("count_regex"):
         args += ["--count-regex", command["count_regex"]]
     try:
-        _run([*args, "--", command["command"]], cwd, timeout=timeout + 60)
+        _run([*args, "--", command["command"]], cwd, timeout=timeout + 60,
+             env=env if command["kind"] == "product" else None)
     except subprocess.TimeoutExpired:
         return f"gating command {name} ({command['command']}) did not finish"
     try:
@@ -202,9 +206,11 @@ def cannot_run(exit_code, tail):
     return "exit 127, command not found" if exit_code == 127 else None
 
 
-def fails_at(command, out, cwd):
+def fails_at(command, out, cwd, env=None):
     """The command's output tail when it runs to a plain failure in cwd, else None: a
-    pass, a timeout, or a command that could not run there says nothing about the base."""
+    pass, a timeout, or a command that could not run there says nothing about the base.
+    A product check runs with the same check environment it had at the head, or a base
+    run without the staging account fails and reads as the base's failure."""
     script = Path(cwd) / SCRIPTS / "receipt.py"
     if not script.exists():
         return None
@@ -214,7 +220,8 @@ def fails_at(command, out, cwd):
     if command.get("count_regex"):
         args += ["--count-regex", command["count_regex"]]
     try:
-        _run([*args, "--", command["command"]], cwd, timeout=timeout + 60)
+        _run([*args, "--", command["command"]], cwd, timeout=timeout + 60,
+             env=env if command["kind"] == "product" else None)
     except subprocess.TimeoutExpired:
         return None
     try:

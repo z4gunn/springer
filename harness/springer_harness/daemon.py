@@ -327,7 +327,8 @@ class Daemon:
                                    local=self.checkout_path(slug)),
                          self.window, self.owner, self.now,
                          in_flight_total=self._in_flight_total, settings=lambda: self.settings(slug),
-                         release=lambda by, gate_id: self.release(slug, by, run_id, reason=gate_id))
+                         release=lambda by, gate_id: self.release(slug, by, run_id, reason=gate_id),
+                         check_secret=lambda name: self.secrets.get(slug, name) if hasattr(self.secrets, "get") else None)
 
     # --- per-project settings ---
 
