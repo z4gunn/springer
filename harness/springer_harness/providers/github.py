@@ -11,6 +11,24 @@ def _run(args, cwd, timeout=120):
     return subprocess.run(args, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
 
 
+def _push_rewritten(path, branch):
+    """A harness unit branch that a rebase or restack rewrote after it was pushed is
+    rejected as non-fast-forward. Origin's tip is pushed over only when this branch
+    once held it (it is in the branch's reflog), so the rewrite is this checkout's own
+    and no commit someone else pushed is lost. The lease names that tip, so a push that
+    lands in between still wins. None when the push does not qualify."""
+    if not branch.startswith("unit/"):
+        return None
+    listed = _run(["git", "ls-remote", "origin", f"refs/heads/{branch}"], path)
+    tip = (listed.stdout.split() or [""])[0]
+    if listed.returncode or not tip:
+        return None
+    held = _run(["git", "reflog", "show", "--format=%H", f"refs/heads/{branch}"], path)
+    if tip not in held.stdout.split():
+        return None
+    return _run(["git", "push", "--quiet", "-u", f"--force-with-lease={branch}:{tip}", "origin", branch], path)
+
+
 class GitHubError(RuntimeError):
     pass
 
@@ -42,6 +60,8 @@ class GitHubSourceHost:
         is reused, so a retry never opens a second."""
         path = self.project_path_of(project)
         pushed = _run(["git", "push", "--quiet", "-u", "origin", branch], path)
+        if pushed.returncode:
+            pushed = _push_rewritten(path, branch) or pushed
         if pushed.returncode:
             raise GitHubError(f"git push {branch} failed: {pushed.stderr.strip()[-400:]}")
         found = json.loads(self._gh(project, "pr", "list", "--head", branch, "--state", "open",

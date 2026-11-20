@@ -80,7 +80,9 @@ def run_gating(commands, out, cwd, warnings=None, baseline=None):
     which no retry of this change can fix: the reference run spent eight sessions on a
     contrast failure main already had. baseline(command) gives the base's output tail
     when the command fails there, and such a command passes with a warning, so the
-    merge waits on a person who sees both outputs."""
+    merge waits on a person who sees both outputs. A base that could not run the
+    command (a missing module or program) says nothing, so the failure stays the
+    change's, unless the change could not run it either: a broken check."""
     script = Path(cwd) / SCRIPTS / "receipt.py"
     if not script.exists():
         return "receipt.py is missing from the worktree"
@@ -110,16 +112,19 @@ def run_gating(commands, out, cwd, warnings=None, baseline=None):
             base_tail = baseline(command)
             if base_tail is not None:
                 tail = (body.get("output_tail") or "").strip()[-OUTPUT_SHOWN // 2:]
-                missing = cannot_run(body.get("exit_code"), tail) or cannot_run(None, base_tail)
-                if missing:
+                here, there = cannot_run(body.get("exit_code"), tail), cannot_run(None, base_tail)
+                if here and there:
                     warnings.append(f"{name} ({command['command']}) is a broken check: it cannot run here or on "
-                                    f"the base ({missing}), so it tested nothing. Fix the command or install what "
+                                    f"the base ({here}), so it tested nothing. Fix the command or install what "
                                     f"it needs. The merge waits on a person.")
                     continue
-                warnings.append(f"{name} ({command['command']}) fails on the base too, so it is not this "
-                                f"change's defect and the merge waits on a person. Here its output ends: {tail} "
-                                f"On the base it ends: {base_tail.strip()[-OUTPUT_SHOWN // 2:]}")
-                continue
+                # A base that could not run the command says nothing about it, so a
+                # failure that ran here stays this change's defect.
+                if not there:
+                    warnings.append(f"{name} ({command['command']}) fails on the base too, so it is not this "
+                                    f"change's defect and the merge waits on a person. Here its output ends: {tail} "
+                                    f"On the base it ends: {base_tail.strip()[-OUTPUT_SHOWN // 2:]}")
+                    continue
         if body.get("result") != "pass":
             why = {"unknown-count": "printed no test count the harness can read. Use a runner that reports one, "
                                     "or give the command a count_regex",

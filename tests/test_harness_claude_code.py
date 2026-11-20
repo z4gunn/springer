@@ -344,6 +344,17 @@ class MechanicalCheckTest(FakeBinCase):
         self.assertIn("No module named 'springer_no_such_module'", detail)
         self.assertNotIn("fails on the base too", detail)
 
+    def test_a_real_failure_stays_the_change_s_when_the_base_cannot_run_the_command(self):
+        """A build run's base trees had no node_modules, so lint could not run there. A unit's
+        lint ran and failed on its own error, and the base's missing eslint turned that into
+        a broken-check warning a person approved over. A base that could not run says nothing."""
+        self.write(**self.PR)
+        lint = {"name": "lint", "kind": "check",
+                "command": "python3 -c \"import sys; print('error no-unused-vars'); sys.exit(1)\""}
+        result = self.check([lint], baseline=lambda c: "sh: eslint: command not found\n")
+        self.assertEqual((result.status, result.failure_class), ("fail", "defect"))
+        self.assertIn("no-unused-vars", result.detail)
+
     def write(self, **result):
         (self.session / "result.json").write_text(json.dumps(result))
 
@@ -528,6 +539,30 @@ class RestackTest(unittest.TestCase):
             (cwd / rel).write_text(text)
         self.git(cwd, "add", "-A")
         self.git(cwd, "commit", "-qm", "work")
+
+    def test_a_rewritten_unit_branch_is_pushed_over_only_its_own_old_tip(self):
+        """A build run wedged for 25 hours: a session rebased a unit branch after pushing it, and
+        the PR push was a plain git push that origin refused as non-fast-forward."""
+        from springer_harness.providers.github import _push_rewritten
+        origin = Path(self.tmp.name) / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+        self.git(self.project, "remote", "add", "origin", str(origin))
+        branch = "unit/acme-1/U-0001"
+        self.git(self.project, "checkout", "-qb", branch)
+        self.commit(self.project, {"f.txt": "first\n"})
+        self.assertEqual(self.git(self.project, "push", "-q", "origin", branch).returncode, 0)
+        self.git(self.project, "commit", "-q", "--amend", "-m", "rewritten")
+        self.assertNotEqual(self.git(self.project, "push", "-q", "origin", branch).returncode, 0)
+        self.assertIsNone(_push_rewritten(self.project, "feat/x"), "only harness unit branches")
+        self.assertEqual(_push_rewritten(self.project, branch).returncode, 0)
+        local = self.git(self.project, "rev-parse", branch).stdout
+        self.assertEqual(self.git(origin, "rev-parse", branch).stdout, local)
+        other = Path(self.tmp.name) / "other"
+        subprocess.run(["git", "clone", "-q", "-b", branch, str(origin), str(other)], check=True)
+        self.commit(other, {"g.txt": "someone else\n"})
+        self.git(other, "push", "-q", "origin", branch)
+        self.git(self.project, "commit", "-q", "--amend", "-m", "again")
+        self.assertIsNone(_push_rewritten(self.project, branch), "a tip this branch never held is kept")
 
     def test_a_ruling_reaches_every_worktree_and_a_withdrawn_one_leaves(self):
         """The hook reads runs/_config-unlock.json from the session's own tree, and git

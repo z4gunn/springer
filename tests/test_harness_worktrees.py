@@ -136,5 +136,22 @@ class CarriedIgnoredTest(unittest.TestCase):
         self.assertEqual((scratch / ".env").read_text(), "A=1\n")
 
 
+    def test_a_base_scratch_tree_takes_node_modules_from_the_unit_when_the_person_lags(self):
+        """The person's checkout had an older lockfile than main, so every base tree in
+        the run went without node_modules. The unit's own tree tracks main."""
+        self.modules("node_modules")
+        (self.project / "package-lock.json").write_text('{"v": 2}\n')
+        git(self.project, "commit", "-qam", "lock moves on main")
+        sha = git(self.project, "rev-parse", "HEAD").stdout.strip()
+        (self.project / "package-lock.json").write_text('{"v": 1}\n')  # the person's copy lags
+        unit = self.project.parent / "unit-tree"
+        (unit / "node_modules" / ".bin").mkdir(parents=True)
+        (unit / "node_modules" / ".bin" / "unit-tool").write_text("#!/bin/sh\n")
+        (unit / "package-lock.json").write_text('{"v": 2}\n')
+        scratch = self.trees.scratch_at(sha, also=(unit,))
+        self.addCleanup(self.trees.drop_scratch, scratch)
+        self.assertTrue((scratch / "node_modules" / ".bin" / "unit-tool").is_file())
+        self.assertFalse((scratch / "node_modules" / ".bin" / "tool").exists(), "not the lagging copy")
+
 if __name__ == "__main__":
     unittest.main()

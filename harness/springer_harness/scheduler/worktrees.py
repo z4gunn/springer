@@ -31,6 +31,7 @@ def _git(cwd, *args):
 # safe to replay onto origin. Anyone else's is a person's, and is left alone.
 OWN_EMAIL = "springer@local"
 IDENTITY = ("-c", "user.name=Springer", "-c", f"user.email={OWN_EMAIL}")
+NPM_CI_TIMEOUT = 900  # a cold install of a workspace monorepo, off the tick on the gating thread
 
 
 def catch_up(path):
@@ -181,7 +182,7 @@ class Worktrees:
             exclude.parent.mkdir(parents=True, exist_ok=True)
             exclude.write_text("\n".join([*lines, pattern]) + "\n")
 
-    def _provide_node_modules(self, path):
+    def _provide_node_modules(self, path, source=None):
         """git carries no node_modules, so a fresh worktree cannot build, test, or run a
         product check, and each session either installed them or failed on it. When the
         worktree's lockfile is the project's and the project has them installed, they
@@ -189,14 +190,15 @@ class Worktrees:
         the root folder and each workspace package's own, such as packages/web/node_modules,
         which a workspace install leaves beside the package when versions conflict.
         A different lockfile, or a failed clone, leaves the install to the session.
+        source names another tree to clone them from, such as a unit's worktree.
         Returns True when the worktree has the root folder."""
-        path = Path(path)
-        lock, project_lock = path / "package-lock.json", self.local / "package-lock.json"
+        path, origin = Path(path), Path(source) if source else self.local
+        lock, project_lock = path / "package-lock.json", origin / "package-lock.json"
         if not (lock.is_file() and project_lock.is_file()) or lock.read_bytes() != project_lock.read_bytes():
             return (path / "node_modules").exists()
         clone = ["cp", "-cR"] if sys.platform == "darwin" else ["cp", "-R", "--reflink=auto"]
-        for rel in [Path("node_modules"), *self._package_node_modules()]:
-            source, target = self.local / rel, path / rel
+        for rel in [Path("node_modules"), *self._package_node_modules(origin)]:
+            source, target = origin / rel, path / rel
             if target.exists() or not source.is_dir() or not target.parent.is_dir():
                 continue
             done = subprocess.run([*clone, str(source), str(target)], capture_output=True, text=True)
@@ -205,31 +207,48 @@ class Worktrees:
                 sys.stderr.write(f"could not clone {rel} into {path}: {done.stderr.strip()[:300]}\n")
         return (path / "node_modules").exists()
 
-    def _package_node_modules(self):
-        """The project's node_modules folders one or two levels down (web/, packages/web/),
-        outside hidden folders and outside node_modules itself. A folder whose package the
-        worktree does not have is skipped by the caller."""
-        found = []
+    def _package_node_modules(self, origin=None):
+        """The node_modules folders one or two levels down (web/, packages/web/) in origin,
+        the project by default, outside hidden folders and outside node_modules itself. A
+        folder whose package the worktree does not have is skipped by the caller."""
+        origin, found = origin or self.local, []
         for pattern in ("*/node_modules", "*/*/node_modules"):
-            for source in sorted(self.local.glob(pattern)):
-                rel = source.relative_to(self.local)
+            for source in sorted(origin.glob(pattern)):
+                rel = source.relative_to(origin)
                 if source.is_dir() and not any(part.startswith(".") or part == "node_modules"
                                                for part in rel.parts[:-1]):
                     found.append(rel)
         return found
 
-    def scratch_at(self, sha):
-        """A detached worktree at sha with the project's node_modules and carried ignored
-        files, for running a gating command on a unit's base. Without the same files the
-        unit had, the base fails for a reason the unit's change did not cause, and that
-        failure would mask a real one. None when git refuses it."""
+    def scratch_at(self, sha, also=()):
+        """A detached worktree at sha with node_modules and the carried ignored files, for
+        running a gating command on a unit's base. Without the same files the unit had,
+        the base fails for a reason the unit's change did not cause, and that failure
+        would mask a real one. node_modules come from the first tree whose lockfile is the
+        base's: the person's checkout, then each of also (the unit's own worktree, which
+        tracks main while the person's checkout can lag it), else an npm ci. None when
+        git refuses the tree."""
         path = self.root / f"_base-{sha[:12]}"
         if not self._intact(path):
             _git(self.project, "worktree", "prune")
             path.parent.mkdir(parents=True, exist_ok=True)
             if _git(self.project, "worktree", "add", "--quiet", "--detach", str(path), sha).returncode:
                 return None
-        self._provide_node_modules(path)
+        provided = self._provide_node_modules(path)
+        for source in also:
+            if provided:
+                break
+            if source and Path(source).is_dir():
+                provided = self._provide_node_modules(path, source)
+        if not provided and (path / "package-lock.json").is_file() and shutil.which("npm"):
+            try:
+                done = subprocess.run(["npm", "ci", "--prefer-offline", "--no-audit", "--no-fund"], cwd=path,
+                                      capture_output=True, text=True, timeout=NPM_CI_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                sys.stderr.write(f"npm ci timed out in {path}\n")
+            else:
+                if done.returncode:
+                    sys.stderr.write(f"npm ci failed in {path}: {(done.stdout + done.stderr).strip()[-300:]}\n")
         self._carry_ignored(path)
         return path
 

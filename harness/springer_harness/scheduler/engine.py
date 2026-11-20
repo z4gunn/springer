@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ..check import review
 from ..check.gating import GatingRuns
-from ..check.mechanical import fails_at, hold_for_person, mechanical_check, needs_gating
+from ..check.mechanical import cannot_run, fails_at, hold_for_person, mechanical_check, needs_gating
 from ..check.risk import LEVELS, triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
 from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
@@ -132,6 +132,7 @@ class RunEngine:
         self.keys = self._load_keys()
         self.settings = settings or (lambda: {"ci_signal": "receipts"})
         self.gating_runs = GatingRuns()
+        self._warned = set()  # (unit, session, detail) already written, so a re-read verdict is not again
         # release(by, gate_id) starts the project's deploy and returns (out_dir, None),
         # or (None, why not). None when the daemon offers no releases (the tests' engines).
         self.release = release
@@ -425,8 +426,11 @@ class RunEngine:
                                   require_receipts=not self._spec(unit_id).get("gating_commands")
                                   and self.settings()["ci_signal"] in ("receipts", "both"))
         warnings = self.gating_runs.warnings(session_dir) if gating else []
-        if warnings and result.status == "pass":
-            self.ledger.append("check_warning", unit_id=unit_id, detail="; ".join(warnings))
+        said = (unit_id, state["sessions"][-1], "; ".join(warnings))
+        if warnings and result.status == "pass" and said not in self._warned:
+            # A tick that fails after the Check reads the same verdict again on the next.
+            self._warned.add(said)
+            self.ledger.append("check_warning", unit_id=unit_id, detail=said[2])
         return hold_for_person(result, warnings)
 
     # --- review ---
@@ -1032,20 +1036,23 @@ class RunEngine:
         if done.returncode or not sha:
             return None
         cache = self.worktrees.root / "_base" / f"{sha}.json"
-        worktrees = self.worktrees
+        worktrees, own = self.worktrees, self.worktrees.path(unit_id)
 
         def at_base(command):
             known = read_json(cache)
             known = known if isinstance(known, dict) else {}
             key = command["command"]
             if key not in known:
-                path = worktrees.scratch_at(sha)
+                path = worktrees.scratch_at(sha, also=(own,))
                 if path is None:
                     return None
                 try:
-                    known[key] = fails_at(command, cache.parent / sha / command["name"], path)
+                    said = fails_at(command, cache.parent / sha / command["name"], path)
                 finally:
                     worktrees.drop_scratch(path)
+                if said is not None and cannot_run(None, said):
+                    return said  # the base tree lacked something, which the next look may have
+                known[key] = said
                 write_json(cache, known)
             return known[key]
         return at_base
