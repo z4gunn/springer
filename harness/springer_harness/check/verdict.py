@@ -49,6 +49,7 @@ def read_result(session_dir):
                        code_review=data.get("code_review"))
 
 
-def risk_for(result, baseline):
-    """Baseline from the spec, raised by the path rules and by reviewers, never lowered."""
-    return level_for(result.touched_paths, baseline, result.raised_level)
+def risk_for(result, baseline, reason=None):
+    """Baseline from the spec, raised by the path rules and by reviewers. The plan's L2
+    counts only with its reason (see risk.baseline_for)."""
+    return level_for(result.touched_paths, baseline, result.raised_level, reason)

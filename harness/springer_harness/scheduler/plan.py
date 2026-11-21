@@ -14,6 +14,7 @@ class UnitDraft:
     declared_paths: tuple = ()
     depends_on: tuple = ()  # keys in this run, across batches
     risk_baseline: str = "L0"
+    risk_reason: str | None = None  # the gate-list reason an L2 baseline needs to stand
     model_tier: str = "sonnet"
     workstream: str | None = None
     executable_check: str | None = None

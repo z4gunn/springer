@@ -24,5 +24,14 @@ def raise_level(*levels):
     return max((level for level in levels if level), key=LEVELS.index)
 
 
-def level_for(paths, baseline, reviewer=None):
-    return raise_level(baseline, "L2" if triggers(paths) else "L0", reviewer)
+PLAN_REASONS = ("auth", "data-model", "billing", "vendor", "infra", "irreversible")
+
+
+def baseline_for(baseline, reason=None):
+    """The plan's L2 stands only with a reason from the gate list. Without one the files
+    the change touched decide, so a blanket L2 never holds an ordinary merge for a person."""
+    return "L1" if baseline == "L2" and reason not in PLAN_REASONS else baseline
+
+
+def level_for(paths, baseline, reviewer=None, reason=None):
+    return raise_level(baseline_for(baseline, reason), "L2" if triggers(paths) else "L0", reviewer)

@@ -120,6 +120,9 @@
         }
       }
     },
+    "risk_reason": {
+      "type": ["string", "null"]
+    },
     "risk_baseline": {
       "type": "string",
       "enum": [

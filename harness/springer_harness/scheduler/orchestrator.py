@@ -15,6 +15,7 @@ import threading
 import time
 from pathlib import Path
 
+from ..check.risk import PLAN_REASONS
 from ..common import read_json, write_json
 from ..providers.claude_code import run_once
 from .engine import REQUESTABLE_GATE_TYPES
@@ -52,7 +53,8 @@ SCHEMA = {
                 "expected_outcome": {"type": "string"}, "brief": {"type": "string"},
                 "declared_paths": {"type": "array", "items": {"type": "string"}},
                 "depends_on": {"type": "array", "items": {"type": "string"}},
-                "risk_baseline": {"enum": list(LEVELS)}, "model_tier": {"enum": list(TIERS)},
+                "risk_baseline": {"enum": list(LEVELS)},
+                "risk_reason": {"enum": [*PLAN_REASONS, None]}, "model_tier": {"enum": list(TIERS)},
                 "executable_check": {"type": ["string", "null"]},
                 "gating_commands": {"type": "array", "items": GATING},
                 "story_ids": {"type": "array", "items": {"type": "string"}}}}},
@@ -107,8 +109,11 @@ Rules for the schema:
 - story_ids: the backlog items the unit builds (e.g. STORY-2026-046), from the
   prioritized-backlog artifact, so the board shows each story where its unit is. Empty
   for work outside the backlog (the PRD, a design unit, a vertical consult).
-- risk_baseline: L0 for docs and artifacts, L2 for code that touches auth, data model,
-  billing, infra, or CI, L3 for a unit that must not start before a person decides.
+- risk_baseline: L0 for docs and artifacts, L1 for code, L3 for a unit that must not start
+  before a person decides. The harness raises a pull request to L2 itself from the files
+  it touches (auth, tenancy, migrations, payments, secrets, uploads, dependencies, CI), so
+  do not set L2 for those. Set L2 only for a risk the file paths cannot show, and name it
+  in risk_reason ({reasons}). An L2 without a risk_reason is read as L1.
 - gates: only the gates the autonomy level fires (under standard, one direction-review
   holding the units that need the picked option and direction). holds names unit keys.
 - When the run brief's lane is polish, the run takes the one issue in run_brief.issue,
@@ -257,7 +262,8 @@ class OrchestratorPlanner:
         refused = (f"Your last answer was refused: {self._refused}. Return a batch without that problem.\n\n"
                    if self._refused else "")
         prompt = PROMPT.format(run_id=self.run_id, agents=", ".join(self._agents()), refused=refused,
-                               build_agents=", ".join(BUILD_AGENTS), state=json.dumps(state, indent=1))
+                               build_agents=", ".join(BUILD_AGENTS),
+                               reasons=", ".join(PLAN_REASONS), state=json.dumps(state, indent=1))
         record = {"n": n, "asked_at": time.time(), "prompt": prompt}
         try:
             found = run_once(self.binary, self.project, prompt, agent="spgr-agent-orchestrator", model=self.model,
@@ -313,7 +319,8 @@ class OrchestratorPlanner:
     def _to_batch(self, output):
         units = [UnitDraft(key=u["key"], agent=u["agent"], expected_outcome=u["expected_outcome"], brief=u["brief"],
                            declared_paths=tuple(u["declared_paths"]), depends_on=tuple(u["depends_on"]),
-                           risk_baseline=u["risk_baseline"], model_tier=u["model_tier"],
+                           risk_baseline=u["risk_baseline"], risk_reason=u.get("risk_reason"),
+                           model_tier=u["model_tier"],
                            executable_check=u.get("executable_check"),
                            gating_commands=tuple(dict(g) for g in u.get("gating_commands") or ()),
                            story_ids=tuple(u.get("story_ids") or ()))

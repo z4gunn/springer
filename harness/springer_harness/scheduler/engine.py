@@ -13,7 +13,7 @@ from pathlib import Path
 from ..check import review
 from ..check.gating import GatingRuns
 from ..check.mechanical import cannot_run, fails_at, hold_for_person, mechanical_check, needs_gating
-from ..check.risk import LEVELS, triggers
+from ..check.risk import LEVELS, baseline_for, triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
 from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
 from ..errors import IllegalTransition, RunExternallyHeld
@@ -362,9 +362,13 @@ class RunEngine:
         if self._spec(unit_id).get("review_of"):
             self._finish_review(unit_id, state, result)
             return
-        level = risk_for(result, self._spec(unit_id)["risk_baseline"])
+        spec = self._spec(unit_id)
+        reason = spec.get("risk_reason")
+        level = risk_for(result, spec["risk_baseline"], reason)
+        planned = [f"plan:{reason}"] if baseline_for(spec["risk_baseline"], reason) == "L2" else []
         write_json(self.units.unit_dir(unit_id) / "risk.json",
-                   {"level": level, "triggers": triggers(result.touched_paths), "findings": list(result.findings)})
+                   {"level": level, "triggers": triggers(result.touched_paths) + planned,
+                    "findings": list(result.findings)})
         if self._lands_nothing(unit_id, result):
             # Nothing of its own to land. Its findings are in the run store, and a stacked
             # parent's code is that parent's change, never a second one.
@@ -976,7 +980,8 @@ class RunEngine:
                     "brief": draft.brief, "input_artifact_refs": [], "expected_outcome": draft.expected_outcome,
                     "workstream": draft.workstream, "declared_paths": list(draft.declared_paths), "allowlist": [],
                     "mcp_config_ref": None, "budget": {"tokens": 200000, "wall_clock_seconds": draft.wall_clock_seconds},
-                    "risk_baseline": draft.risk_baseline, "dependencies": [self.keys[k] for k in draft.depends_on],
+                    "risk_baseline": draft.risk_baseline, "risk_reason": draft.risk_reason,
+                    "dependencies": [self.keys[k] for k in draft.depends_on],
                     "executable_check": draft.executable_check,
                     "gating_commands": [dict(g) for g in draft.gating_commands],
                     "story_ids": list(draft.story_ids)}

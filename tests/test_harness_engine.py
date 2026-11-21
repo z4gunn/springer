@@ -539,8 +539,27 @@ class MergePolicyTest(EngineCase):
     def test_risk_rules_raise_and_never_lower(self):
         self.assertEqual(level_for(["src/ok.ts"], "L0"), "L0")
         self.assertEqual(level_for(["src/auth/x.ts"], "L0"), "L2")
-        self.assertEqual(level_for(["src/ok.ts"], "L2", "L1"), "L2")
+        self.assertEqual(level_for(["src/ok.ts"], "L1", "L2"), "L2")
         self.assertEqual(level_for(["pnpm-lock.yaml"], "L1"), "L2")
+
+    def test_a_plan_l2_stands_only_with_a_gate_list_reason(self):
+        self.assertEqual(level_for(["src/ok.ts"], "L2"), "L1")
+        self.assertEqual(level_for(["src/ok.ts"], "L2", reason="because"), "L1")
+        self.assertEqual(level_for(["src/ok.ts"], "L2", reason="vendor"), "L2")
+        self.assertEqual(level_for(["src/auth/x.ts"], "L2"), "L2")
+        self.assertEqual(level_for(["src/ok.ts"], "L3"), "L3")
+
+    def test_a_blanket_l2_unit_merges_alone_under_autopilot(self):
+        engine = self.engine([batch(unit("a", agent="routine", risk_baseline="L2"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertEqual(self.host.merged, [1])
+
+    def test_an_l2_unit_with_a_reason_waits_on_a_person_and_says_why(self):
+        engine = self.engine([batch(unit("a", agent="routine", risk_baseline="L2", risk_reason="vendor"))])
+        self.tick_until(engine, lambda: any(g["content"]["checkpoint_type"] == "pr-merge" for g in engine.gates.all()))
+        self.assertEqual(self.host.merged, [])
+        risk = json.loads((engine.units.unit_dir("U-0001") / "risk.json").read_text())
+        self.assertEqual((risk["level"], risk["triggers"]), ("L2", ["plan:vendor"]))
 
     def test_l0_merges_alone_and_writes_no_gate(self):
         engine = self.engine([batch(unit("a", agent="routine"))])
