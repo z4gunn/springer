@@ -54,16 +54,21 @@ class GitHubSourceHost:
         return self._gh(project, "pr", "create", "--base", base, "--head", branch, "--title", title,
                         "--body", body).strip().splitlines()[-1]
 
-    def open(self, project, branch, base, title=""):
-        """Push a branch and return the number of its open PR, opening one when the
-        session reported a PR outcome without opening it. A PR the branch already has
-        is reused, so a retry never opens a second."""
+    def push(self, project, branch):
+        """Send a unit branch's commits to its pull request. A retry commits its fix
+        without pushing, and CI and the reviewer read only what the host has."""
         path = self.project_path_of(project)
         pushed = _run(["git", "push", "--quiet", "-u", "origin", branch], path)
         if pushed.returncode:
             pushed = _push_rewritten(path, branch) or pushed
         if pushed.returncode:
             raise GitHubError(f"git push {branch} failed: {pushed.stderr.strip()[-400:]}")
+
+    def open(self, project, branch, base, title=""):
+        """Push a branch and return the number of its open PR, opening one when the
+        session reported a PR outcome without opening it. A PR the branch already has
+        is reused, so a retry never opens a second."""
+        self.push(project, branch)
         found = json.loads(self._gh(project, "pr", "list", "--head", branch, "--state", "open",
                                     "--json", "number") or "[]")
         if found:

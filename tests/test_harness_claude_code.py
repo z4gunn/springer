@@ -564,6 +564,20 @@ class RestackTest(unittest.TestCase):
         self.git(self.project, "commit", "-q", "--amend", "-m", "again")
         self.assertIsNone(_push_rewritten(self.project, branch), "a tip this branch never held is kept")
 
+    def test_a_push_sends_a_later_commit_to_the_branch_s_pull_request(self):
+        from springer_harness.providers.github import GitHubSourceHost
+        origin = Path(self.tmp.name) / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+        self.git(self.project, "remote", "add", "origin", str(origin))
+        branch = "unit/acme-1/U-0001"
+        self.git(self.project, "checkout", "-qb", branch)
+        self.commit(self.project, {"f.txt": "first\n"})
+        host = GitHubSourceHost(lambda project: self.project)
+        host.push("acme", branch)
+        self.commit(self.project, {"f.txt": "the fix\n"})
+        host.push("acme", branch)
+        self.assertEqual(self.git(origin, "rev-parse", branch).stdout, self.git(self.project, "rev-parse", branch).stdout)
+
     def test_a_ruling_reaches_every_worktree_and_a_withdrawn_one_leaves(self):
         """The hook reads runs/_config-unlock.json from the session's own tree, and git
         does not carry the run store, so a ruling the human made once reached no unit."""

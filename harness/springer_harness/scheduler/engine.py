@@ -395,6 +395,10 @@ class RunEngine:
     def _opened(self, unit_id, pr):
         """On GitHub the session opened the PR and reports its number. On the local host
         the harness opens the change, and a retry reuses the change its branch has."""
+        if pr.get("number") is not None and hasattr(self.source_host, "push"):
+            # The session opened the PR, and a later session's fix is only on the local
+            # branch. Unpushed, the PR keeps its old CI result and no approval can merge it.
+            self.source_host.push(self.project_slug, pr.get("branch") or self.worktrees.branch(unit_id))
         if pr.get("number") is not None or not hasattr(self.source_host, "open"):
             return pr
         # The harness picks the base. A session reports the branch it started on, which is

@@ -561,6 +561,16 @@ class MergePolicyTest(EngineCase):
         risk = json.loads((engine.units.unit_dir("U-0001") / "risk.json").read_text())
         self.assertEqual((risk["level"], risk["triggers"]), ("L2", ["plan:vendor"]))
 
+    def test_a_retry_s_fix_is_pushed_to_the_pull_request_the_session_opened(self):
+        """A build run sat for a day on approved merges: the fix was committed on the unit
+        branch and never pushed, so the PR kept its failed CI run."""
+        pushed = []
+        self.host.push = lambda project, branch: pushed.append(branch)
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertEqual(len(pushed), 1)
+        self.assertTrue(pushed[0].endswith("U-0001"), pushed)
+
     def test_l0_merges_alone_and_writes_no_gate(self):
         engine = self.engine([batch(unit("a", agent="routine"))])
         self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
