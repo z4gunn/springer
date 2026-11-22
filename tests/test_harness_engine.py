@@ -691,6 +691,17 @@ class MergePolicyTest(EngineCase):
         self.assertEqual(self.events(engine, "merge_failed")[0]["pr"], 1)
         self.assertEqual(self.host.merged, [])
 
+    def test_a_conflicting_pr_whose_checks_never_run_goes_back_to_its_builder(self):
+        """An approved PR waited without end: it conflicted with main, the host ran no
+        checks on it, and the merge only ever read the checks."""
+        self.host.check_states = {1: ("pending", "no checks have reported yet")}
+        self.host.mergeable_states = {1: "conflicting"}
+        self.provider.script["routine"].append(Attempt(result=pr_result(1, touched=("packages/ui/button.tsx",))))
+        engine = self.actions_engine()
+        self.tick_until(engine, lambda: len(self.provider.spawned) == 2)
+        self.assertIn("PR 1 conflicts with main", self.provider.spawned[-1].brief)
+        self.assertEqual(self.host.merged, [])
+
     def test_a_merge_refused_for_another_reason_blocks_for_a_person(self):
         self.host.merge_errors = {1: "gh pr merge failed: branch protection"}
         engine = self.engine([batch(unit("a", agent="routine"))])

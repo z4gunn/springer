@@ -837,6 +837,10 @@ class RunEngine:
             self.units.transition(unit_id, "retry", f"defect: CI failed on PR {number}",
                                   retries_spent=state["retries_spent"] + 1)
             self._retire_merge_gates(unit_id)
+        elif getattr(self.source_host, "mergeable", lambda *_: "unknown")(self.project_slug, number) == "conflicting":
+            # The host runs no checks on a PR that conflicts with its base, so waiting
+            # for them never ends. The conflict is handled as a refused merge would be.
+            self._merge_failed(unit_id, state, number, f"PR {number} conflicts with its base, so its checks never ran")
         return False
 
     def _apply_answers(self):
