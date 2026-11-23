@@ -266,6 +266,11 @@ class RunEngine:
     def reconcile(self):
         for state in self.units.by_state("running"):
             unit_id = state["unit_id"]
+            if not state["sessions"]:
+                # The claim stood and the spawn raised (the provider's binary was being
+                # replaced), so there is no session to reconcile. The unit goes again.
+                self.units.transition(unit_id, "redispatch", "the session never started")
+                continue
             session_id = state["sessions"][-1]
             handle = self.handles.get((unit_id, session_id))
             store = self.sessions(unit_id)

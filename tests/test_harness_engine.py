@@ -524,6 +524,27 @@ def brief_with_autonomy(project, autonomy):
     store.path.write_text(render({**front, "autonomy": autonomy}, sections))
 
 
+class SpawnFailureTest(EngineCase):
+    def test_a_unit_whose_session_never_started_goes_again(self):
+        """A build run wedged on every tick: the provider's binary was replaced during a
+        spawn, the unit stayed running with no session, and reconcile read its last one."""
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.provider.script["routine"] = [Attempt(result=pr_result(1, touched=("packages/ui/button.tsx",)))]
+        spawn, calls = engine._spawn, []
+
+        def flaky(unit_id, state):
+            calls.append(unit_id)
+            if len(calls) == 1:
+                raise FileNotFoundError("claude")
+            return spawn(unit_id, state)
+        engine._spawn = flaky
+        with self.assertRaises(FileNotFoundError):
+            for _ in range(5):
+                engine.tick()
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") in ("gated", "done"))
+        self.assertEqual(len(calls), 2)
+
+
 class MergePolicyTest(EngineCase):
     def setUp(self):
         super().setUp()
