@@ -30,6 +30,9 @@ def _push_rewritten(path, branch):
     return _run(["git", "push", "--quiet", "-u", f"--force-with-lease={branch}:{tip}", "origin", branch], path)
 
 
+RUNNER_FAULT = "the job failed with every step green"
+
+
 class GitHubError(RuntimeError):
     pass
 
@@ -106,9 +109,15 @@ class GitHubSourceHost:
         if not checks:
             return "pending", "no checks have reported yet"
         failed = [c["name"] for c in checks if c.get("bucket") in ("fail", "cancel")]
+        pending = any(c.get("bucket") == "pending" for c in checks)
+        if failed and pending:
+            # GitHub serves a failed run's log, and reruns it, only once the whole run
+            # is over, so a failure read mid-run reached the builder with no log and
+            # could not be told from a runner fault.
+            return "pending", "failed: " + ", ".join(failed) + ", waiting for the other checks to finish"
         if failed:
             return "fail", "failed: " + ", ".join(failed)
-        if any(c.get("bucket") == "pending" for c in checks):
+        if pending:
             return "pending", "checks still running"
         return "pass", f"{len(checks)} check(s) green"
 
@@ -130,11 +139,25 @@ class GitHubSourceHost:
         instead of a session spent finding it, and the engine can tell a runner that ran
         out of memory from a test that failed."""
         tails = []
+        path = self.project_path_of(project)
         for run_id in self._failed_runs(project, number):
-            done = _run(["gh", "run", "view", run_id, "--log-failed"], self.project_path_of(project))
+            tails += self._green_step_failures(path, run_id)
+            done = _run(["gh", "run", "view", run_id, "--log-failed"], path)
             lines = [line.split("\t", 2)[-1] for line in (done.stdout or "").splitlines() if line.strip()]
             tails.append("\n".join(lines)[-limit:])
-        return "\n".join(tails)[-limit * 2:]
+        return "\n".join(t for t in tails if t)[-limit * 2:]
+
+    def _green_step_failures(self, path, run_id):
+        """A job that failed while every step passed failed on the runner, not in the
+        change (a self-hosted runner did this on a PR whose build was green)."""
+        done = _run(["gh", "run", "view", run_id, "--json", "jobs"], path)
+        try:
+            jobs = json.loads(done.stdout or "{}").get("jobs") or []
+        except ValueError:
+            return []
+        return [f"{job.get('name')}: {RUNNER_FAULT}" for job in jobs
+                if job.get("conclusion") == "failure"
+                and not any(step.get("conclusion") == "failure" for step in job.get("steps") or [])]
 
     def rerun(self, project, number):
         """Rerun the failed jobs of the PR's failed Actions runs. Returns the runs rerun."""

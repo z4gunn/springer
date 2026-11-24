@@ -929,6 +929,39 @@ class GitHubTest(FakeBinCase):
         self.assertIn(["run", "rerun", "451", "--failed"], calls)
         self.assertNotIn(["run", "rerun", "452", "--failed"], calls)
 
+    def test_a_failure_while_other_checks_run_waits_for_the_run_to_finish(self):
+        """GitHub serves a failed log only once the run is over, so a failure read
+        mid-run reached the builder with no log."""
+        from springer_harness.providers import github
+        project = git_project(self.root / "acme")
+        host = GitHubSourceHost(lambda slug: project)
+        out = json.dumps([{"name": "build", "bucket": "fail"}, {"name": "acceptance", "bucket": "pending"}])
+        with mock.patch.object(github, "_run", return_value=subprocess.CompletedProcess([], 0, out, "")):
+            status, detail = host.checks("acme", 7)
+        self.assertEqual(status, "pending")
+        self.assertIn("failed: build", detail)
+
+    def test_a_job_that_failed_with_every_step_green_reads_as_a_runner_fault(self):
+        from springer_harness.providers import github
+        from springer_harness.scheduler.engine import INFRA_FAILURE
+        project = git_project(self.root / "acme")
+        host = GitHubSourceHost(lambda slug: project)
+        jobs = {"jobs": [{"name": "build", "conclusion": "failure",
+                          "steps": [{"name": "Lint", "conclusion": "success"}]},
+                         {"name": "acceptance", "conclusion": "success", "steps": []}]}
+
+        def run(cmd, cwd):
+            if cmd[:3] == ["gh", "pr", "checks"]:
+                return subprocess.CompletedProcess(cmd, 0, json.dumps(
+                    [{"bucket": "fail", "link": "https://github.com/o/r/actions/runs/9/job/1"}]), "")
+            if "--json" in cmd and "jobs" in cmd:
+                return subprocess.CompletedProcess(cmd, 0, json.dumps(jobs), "")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        with mock.patch.object(github, "_run", side_effect=run):
+            log = host.failure_log("acme", 7)
+        self.assertIn("build: the job failed with every step green", log)
+        self.assertTrue(INFRA_FAILURE.search(log))
+
     def test_a_label_is_created_and_added_to_the_pr(self):
         project = git_project(self.root / "acme")
         GitHubSourceHost(lambda slug: project).label("acme", 7, "springer:hosted-ci")

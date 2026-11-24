@@ -110,7 +110,8 @@ def _git_out(cwd, *args):
 
 # A CI failure that is the runner's, not the change's, gets a rerun before a session.
 INFRA_FAILURE = re.compile(r"heap out of memory|Reached heap limit|exit code 13[47]\b|runner has received a shutdown"
-                           r"|lost communication with the server|No space left on device|ETIMEDOUT|ECONNRESET", re.I)
+                           r"|lost communication with the server|No space left on device|ETIMEDOUT|ECONNRESET"
+                           r"|the job failed with every step green", re.I)
 CI_RERUN_GRACE = 180
 HOSTED_CI_LABEL = "springer:hosted-ci"
 
