@@ -13,7 +13,7 @@ from harness_support import HAVE_JSONSCHEMA, OWNER, EngineCase, registry, schema
 
 from springer_harness.check.risk import level_for
 from springer_harness.check.verdict import normalize_findings
-from springer_harness.common import iso
+from springer_harness.common import iso, read_json
 from springer_harness.errors import IllegalTransition
 from springer_harness.providers.mock import Attempt, MockProvider, fail_result, pr_result
 from springer_harness.scheduler.engine import overlaps
@@ -1130,6 +1130,19 @@ class RecoveryTest(EngineCase):
         self.assertEqual(self.states(fresh)["U-0001"], "blocked")
         self.assertTrue(list((fresh.run_dir / "artifacts").glob("E-*.json")))
 
+    def test_answering_a_blocked_unit_s_gate_resolves_its_escalation(self):
+        """Run-state listed nine open escalations after every unit they named had merged."""
+        engine = self._gated()
+        self.host.prs[9] = "closed"
+        fresh = self.restart(engine)
+        gate = next(g["content"] for g in fresh.gates.open_gates() if g["content"]["artifact_ref"].startswith("E-"))
+        fresh.gates.answer(gate["checkpoint_id"], "retry", "human", free_text="reopened the PR")
+        fresh.tick()
+        escalation = read_json(fresh.run_dir / "artifacts" / f"{gate['artifact_ref']}.json")["content"]
+        self.assertEqual(escalation["status"], "resolved")
+        self.assertIn("reopened the PR", escalation["resolution_notes"])
+        self.assertNotIn(gate["artifact_ref"], fresh.project()["content"]["open_escalations"])
+
     def test_an_orphan_worktree_is_removed_and_a_retrying_one_is_kept(self):
         self.provider.script["spgr-agent-backend-developer"] = [Attempt(result=fail_result("defect")), Attempt()]
         engine = self.engine([batch(unit("a"))])
@@ -1233,6 +1246,30 @@ class CannedRunTest(EngineCase):
         self.assertIn("run 1 shipped the stories", line[0]["detail"])
         if HAVE_JSONSCHEMA:
             self.assertEqual(schema_errors("pdca-cycle-v1", engine.cycles.all()[0]), [])
+
+    def test_a_plan_that_routes_nothing_and_is_not_done_asks_the_person_once(self):
+        """A planner returned no units, no gates and done false. Its empty answer stood
+        until something changed, nothing did, and the run sat ten hours with nobody told."""
+        engine = self.engine([batch(unit("a"))])
+        engine.planner.finished = lambda: False
+        engine.planner.idle = lambda: "plan-002"
+        engine.planner.latest_rationale = lambda: "every remaining story needs email"
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        engine.tick()
+        engine.tick()
+        asked = [g["content"] for g in engine.gates.all() if g["content"]["context"].get("idle_plan")]
+        self.assertEqual(len(asked), 1, "one question per idle plan")
+        self.assertEqual(asked[0]["checkpoint_type"], "scope-review")
+        self.assertIn("every remaining story needs email", asked[0]["decision_prompt"])
+        engine.gates.answer(asked[0]["checkpoint_id"], "plan again", "human")
+        engine.tick()
+        self.assertEqual(len([g for g in engine.gates.all() if g["content"]["context"].get("idle_plan")]), 1)
+        self.assertFalse(engine.cycles.is_complete())
+        engine.planner.idle = lambda: "plan-003"
+        engine.tick()
+        self.assertEqual(len([g for g in engine.gates.all() if g["content"]["context"].get("idle_plan")]), 2)
+        if HAVE_JSONSCHEMA:
+            self.assertEqual(schema_errors("hil-checkpoint-v2", engine.gates.all()[-1], registry()), [])
 
     def release_run(self, answer, foreign_gate=False):
         """Drive to the release gate, answering every other gate with its first option."""

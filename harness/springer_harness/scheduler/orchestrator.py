@@ -137,8 +137,12 @@ Rules for the schema:
 - A unit whose PR is open (state gated) is not a reason to wait. Work that builds on it
   depends_on its key: that unit's worktree starts from the open PR's branch, its own PR
   stacks on that branch, and it merges after the first one. Route that work now.
+- open_stories in the run state is every open item on the project backlog, read for
+  you, with the units that carried it. Route from it and do not run a script to re-read
+  the backlog. Before you return no units, name each open MVP story and why it is held.
 - done: true only when the profile's work is finished and nothing remains to route.
-  Return an empty units list with done false when everything left is held.
+  Return an empty units list with done false when everything left is held. The harness
+  then puts your rationale to the person as a question, so name what would unblock it.
 
 {refused}Run state:
 {state}
@@ -188,6 +192,21 @@ class OrchestratorPlanner:
     def finished(self):
         latest = self._latest()
         return bool(latest and latest.get("output", {}).get("done") and not latest["output"].get("units"))
+
+    def idle(self):
+        """The newest plan's name when it routed nothing, opened no gate, and did not call
+        the run done. Its empty answer stands until something changes, so without a
+        question to the person the run sits silent (a live run idled 10h on one)."""
+        with self._lock:
+            if self._thread and self._thread.is_alive():
+                return None
+        plans = sorted(self.folder.glob("plan-*.json")) if self.folder.is_dir() else []
+        if not plans:
+            return None
+        output = (read_json(plans[-1]) or {}).get("output", {})
+        if output.get("done") or output.get("units") or output.get("gates"):
+            return None
+        return plans[-1].stem
 
     def latest_rationale(self):
         latest = self._latest()
@@ -239,8 +258,27 @@ class OrchestratorPlanner:
                              if any(d.get("response") for d in content.get("decisions") or []) else {})})
         artifacts = sorted(p.name for p in (self.run_dir / "artifacts").glob("*.json") if not p.name.startswith("G-"))
         return {"run_brief": brief.get("content", brief), "keys_used": read_json(self.run_dir / "unit-keys.json", {}),
-                "units": units, "gates": gates, "artifacts": artifacts,
+                "units": units, "gates": gates, "artifacts": artifacts, "open_stories": self._open_stories(),
                 "earlier_plans": [p.get("output", {}).get("rationale") for p in self._plans()]}
+
+    def _open_stories(self):
+        """The backlog's open items, so the planner need not script a read of the file.
+        A planner whose reading script the allowlist refused carried over an old reading
+        and never routed two MVP features."""
+        backlog = read_json(self.project / "runs" / "_backlog.json") or {}
+        stories = []
+        for epic in backlog.get("epics") or []:
+            for feature in epic.get("features") or []:
+                for story in feature.get("stories") or []:
+                    if story.get("closed"):
+                        continue
+                    stories.append({"story_id": story.get("story_id"), "feature_id": feature.get("feature_id"),
+                                    "mvp": bool(feature.get("mvp")) and not feature.get("deferred"),
+                                    "title": _summary(story.get("title"), 120),
+                                    "depends_on": story.get("depends_on") or [],
+                                    "unit_ids": story.get("unit_ids") or [], "pr": story.get("pr"),
+                                    **({"note": _summary(story["note"], 200)} if story.get("note") else {})})
+        return stories
 
     def _fingerprint(self):
         state = self.state()

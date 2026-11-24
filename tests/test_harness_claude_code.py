@@ -462,6 +462,29 @@ class OrchestratorTest(FakeBinCase):
         time.sleep(0.2)
         self.assertEqual(len(self.calls()), before)
 
+    def test_an_empty_answer_is_idle_and_names_its_plan(self):
+        """An empty not-done plan left a run silent. The engine asks the person, once per plan."""
+        self.plan_file.write_text(json.dumps({**self.PLAN, "units": []}))
+        self.assertIsNone(self.ask())
+        self.assertEqual(self.planner.idle(), "plan-001")
+        self.plan_file.write_text(json.dumps({**self.PLAN, "units": [], "done": True}))
+        (self.project / "runs/acme-1/plan/plan-001.json").write_text(json.dumps({"output": {"done": True}}))
+        self.assertIsNone(self.planner.idle())
+
+    def test_the_state_lists_the_open_backlog_stories(self):
+        """A planner whose script to read the backlog was refused carried over an old reading
+        and never routed two MVP features."""
+        backlog = {"epics": [{"features": [
+            {"feature_id": "FEAT-19", "mvp": True, "stories": [
+                {"story_id": "STORY-2026-078", "title": "Candidate page", "unit_ids": []},
+                {"story_id": "STORY-2026-077", "title": "Email", "closed": {"at": "x"}}]},
+            {"feature_id": "F-DEFERRED", "mvp": True, "deferred": True, "stories": [
+                {"story_id": "DEFERRED-1", "title": "Later"}]}]}]}
+        (self.project / "runs/_backlog.json").write_text(json.dumps(backlog))
+        stories = self.planner.state()["open_stories"]
+        self.assertEqual([(s["story_id"], s["feature_id"], s["mvp"]) for s in stories],
+                         [("STORY-2026-078", "FEAT-19", True), ("DEFERRED-1", "F-DEFERRED", False)])
+
     def test_a_batch_naming_an_unknown_agent_is_refused_and_logged(self):
         self.plan_file.write_text(json.dumps({**self.PLAN, "units": [{**self.PLAN["units"][0], "agent": "nobody"}]}))
         self.assertIsNone(self.ask())

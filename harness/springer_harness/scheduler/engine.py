@@ -250,6 +250,8 @@ class RunEngine:
             self.derive_ready()
             self.dispatch()
         self.finish_if_done()
+        if not paused and not self.cycles.is_complete():
+            self.ask_when_idle()
         self.project()
         return "complete" if self.cycles.is_complete() else "ticked"
 
@@ -855,6 +857,7 @@ class RunEngine:
             response = content["response"]
             if not response or content["digest"] or content["context"].get("retired"):
                 continue
+            self._resolve_escalation(content)
             for unit_id in content["holds"]:
                 state = self.units.state(unit_id)
                 option = response["option"]
@@ -873,6 +876,22 @@ class RunEngine:
                     self._append_note(unit_id, self._answer_note(content, response))
                     self.units.transition(unit_id, "ready", f"gate {content['checkpoint_id']} answered {option}",
                                           retries_spent=0)
+
+    def _resolve_escalation(self, content):
+        """The blocked card's escalation closes with its gate. Left open, run-state listed
+        nine escalations a day after every unit they named had merged."""
+        ref = content.get("artifact_ref") or ""
+        path = self.run_dir / "artifacts" / f"{ref}.json"
+        if not ref.startswith("E-") or not path.exists():
+            return
+        artifact = read_json(path)
+        if artifact["content"].get("status") != "open":
+            return
+        response = content["response"]
+        artifact["content"]["status"] = "resolved"
+        artifact["content"]["resolution_notes"] = (f"{content['checkpoint_id']} answered {response['option']}"
+                                                   + (f": {response['free_text']}" if response.get("free_text") else ""))[:1000]
+        write_json(path, artifact)
 
     def _record_unlock(self, gate_id, entries):
         """Add the approved paths to the project's rulings. The unit's worktree gets a
@@ -1166,6 +1185,30 @@ class RunEngine:
             if self._held_for_release():
                 return
             self.cycles.complete_run()
+
+    def ask_when_idle(self):
+        """A plan that routes nothing and is not done leaves the run with nothing moving
+        and nobody asked. One gate puts the planner's reasons in front of the person, and
+        the answer changes the run state, so the planner is asked again and reads it."""
+        plan = getattr(self.planner, "idle", lambda: None)()
+        if not plan or not self.units.ids():
+            return
+        moving = ("planned", "ready", "running", "returned", "checking", "retry", "redispatch")
+        if any(s["state"] in moving for s in self.open_units()):
+            return
+        gates = self.gates.all()
+        if any(g["content"]["response"] is None and not g["content"]["digest"] for g in gates):
+            return
+        if any(g["content"]["context"].get("idle_plan") == plan for g in gates):
+            return
+        latest = getattr(self.planner, "latest_rationale", lambda: None)() or "The plan gave no reason."
+        gate = self.gates.open(
+            "scope-review", "L3", [], f"The plan routed nothing and the run is not done. {latest}"[:3000],
+            [{"option": "plan again", "consequence": "The planner is asked again and reads your note.",
+              "recommended_because": "Name what it missed, or what you have unblocked, in the note."},
+             {"option": "leave idle", "consequence": "The run waits until something else changes."}],
+            context={"idle_plan": plan})
+        self.ledger.append("plan_idle", gate_id=gate["content"]["checkpoint_id"], plan=plan)
 
     def _complete_with_no_work(self):
         latest = getattr(self.planner, "latest_rationale", lambda: None)()
