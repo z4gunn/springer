@@ -713,6 +713,40 @@ class MergePolicyTest(EngineCase):
         notes = (engine.units.unit_dir("U-0001") / "redispatch-notes.txt").read_text()
         self.assertIn("CI failed on PR 1: failed: conformance", notes)
 
+    def lane(self, engine, lane):
+        brief = engine.run_dir / "run-brief.json"
+        doc = read_json(brief) or {"content": {}}
+        doc.setdefault("content", {})["lane"] = lane
+        brief.parent.mkdir(parents=True, exist_ok=True)
+        brief.write_text(json.dumps(doc))
+
+    def test_a_build_lane_left_out_of_hosted_ci_lanes_merges_on_local_checks(self):
+        """Hosted CI minutes ran out on build runs. A build run proves its changes with
+        the project's checks on this machine and never waits on Actions."""
+        self.host.check_states = {1: ("pending", "checks still running")}
+        labels = []
+        self.host.label = lambda project, number, name: labels.append((number, name))
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        engine.settings = lambda: {"ci_signal": "both", "hosted_ci_lanes": ["polish"]}
+        self.lane(engine, "build")
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertEqual((self.host.merged, labels), ([1], []))
+
+    def test_a_polish_lane_in_hosted_ci_lanes_labels_its_pr_and_waits_for_ci(self):
+        self.host.check_states = {1: ("pending", "checks still running")}
+        labels = []
+        self.host.label = lambda project, number, name: labels.append((number, name))
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        engine.settings = lambda: {"ci_signal": "both", "hosted_ci_lanes": ["polish"]}
+        self.lane(engine, "polish")
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "gated")
+        for _ in range(3):
+            engine.tick()
+        self.assertEqual((self.states(engine)["U-0001"], labels), ("gated", [(1, "springer:hosted-ci")]))
+        self.host.check_states = {1: ("pass", "2 check(s) green")}
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+        self.assertEqual(labels, [(1, "springer:hosted-ci")], "labelled once")
+
     def test_a_runner_out_of_memory_reruns_ci_once_without_a_session(self):
         """17 of 20 CI failures in one run were ESLint out of heap on the runner, and each
         sent the unit back to its builder and a fresh review."""

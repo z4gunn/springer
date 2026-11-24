@@ -32,6 +32,9 @@ class Args(BaseModel):
 class ProjectConfigure(Args):
     ci_signal: Literal["receipts", "self-hosted-actions", "both"] | None = None
     source_host: Literal["local", "github"] | None = None
+    # The lanes whose PRs wait on the host's CI. The others prove a change with the
+    # project's checks on this machine, which spends no hosted CI minutes.
+    hosted_ci_lanes: list[Literal["build", "polish"]] | None = None
 
 
 class ProjectCreate(Args):
@@ -262,6 +265,8 @@ def project_configure(c):
     needs the github source host. The host does not change under a run in progress,
     whose open changes belong to the host they were opened on."""
     changes = {k: v for k, v in (("ci_signal", c.args.ci_signal), ("source_host", c.args.source_host)) if v}
+    if c.args.hosted_ci_lanes is not None:
+        changes["hosted_ci_lanes"] = sorted(set(c.args.hosted_ci_lanes))
     from ..daemon import settings_from
     merged = settings_from({**(c.daemon.home.project(c.project).get("settings") or {}), **changes})
     if merged["ci_signal"] in ("self-hosted-actions", "both") and merged["source_host"] != "github":

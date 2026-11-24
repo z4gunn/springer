@@ -143,6 +143,13 @@ class GitHubSourceHost:
             _run(["gh", "run", "rerun", run_id, "--failed"], self.project_path_of(project))
         return runs
 
+    def label(self, project, number, name):
+        """Add a label to a PR, creating it in the repository when it is missing."""
+        path = self.project_path_of(project)
+        _run(["gh", "label", "create", name, "--color", "0e8a16", "--force",
+              "--description", "Springer: this PR waits on hosted CI"], path)
+        self._gh(project, "pr", "edit", str(number), "--add-label", name)
+
     def retarget(self, project, number, base):
         self._gh(project, "pr", "edit", str(number), "--base", base)
 

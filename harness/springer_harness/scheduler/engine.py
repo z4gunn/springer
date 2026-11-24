@@ -112,6 +112,7 @@ def _git_out(cwd, *args):
 INFRA_FAILURE = re.compile(r"heap out of memory|Reached heap limit|exit code 13[47]\b|runner has received a shutdown"
                            r"|lost communication with the server|No space left on device|ETIMEDOUT|ECONNRESET", re.I)
 CI_RERUN_GRACE = 180
+HOSTED_CI_LABEL = "springer:hosted-ci"
 
 
 class RunEngine:
@@ -448,7 +449,7 @@ class RunEngine:
         result = mechanical_check(session_dir, self.worktrees.path(unit_id), self.run_dir, self.project_path,
                                   unit_id, parse_iso(record["started_at"]),
                                   require_receipts=not self._spec(unit_id).get("gating_commands")
-                                  and self.settings()["ci_signal"] in ("receipts", "both"))
+                                  and self._ci_signal() in ("receipts", "both"))
         warnings = self.gating_runs.warnings(session_dir) if gating else []
         said = (unit_id, state["sessions"][-1], "; ".join(warnings))
         if warnings and result.status == "pass" and said not in self._warned:
@@ -890,8 +891,9 @@ class RunEngine:
         """The merge waits for the project's CI signal. Receipts were verified at Check.
         Actions checks are read from the PR: pending waits, a failure sends the unit
         back as a defect, the same as a reviewer would."""
-        if self.settings()["ci_signal"] not in ("self-hosted-actions", "both") or not hasattr(self.source_host, "checks"):
+        if self._ci_signal() not in ("self-hosted-actions", "both") or not hasattr(self.source_host, "checks"):
             return True
+        self._label_for_hosted_ci(unit_id, number)
         status, detail = self.source_host.checks(self.project_slug, number)
         if status == "pass":
             return True
@@ -909,6 +911,36 @@ class RunEngine:
             # for them never ends. The conflict is handled as a refused merge would be.
             self._merge_failed(unit_id, state, number, f"PR {number} conflicts with its base, so its checks never ran")
         return False
+
+    def _lane(self):
+        return ((read_json(self.run_dir / "run-brief.json") or {}).get("content") or {}).get("lane") or "build"
+
+    def _ci_signal(self):
+        """The project's CI signal for this run's lane. A lane left out of
+        hosted_ci_lanes proves its changes with the project's checks on this machine,
+        because hosted CI minutes are kept for polish and maintenance."""
+        settings = self.settings()
+        signal = settings.get("ci_signal", "receipts")
+        lanes = settings.get("hosted_ci_lanes")
+        if lanes is not None and signal in ("self-hosted-actions", "both") and self._lane() not in lanes:
+            return "receipts"
+        return signal
+
+    def _label_for_hosted_ci(self, unit_id, number):
+        """When only some lanes use hosted CI, the project's workflow runs on a unit PR
+        only with this label, so the harness adds it to the PRs that wait on CI. Once."""
+        if self.settings().get("hosted_ci_lanes") is None or not hasattr(self.source_host, "label"):
+            return
+        marker = self.units.unit_dir(unit_id) / "ci-label.json"
+        if (read_json(marker) or {}).get("pr") == number:
+            return
+        try:
+            self.source_host.label(self.project_slug, number, HOSTED_CI_LABEL)
+        except Exception as exc:  # noqa: BLE001, a label that fails leaves CI pending, retried next tick
+            self.ledger.append("pr_label_failed", unit_id=unit_id, pr=number, detail=str(exc)[-300:])
+            return
+        write_json(marker, {"pr": number, "label": HOSTED_CI_LABEL})
+        self.ledger.append("pr_labeled", unit_id=unit_id, pr=number, label=HOSTED_CI_LABEL)
 
     def _rerun_infra_failure(self, unit_id, state, number, log):
         """A runner that ran out of memory or lost its connection says nothing about the

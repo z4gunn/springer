@@ -344,6 +344,12 @@ class OperationCatalogTest(ApiCase):
         bad = self.op("project.configure", {"ci_signal": "jenkins"}, expect=400)
         self.assertIn("ci_signal", json.dumps(bad))
 
+    def test_project_configure_names_the_lanes_that_wait_on_hosted_ci(self):
+        out = self.confirmed("project.configure", {"source_host": "github", "hosted_ci_lanes": ["polish"]})
+        self.assertEqual(out["result"]["settings"]["hosted_ci_lanes"], ["polish"])
+        bad = self.op("project.configure", {"hosted_ci_lanes": ["release"]}, expect=400)
+        self.assertIn("hosted_ci_lanes", json.dumps(bad))
+
     def test_a_hosted_project_reads_its_ci_unless_the_person_chose(self):
         self.confirmed("project.configure", {"source_host": "github"})
         self.assertEqual(self.get("/v1/projects/acme")["settings"]["ci_signal"], "both")

@@ -929,6 +929,13 @@ class GitHubTest(FakeBinCase):
         self.assertIn(["run", "rerun", "451", "--failed"], calls)
         self.assertNotIn(["run", "rerun", "452", "--failed"], calls)
 
+    def test_a_label_is_created_and_added_to_the_pr(self):
+        project = git_project(self.root / "acme")
+        GitHubSourceHost(lambda slug: project).label("acme", 7, "springer:hosted-ci")
+        calls = [c for c in self.calls() if isinstance(c, list)]
+        self.assertTrue(any(c[:3] == ["label", "create", "springer:hosted-ci"] for c in calls))
+        self.assertIn(["pr", "edit", "7", "--add-label", "springer:hosted-ci"], calls)
+
 
 class SetupTest(FakeBinCase):
     def test_doctor_passes_with_a_subscription_login_and_names_the_api_key(self):
