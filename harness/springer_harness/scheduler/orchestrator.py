@@ -137,6 +137,10 @@ Rules for the schema:
 - A unit whose PR is open (state gated) is not a reason to wait. Work that builds on it
   depends_on its key: that unit's worktree starts from the open PR's branch, its own PR
   stacks on that branch, and it merges after the first one. Route that work now.
+- Before a frontend or mobile unit, check its story's criteria against the API spec and
+  the default branch with Grep. A route, field, or column they need that is not there
+  gets a backend unit first, and the client unit depends_on it. Never route a story that
+  needs both halves as one client-only unit.
 - open_stories in the run state is every open item on the project backlog, read for
   you, with the units that carried it. Route from it and do not run a script to re-read
   the backlog. Before you return no units, name each open MVP story and why it is held.

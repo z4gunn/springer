@@ -1,0 +1,43 @@
+{
+  "id": "orchestrator-splits-full-stack-story",
+  "about": "The orchestrator routes a backend unit first when a story's criteria need a route the server does not have, and the web unit depends on it.",
+  "workspace": {
+    "packages/api/src/routes/roles.ts": "import {Router} from 'express';\n\nexport const roles = Router();\n\n// GET /api/roles/:roleId returns one role.\nroles.get('/api/roles/:roleId', (req, res) => {\n  res.json({id: req.params.roleId});\n});\n",
+    "packages/web/src/features/candidates/CandidatesPage.tsx": "export function CandidatesPage() {\n  return <table aria-label=\"Ranked candidates\" />;\n}\n",
+    "runs/eval/artifacts/api-spec.json": "{\n  \"artifact_id\": \"api-spec\",\n  \"artifact_type\": \"api-spec\",\n  \"schema_version\": \"v1\",\n  \"status\": \"confirmed\",\n  \"content\": {\n    \"endpoints\": [\n      {\n        \"method\": \"GET\",\n        \"path\": \"/api/roles/{roleId}\",\n        \"returns\": \"one role\"\n      },\n      {\n        \"method\": \"GET\",\n        \"path\": \"/api/roles/{roleId}/export\",\n        \"operationId\": \"exportRole\",\n        \"returns\": \"text/csv of the role's ranked candidates, and writes an export_downloaded audit row\"\n      }\n    ]\n  }\n}",
+    "runs/eval/artifacts/user-story-story-080.json": "{\n  \"artifact_id\": \"user-story-story-080\",\n  \"artifact_type\": \"user-story\",\n  \"schema_version\": \"v1\",\n  \"status\": \"confirmed\",\n  \"content\": {\n    \"story_id\": \"STORY-080\",\n    \"title\": \"Export the ranked list\",\n    \"as_a\": \"hiring owner\",\n    \"i_want\": \"an Export button on Candidates\",\n    \"so_that\": \"I can share the ranked list\"\n  }\n}",
+    "runs/eval/artifacts/acceptance-criteria-story-080.json": "{\n  \"artifact_id\": \"acceptance-criteria-story-080\",\n  \"artifact_type\": \"acceptance-criteria\",\n  \"schema_version\": \"v1\",\n  \"status\": \"confirmed\",\n  \"content\": {\n    \"story_id\": \"STORY-080\",\n    \"criteria\": [\n      {\n        \"id\": \"AC-080-1\",\n        \"text\": \"Clicking Export on Candidates downloads one CSV with every ranked candidate, served by GET /api/roles/{roleId}/export.\"\n      },\n      {\n        \"id\": \"AC-080-2\",\n        \"text\": \"Each export writes an export_downloaded audit row.\"\n      }\n    ]\n  }\n}",
+    "runs/eval/state.md": "# Run eval: build lane, profile small, autonomy autopilot\n\nPhase: build. Architecture, design and the backlog are confirmed. No unit is in flight and no gate is open. The WIP limit is 2.\nOpen MVP stories: STORY-080 (Export the ranked list). Its story and criteria artifacts are in runs/eval/artifacts/.\nAgents available: spgr-agent-frontend-developer, spgr-agent-backend-developer, spgr-agent-code-reviewer.\nUnit keys used: none.\n"
+  },
+  "adopt_profile": "small",
+  "model": "opus",
+  "max_turns": 40,
+  "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Agent"
+  ],
+  "prompt": "Use the Agent tool to dispatch the spgr-agent-orchestrator subagent with this prompt: \"Plan the next batch for run eval. Read runs/eval/state.md, then the artifacts it names, then route. Write no file. Reply with only a JSON object {\\\"units\\\": [{\\\"key\\\", \\\"agent\\\", \\\"story_ids\\\", \\\"depends_on\\\", \\\"brief\\\"}], \\\"rationale\\\"}.\" Do not plan it yourself. When it returns, reply with its JSON verbatim and nothing else.",
+  "expect": [
+    {
+      "id": "searches-the-code",
+      "type": "called",
+      "why": "check the default branch for the route before routing a client unit",
+      "match": {
+        "tool": "^Grep$",
+        "scope": "subagent"
+      }
+    },
+    {
+      "id": "backend-unit-routed",
+      "type": "final",
+      "pattern": "spgr-agent-backend-developer"
+    },
+    {
+      "id": "web-unit-depends-on-it",
+      "type": "final",
+      "pattern": "\"depends_on\"\\s*:\\s*\\[\\s*\"[^\"]+\""
+    }
+  ]
+}

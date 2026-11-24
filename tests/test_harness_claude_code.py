@@ -456,6 +456,11 @@ class OrchestratorTest(FakeBinCase):
         self.assertIn("depends_on its key", PROMPT)
         self.assertIn("starts from the open PR's branch", PROMPT)
 
+    def test_the_prompt_routes_the_server_half_of_a_story_first(self):
+        """Two stories went out as web-only units whose criteria needed a route and a column."""
+        from springer_harness.scheduler.orchestrator import PROMPT
+        self.assertIn("gets a backend unit first, and the client unit depends_on it", PROMPT)
+
     def test_nothing_is_asked_while_work_can_move(self):
         self.assertIsNone(self.planner.next_batch(Snapshot(1, 1, 0, active=1)))
         self.assertEqual(self.calls(), [])
