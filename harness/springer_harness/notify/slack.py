@@ -100,7 +100,11 @@ def gate_blocks(view):
     elements = []
     if view["answerable"]:
         for number, option in enumerate(view["options"][:5], 1):
-            button = {"type": "button", "action_id": f"gate:{option['option']}",
+            # Slack caps an action_id at 255 characters. A session's option ran past it
+            # and the whole gate message was refused. The tap is read from the value, so
+            # the id only has to be unique in the block.
+            name = f"gate:{option['option']}"
+            button = {"type": "button", "action_id": name if len(name) <= 255 else f"gate:{number}",
                       "text": {"type": "plain_text", "text": option_label(number, option)[:75]},
                       "value": json.dumps({**target, "o": option["option"]})}
             # Only the recommended option is styled to draw the eye. A styled first

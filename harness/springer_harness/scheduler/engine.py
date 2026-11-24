@@ -709,7 +709,7 @@ class RunEngine:
                 if not paused:
                     self._merge(unit_id, state, level)
             else:
-                gates = self.gates.holding(unit_id, "pr-merge")
+                gates = self._merge_gates(unit_id)
                 if not gates:
                     self._open_merge_gate(unit_id, state, level)
                 elif gates[-1]["content"]["response"] and \
@@ -858,7 +858,7 @@ class RunEngine:
             for unit_id in content["holds"]:
                 state = self.units.state(unit_id)
                 option = response["option"]
-                if content["checkpoint_type"] == "pr-merge":
+                if content["checkpoint_type"] == "pr-merge" and not content["context"].get("gate_request"):
                     if option == "send_back" and state["state"] == "gated":
                         self._send_back(unit_id, state, response)
                 elif option == "cancel" and state["state"] in ("planned", "ready", "blocked"):
@@ -912,9 +912,15 @@ class RunEngine:
         self.units.transition(unit_id, "retry", "human sent the merge back", retries_spent=state["retries_spent"] + 1)
         self._retire_merge_gates(unit_id)
 
+    def _merge_gates(self, unit_id):
+        """The merge gates the harness opened for this unit. A session may ask its own
+        question under the same type, and that one is answered like any other request:
+        read as a merge gate, its answer released nothing and the unit stayed blocked."""
+        return [g for g in self.gates.holding(unit_id, "pr-merge") if not g["content"]["context"].get("gate_request")]
+
     def _retire_merge_gates(self, unit_id):
         """A sent-back unit opens a fresh merge gate when it next returns."""
-        for gate in self.gates.holding(unit_id, "pr-merge"):
+        for gate in self._merge_gates(unit_id):
             gate["content"]["context"]["retired"] = True
             write_json(self.gates.path(gate["content"]["checkpoint_id"]), gate)
 

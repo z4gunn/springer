@@ -146,6 +146,20 @@ class GateRequestTest(EngineCase):
         if HAVE_JSONSCHEMA:
             self.assertEqual(schema_errors("hil-checkpoint-v2", engine.gates.get(gate_id), registry()), [])
 
+    def test_a_session_s_question_typed_as_a_merge_gate_still_releases_the_unit_when_answered(self):
+        """A builder asked how to rebase its pull request under checkpoint_type pr-merge.
+        The answer was read as a merge gate's, which acts only on send_back, and the unit
+        stayed blocked."""
+        engine = self.run_until_blocked({"checkpoint_type": "pr-merge", "decision_prompt": "Rebase PR 7 how?",
+                                         "options": [{"option": "harness rebases", "consequence": "It is rebased."},
+                                                     {"option": "leave it", "consequence": "It waits."}]})
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")
+        gate_id = engine.gates.open_gates()[0]["content"]["checkpoint_id"]
+        engine.gates.answer(gate_id, "harness rebases", "human")
+        self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "done")
+        self.assertIn("harness rebases", self.provider.spawned[-1].brief)
+        self.assertEqual(engine._merge_gates("U-0001"), [], "the question is not a merge decision")
+
     def test_check_running_again_after_a_crash_opens_one_gate(self):
         engine = self.run_until_blocked()
         self.tick_until(engine, lambda: self.states(engine)["U-0001"] == "blocked")

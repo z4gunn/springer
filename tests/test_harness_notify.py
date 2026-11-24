@@ -329,6 +329,17 @@ class SlackHandlerTest(NotifyCase):
         self.assertEqual([(b["action_id"], b.get("style")) for b in actions["elements"]],
                          [("gate:approve", None), ("gate:send_back", "danger"), ("gate_form", None)])
 
+    def test_a_long_option_name_keeps_its_button_within_slack_s_action_id_cap(self):
+        """A session wrote a whole procedure as the option, and Slack refused the message."""
+        self.set_up_slack()
+        self.engine.gates.open("scope-change", "L3", ["U-0001"], "Rebase how?", [
+            {"option": "rebase " * 60, "consequence": "It is rebased."}, {"option": "leave", "consequence": "It waits."}])
+        self.notifier.poll()
+        view = next(v for k, v in self.channel.sent if k == "gate")
+        buttons = actions_of(gate_blocks(view))["elements"]
+        self.assertEqual([b["action_id"] for b in buttons], ["gate:1", "gate:leave", "gate_form"])
+        self.assertEqual(json.loads(buttons[0]["value"])["o"], "rebase " * 60)
+
     def test_only_the_recommended_option_is_styled_and_labeled(self):
         """A styled first button drew a tap the person did not mean."""
         self.set_up_slack()
