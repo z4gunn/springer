@@ -3,6 +3,7 @@ the only merger, so merge lives here, and after a merge the main checkout is mov
 forward so the next worktree starts from what was merged."""
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -110,6 +111,37 @@ class GitHubSourceHost:
         if any(c.get("bucket") == "pending" for c in checks):
             return "pending", "checks still running"
         return "pass", f"{len(checks)} check(s) green"
+
+    def _failed_runs(self, project, number):
+        done = _run(["gh", "pr", "checks", str(number), "--json", "bucket,link"], self.project_path_of(project))
+        try:
+            checks = json.loads(done.stdout or "[]")
+        except ValueError:
+            return []
+        runs = []
+        for check in checks:
+            match = re.search(r"/actions/runs/(\d+)", check.get("link") or "")
+            if check.get("bucket") in ("fail", "cancel") and match and match.group(1) not in runs:
+                runs.append(match.group(1))
+        return runs
+
+    def failure_log(self, project, number, limit=3000):
+        """The tail of each failed Actions run's failed steps, so a builder reads the error
+        instead of a session spent finding it, and the engine can tell a runner that ran
+        out of memory from a test that failed."""
+        tails = []
+        for run_id in self._failed_runs(project, number):
+            done = _run(["gh", "run", "view", run_id, "--log-failed"], self.project_path_of(project))
+            lines = [line.split("\t", 2)[-1] for line in (done.stdout or "").splitlines() if line.strip()]
+            tails.append("\n".join(lines)[-limit:])
+        return "\n".join(tails)[-limit * 2:]
+
+    def rerun(self, project, number):
+        """Rerun the failed jobs of the PR's failed Actions runs. Returns the runs rerun."""
+        runs = self._failed_runs(project, number)
+        for run_id in runs:
+            _run(["gh", "run", "rerun", run_id, "--failed"], self.project_path_of(project))
+        return runs
 
     def retarget(self, project, number, base):
         self._gh(project, "pr", "edit", str(number), "--base", base)

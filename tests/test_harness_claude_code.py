@@ -77,6 +77,12 @@ if args[:2] == ["pr", "view"] and "mergeCommit" in args:
     print(json.dumps({{"mergeCommit": {{"oid": "abc123"}}}})); sys.exit(0)
 if args[:2] == ["pr", "diff"]:
     print("diff --git a/x b/x"); sys.exit(0)
+if args[:2] == ["pr", "checks"] and "bucket,link" in args:
+    print(json.dumps([{{"bucket": "fail", "link": "https://github.com/o/r/actions/runs/451/job/9"}},
+                      {{"bucket": "fail", "link": "https://github.com/o/r/actions/runs/451/job/10"}},
+                      {{"bucket": "pass", "link": "https://github.com/o/r/actions/runs/452/job/11"}}])); sys.exit(0)
+if args[:3] == ["run", "view", "451"]:
+    print("build\tLint\t2026-11-23T15:45:02Z FATAL ERROR: Reached heap limit"); sys.exit(0)
 sys.exit(0)
 '''
 
@@ -911,6 +917,17 @@ class GitHubTest(FakeBinCase):
         calls = [c for c in self.calls() if isinstance(c, list)]
         self.assertIn(["pr", "merge", "7", "--squash"], calls)
         self.assertIn(["pr", "edit", "8", "--base", "main"], calls)
+
+
+    def test_a_failed_run_s_log_is_read_and_its_failed_jobs_rerun_once_per_run(self):
+        project = git_project(self.root / "acme")
+        host = GitHubSourceHost(lambda slug: project)
+        self.assertIn("Reached heap limit", host.failure_log("acme", 7))
+        self.assertEqual(host.rerun("acme", 7), ["451"])
+        calls = [c for c in self.calls() if isinstance(c, list)]
+        self.assertIn(["run", "view", "451", "--log-failed"], calls)
+        self.assertIn(["run", "rerun", "451", "--failed"], calls)
+        self.assertNotIn(["run", "rerun", "452", "--failed"], calls)
 
 
 class SetupTest(FakeBinCase):

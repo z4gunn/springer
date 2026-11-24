@@ -32,6 +32,15 @@ Write the code-review artifact to {artifacts}/. In result.json set "outcome": "r
 finding. List every other finding, and it becomes a follow-up."""
 
 
+DELTA = """
+
+This is a re-review. {review_id} read the PR at {head} and found: {findings}
+
+The package covers only what changed since {head}. Confirm each earlier finding is fixed or
+say why it stands, then review the new changes. Do not review again the code the earlier
+review passed unless a new change touches it."""
+
+
 def _python(project):
     venv = Path(project) / ".venv" / "bin" / "python"
     return str(venv) if venv.exists() else sys.executable

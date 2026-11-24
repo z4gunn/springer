@@ -6,6 +6,7 @@ the only in-memory state, and losing them is what a crash is.
 """
 
 import os
+import re
 import signal
 import subprocess
 from pathlib import Path
@@ -107,6 +108,12 @@ def _git_out(cwd, *args):
     return done.returncode, done.stdout.strip()
 
 
+# A CI failure that is the runner's, not the change's, gets a rerun before a session.
+INFRA_FAILURE = re.compile(r"heap out of memory|Reached heap limit|exit code 13[47]\b|runner has received a shutdown"
+                           r"|lost communication with the server|No space left on device|ETIMEDOUT|ECONNRESET", re.I)
+CI_RERUN_GRACE = 180
+
+
 class RunEngine:
     def __init__(self, project_slug, project_path, run_id, provider, planner, source_host, worktrees, window, owner,
                  now, in_flight_total=None, settings=None, release=None):
@@ -186,14 +193,16 @@ class RunEngine:
         return None
 
     def _tier(self, unit_id, state):
-        """The spec's tier, never below the agent's declared model, one up on the second
-        retry, or the tier a human raised to."""
-        spec_tier = self._spec(unit_id)["model_tier"]
-        index = TIERS.index(spec_tier)
-        declared = self._declared_tier(unit_id)
+        """The spec's tier, never below the agent's declared model (a review unit's tier
+        is the engine's, see _review_tier), one up on the second retry (a review's first),
+        or the tier a human raised to."""
+        spec = self._spec(unit_id)
+        index = TIERS.index(spec["model_tier"])
+        declared = None if spec.get("review_of") else self._declared_tier(unit_id)
         if declared:
             index = max(index, TIERS.index(declared))
-        if state["retries_spent"] >= 2:
+        # A review the engine tiered steps up on its first failure, a unit on its second.
+        if state["retries_spent"] >= (1 if spec.get("review_of") else 2):
             index = min(index + 1, len(TIERS) - 1)
         for entry in self.ledger.read():
             line = entry.line
@@ -462,8 +471,11 @@ class RunEngine:
         pr = state["pr"]
         review_id = self.units.next_id()
         out = self.units.unit_dir(review_id) / "review" / "package.md"
-        problem = review.cut_package(self.project_path, pr.get("base") or self.worktrees.default_branch(),
-                                     pr["branch"], out, spec["declared_paths"]) if self._mechanical() else None
+        head = self._branch_head(pr["branch"])
+        earlier = self._earlier_review(unit_id, state, head)
+        base = earlier["head"] if earlier else pr.get("base") or self.worktrees.default_branch()
+        problem = review.cut_package(self.project_path, base, pr["branch"], out,
+                                     spec["declared_paths"]) if self._mechanical() else None
         session_dir = self.sessions(unit_id).dir(state["sessions"][-1])
         report = session_dir / "return.txt"
         brief = review.BRIEF.format(number=pr["number"], unit_id=unit_id, branch=pr["branch"], base=pr.get("base"),
@@ -471,15 +483,56 @@ class RunEngine:
                                     package=out if problem is None else f"not cut ({problem}), so read the diff",
                                     report=report.read_text()[-4000:] if report.exists() else "(no report)",
                                     artifacts=self.run_dir / "artifacts")
+        if earlier:
+            brief += review.DELTA.format(review_id=earlier["review_id"], head=earlier["head"],
+                                         findings=earlier["findings"] or "(none listed)")
         self.units.create({"unit_id": review_id, "cycle_id": spec["cycle_id"], "agent": review.REVIEWER,
-                           "role_prompt_ref": f".claude/agents/{review.REVIEWER}.md", "model_tier": "opus",
+                           "role_prompt_ref": f".claude/agents/{review.REVIEWER}.md",
+                           "model_tier": self._review_tier(unit_id, state),
                            "brief": brief, "input_artifact_refs": [], "expected_outcome": f"A verdict on PR {pr['number']}",
                            "workstream": "review", "declared_paths": [], "allowlist": [], "mcp_config_ref": None,
                            "budget": {"tokens": 200000, "wall_clock_seconds": 1800}, "risk_baseline": "L0",
                            "dependencies": [], "executable_check": None, "review_of": unit_id,
-                           "review_session": state["sessions"][-1]})
+                           "review_session": state["sessions"][-1], "reviewed_head": head})
         self.units.save({**self.units.state(unit_id), "reviews": state.get("reviews", []) + [review_id]})
         self.ledger.append("review_opened", unit_id=unit_id, review_unit=review_id, pr=pr["number"])
+
+    def _review_tier(self, unit_id, state):
+        """Sonnet reads the first review of a low-risk PR. A re-review, a PR at L2 or
+        above, and a review whose session failed go to Opus (see _tier), so the last
+        automated gate before a merge a person does not see is still read by Opus when
+        Sonnet asked for changes."""
+        if state.get("reviews") or self._level(unit_id) not in ("L0", "L1"):
+            return "opus"
+        return "sonnet"
+
+    def _branch_head(self, branch):
+        for ref in (f"origin/{branch}", branch):
+            code, sha = _git_out(self.project_path, "rev-parse", "--verify", "--quiet", ref)
+            if code == 0 and sha:
+                return sha
+        return None
+
+    def _earlier_review(self, unit_id, state, head):
+        """The last finished review of this PR, when the new head still contains the head
+        it read. A re-review then reads only what changed since and checks the earlier
+        findings, instead of the whole PR again. A rebase that dropped the reviewed head
+        gets a full review."""
+        for review_id in reversed(state.get("reviews") or []):
+            verdict = read_json(self.units.unit_dir(unit_id) / "review" / f"{review_id}.json")
+            reviewed = self._spec(review_id).get("reviewed_head")
+            if not verdict or not reviewed:
+                continue
+            if not head or reviewed == head:
+                return None
+            done = subprocess.run(["git", "-C", str(self.project_path), "merge-base", "--is-ancestor", reviewed, head],
+                                  capture_output=True, timeout=60)
+            if done.returncode != 0:
+                return None
+            findings = "; ".join(f"{f.get('severity', '')} {f.get('file', '')}: {f.get('detail', '')}".strip()
+                                 for f in verdict.get("findings") or [] if isinstance(f, dict))
+            return {"review_id": review_id, "head": reviewed, "findings": findings[:4000]}
+        return None
 
     def _mechanical(self):
         return getattr(self.provider, "mechanical", False)
@@ -702,7 +755,10 @@ class RunEngine:
             # Opened here rather than at Check, so a crash between the two is repaired
             # on the next tick, and a PR gated before reviews existed gets one too.
             if self._reviews() and not self._reviewed_head(state):
-                self._open_review(unit_id)
+                # The review waits for the host's CI. Opened beside it, a red CI threw
+                # away a review already paid for, and the retry bought a second one.
+                if self._ci_green(unit_id, state, state["pr"]["number"]):
+                    self._open_review(unit_id)
                 continue
             if self._review_pending(state):
                 continue
@@ -840,7 +896,11 @@ class RunEngine:
         if status == "pass":
             return True
         if status == "fail":
-            self._append_note(unit_id, f"CI failed on PR {number}: {detail}")
+            log = getattr(self.source_host, "failure_log", lambda *_: "")(self.project_slug, number) or ""
+            if self._rerun_infra_failure(unit_id, state, number, log):
+                return False
+            tail = f"\nThe failed steps end:\n{log[-3000:]}" if log else ""
+            self._append_note(unit_id, f"CI failed on PR {number}: {detail}{tail}")
             self.units.transition(unit_id, "retry", f"defect: CI failed on PR {number}",
                                   retries_spent=state["retries_spent"] + 1)
             self._retire_merge_gates(unit_id)
@@ -849,6 +909,26 @@ class RunEngine:
             # for them never ends. The conflict is handled as a refused merge would be.
             self._merge_failed(unit_id, state, number, f"PR {number} conflicts with its base, so its checks never ran")
         return False
+
+    def _rerun_infra_failure(self, unit_id, state, number, log):
+        """A runner that ran out of memory or lost its connection says nothing about the
+        change. Its failed jobs run again once per PR head, with no session spent. 17 of
+        20 CI failures in one run were ESLint out of heap, each a builder retry and a
+        fresh review."""
+        if not INFRA_FAILURE.search(log) or not hasattr(self.source_host, "rerun"):
+            return False
+        path = self.units.unit_dir(unit_id) / "ci-reruns.json"
+        reruns = read_json(path) or []
+        head = self._branch_head(state["pr"].get("branch") or "") or f"pr-{number}"
+        earlier = next((r for r in reruns if r.get("head") == head), None)
+        if earlier:
+            # The checks can read as failed for a moment after the rerun starts.
+            return self.now() - earlier["at"] < CI_RERUN_GRACE
+        runs = self.source_host.rerun(self.project_slug, number)
+        write_json(path, reruns + [{"head": head, "at": self.now()}])
+        self.ledger.append("ci_rerun", unit_id=unit_id, pr=number, runs=list(runs or []),
+                           detail=INFRA_FAILURE.search(log).group(0))
+        return True
 
     def _apply_answers(self):
         """Carry out what each answered gate decided, once."""

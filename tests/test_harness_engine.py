@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import time
 import unittest
+from unittest import mock
 
 from harness_support import HAVE_JSONSCHEMA, OWNER, EngineCase, registry, schema_errors
 
@@ -712,6 +713,36 @@ class MergePolicyTest(EngineCase):
         notes = (engine.units.unit_dir("U-0001") / "redispatch-notes.txt").read_text()
         self.assertIn("CI failed on PR 1: failed: conformance", notes)
 
+    def test_a_runner_out_of_memory_reruns_ci_once_without_a_session(self):
+        """17 of 20 CI failures in one run were ESLint out of heap on the runner, and each
+        sent the unit back to its builder and a fresh review."""
+        self.host.check_states = {1: ("fail", "failed: build")}
+        self.host.failure_log = lambda project, number: "Lint\nFATAL ERROR: Reached heap limit Allocation failed"
+        reruns = []
+        self.host.rerun = lambda project, number: reruns.append(number) or ["45208311058"]
+        engine = self.actions_engine()
+        self.tick_until(engine, lambda: reruns)
+        engine.tick()
+        self.assertEqual(engine.units.state("U-0001")["retries_spent"], 0, "a stale failure right after the rerun waits")
+        self.clock.advance(200)
+        engine.tick()
+        self.assertEqual(reruns, [1], "one rerun per head")
+        self.assertEqual(engine.units.state("U-0001")["retries_spent"], 1, "the second failure goes to the builder")
+        notes = (engine.units.unit_dir("U-0001") / "redispatch-notes.txt").read_text()
+        self.assertIn("Reached heap limit", notes)
+        self.assertEqual([e["pr"] for e in self.events(engine, "ci_rerun")], [1])
+
+    def test_a_real_ci_failure_sends_the_log_tail_to_the_builder_and_no_rerun(self):
+        self.host.check_states = {1: ("fail", "failed: build")}
+        self.host.failure_log = lambda project, number: "src/a.ts\n  3:1  error  'x' is never used"
+        reruns = []
+        self.host.rerun = lambda project, number: reruns.append(number)
+        engine = self.actions_engine()
+        self.tick_until(engine, lambda: "U-0001" in engine.units.ids() and engine.units.state("U-0001")["retries_spent"] == 1)
+        self.assertEqual(reruns, [])
+        notes = (engine.units.unit_dir("U-0001") / "redispatch-notes.txt").read_text()
+        self.assertIn("'x' is never used", notes)
+
     def events(self, engine, name):
         return [e.line for e in engine.ledger.read() if e.line.get("event") == name]
 
@@ -939,6 +970,88 @@ class ReviewTest(EngineCase):
         notes = (engine.units.unit_dir("U-0001") / "redispatch-notes.txt").read_text()
         self.assertIn("P1 a.ts: fix it", notes)
         self.assertEqual(self.host.merged, [1])
+
+    def test_a_re_review_reads_only_the_changes_since_the_earlier_head(self):
+        """94 Opus reviews for 48 build units: every retry was reviewed whole again."""
+        self.review("request_changes", "approve")
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        heads = iter(["a" * 40, "b" * 40])
+        engine._branch_head = lambda branch: next(heads)
+        ancestry = []
+        real_run = subprocess.run
+
+        def run(cmd, *args, **kwargs):
+            if "--is-ancestor" in cmd:
+                ancestry.append(cmd[-2:])
+                return subprocess.CompletedProcess(cmd, 0)
+            return real_run(cmd, *args, **kwargs)
+        with mock.patch("springer_harness.scheduler.engine.subprocess.run", side_effect=run):
+            self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        first, second = engine.units.state("U-0001")["reviews"]
+        self.assertEqual(engine.units.spec(first)["reviewed_head"], "a" * 40)
+        self.assertNotIn("This is a re-review", engine.units.spec(first)["brief"])
+        brief = engine.units.spec(second)["brief"]
+        self.assertIn(f"This is a re-review. {first} read the PR at {'a' * 40}", brief)
+        self.assertIn("P1 a.ts: fix it", brief)
+        self.assertEqual(ancestry, [["a" * 40, "b" * 40]])
+        if HAVE_JSONSCHEMA:
+            self.assertEqual(schema_errors("unit-spec-v1", engine.units.spec(second), registry()), [])
+
+    def test_a_re_review_after_a_rebase_that_dropped_the_reviewed_head_is_whole(self):
+        self.review("request_changes", "approve")
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        heads = iter(["a" * 40, "c" * 40])
+        engine._branch_head = lambda branch: next(heads)
+        real_run = subprocess.run
+
+        def run(cmd, *args, **kwargs):
+            if "--is-ancestor" in cmd:
+                return subprocess.CompletedProcess(cmd, 1)
+            return real_run(cmd, *args, **kwargs)
+        with mock.patch("springer_harness.scheduler.engine.subprocess.run", side_effect=run):
+            self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        second = engine.units.state("U-0001")["reviews"][-1]
+        self.assertNotIn("This is a re-review", engine.units.spec(second)["brief"])
+
+    def test_a_low_risk_first_review_runs_on_sonnet_and_the_re_review_on_opus(self):
+        """The reviewer was 40 percent of one run's cost, every review on Opus."""
+        self.review("request_changes", "approve")
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        tiers = {r.unit_id: r.model_tier for r in self.provider.spawned if r.unit_id != "U-0001"}
+        first, second = engine.units.state("U-0001")["reviews"]
+        self.assertEqual((tiers[first], tiers[second]), ("sonnet", "opus"))
+
+    def test_a_review_of_an_l2_pr_runs_on_opus(self):
+        self.provider.script["routine"] = [Attempt(result=pr_result(1, touched=("packages/db/migrations/0001.sql",)))]
+        self.review("approve")
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: "U-0002" in engine.units.ids())
+        self.assertIn(engine._level("U-0001"), ("L2", "L3"))
+        self.assertEqual(engine.units.spec("U-0002")["model_tier"], "opus")
+
+    def test_a_review_session_that_fails_goes_again_on_opus(self):
+        self.provider.script["U-0002"] = [Attempt(result=fail_result("defect")),
+                                          Attempt(result={"status": "pass", "outcome": "review", "verdict": "approve",
+                                                          "findings": []})]
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        tiers = [r.model_tier for r in self.provider.spawned if r.unit_id == "U-0002"]
+        self.assertEqual(tiers, ["sonnet", "opus"])
+
+    def test_the_review_waits_for_the_host_s_ci(self):
+        """Opened beside CI, a red CI threw away a review already paid for."""
+        self.host.check_states = {1: ("pending", "checks still running")}
+        self.review("approve")
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        engine.settings = lambda: {"ci_signal": "both"}
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "gated")
+        for _ in range(3):
+            engine.tick()
+        self.assertEqual(engine.units.ids(), ["U-0001"], "no review while CI runs")
+        self.host.check_states = {1: ("pass", "2 check(s) green")}
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "done")
+        self.assertEqual(engine.units.state("U-0001")["reviews"], ["U-0002"])
 
     def test_a_second_request_for_changes_goes_to_a_person(self):
         self.review("request_changes", "request_changes")

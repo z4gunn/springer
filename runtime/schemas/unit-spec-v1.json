@@ -207,6 +207,13 @@
       ],
       "pattern": "^S-[0-9]{4,}$",
       "description": "Set on a review unit: the reviewed unit's session whose PR head it reviews. A retry starts a new session, which gets a new review."
+    },
+    "reviewed_head": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Set on a review unit: the PR head commit it read. A re-review whose head still contains it reads only the changes since and checks the earlier findings."
     }
   },
   "additionalProperties": false
