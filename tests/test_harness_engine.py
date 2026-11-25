@@ -1418,6 +1418,20 @@ class CannedRunTest(EngineCase):
         if HAVE_JSONSCHEMA:
             self.assertEqual(schema_errors("hil-checkpoint-v2", engine.gates.all()[-1], registry()), [])
 
+    def test_a_pr_waiting_on_ci_is_moving_and_does_not_ask_the_person(self):
+        """An L1 PR restacked onto main sat gated on its CI rerun, and an idle plan asked
+        the person to plan again while that PR and a follow-up were about to merge."""
+        self.host.check_states = {1: ("pending", "checks still running")}
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        engine.settings = lambda: {"ci_signal": "self-hosted-actions"}
+        engine.planner.finished = lambda: False
+        engine.planner.idle = lambda: "plan-002"
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "gated")
+        for _ in range(3):
+            engine.tick()
+        self.assertEqual(self.states(engine)["U-0001"], "gated")
+        self.assertEqual([g for g in engine.gates.all() if g["content"]["context"].get("idle_plan")], [])
+
     def release_run(self, answer, foreign_gate=False):
         """Drive to the release gate, answering every other gate with its first option."""
         started = []

@@ -1306,7 +1306,9 @@ class RunEngine:
         plan = getattr(self.planner, "idle", lambda: None)()
         if not plan or not self.units.ids():
             return
-        moving = ("planned", "ready", "running", "returned", "checking", "retry", "redispatch")
+        # A gated unit no open gate holds is a PR waiting on CI, its review, or a restack,
+        # and merges on its own. One a person holds is caught by the open-gate test below.
+        moving = ("planned", "ready", "running", "returned", "checking", "retry", "redispatch", "gated")
         if any(s["state"] in moving for s in self.open_units()):
             return
         gates = self.gates.all()
