@@ -31,6 +31,12 @@ def _push_rewritten(path, branch):
 
 
 RUNNER_FAULT = "the job failed with every step green"
+TOOL_INSTALL_FAULT = "a tool install step failed before anything was checked"
+# A step that fetches a CI tool (a scanner, a CLI) fails on the network or the runner,
+# never on the change. The project's own dependency install is left out: a lockfile
+# the change broke fails there too.
+TOOL_INSTALL_STEP = re.compile(r"^(install|set ?up|download|fetch)\b", re.I)
+PROJECT_INSTALL_STEP = re.compile(r"dependenc|\bdeps\b|packages|\bnpm\b|\bpnpm\b|\byarn\b|node_modules|\bpip\b|poetry", re.I)
 
 
 class GitHubError(RuntimeError):
@@ -141,23 +147,32 @@ class GitHubSourceHost:
         tails = []
         path = self.project_path_of(project)
         for run_id in self._failed_runs(project, number):
-            tails += self._green_step_failures(path, run_id)
+            tails += self._runner_faults(path, run_id)
             done = _run(["gh", "run", "view", run_id, "--log-failed"], path)
             lines = [line.split("\t", 2)[-1] for line in (done.stdout or "").splitlines() if line.strip()]
             tails.append("\n".join(lines)[-limit:])
         return "\n".join(t for t in tails if t)[-limit * 2:]
 
-    def _green_step_failures(self, path, run_id):
-        """A job that failed while every step passed failed on the runner, not in the
-        change (a self-hosted runner did this on a PR whose build was green)."""
+    def _runner_faults(self, path, run_id):
+        """Failed jobs whose failure says nothing about the change: one that failed while
+        every step passed (a self-hosted runner did this on a PR whose build was green),
+        and one whose first failed step installs a CI tool (a scanner download failed
+        before the image it scans was read)."""
         done = _run(["gh", "run", "view", run_id, "--json", "jobs"], path)
         try:
             jobs = json.loads(done.stdout or "{}").get("jobs") or []
         except ValueError:
             return []
-        return [f"{job.get('name')}: {RUNNER_FAULT}" for job in jobs
-                if job.get("conclusion") == "failure"
-                and not any(step.get("conclusion") == "failure" for step in job.get("steps") or [])]
+        faults = []
+        for job in jobs:
+            if job.get("conclusion") != "failure":
+                continue
+            failed = [step.get("name") or "" for step in job.get("steps") or [] if step.get("conclusion") == "failure"]
+            if not failed:
+                faults.append(f"{job.get('name')}: {RUNNER_FAULT}")
+            elif TOOL_INSTALL_STEP.search(failed[0]) and not PROJECT_INSTALL_STEP.search(failed[0]):
+                faults.append(f"{job.get('name')}: {TOOL_INSTALL_FAULT} ({failed[0]})")
+        return faults
 
     def rerun(self, project, number):
         """Rerun the failed jobs of the PR's failed Actions runs. Returns the runs rerun."""

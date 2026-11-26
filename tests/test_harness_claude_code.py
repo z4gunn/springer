@@ -1001,6 +1001,36 @@ class GitHubTest(FakeBinCase):
         self.assertIn("build: the job failed with every step green", log)
         self.assertTrue(INFRA_FAILURE.search(log))
 
+    def test_a_failed_tool_install_step_is_the_runner_s_and_a_dependency_install_is_not(self):
+        """An image scan failed at Install Grype, a download, before any image was read,
+        and would have cost the builder a retry it could not use."""
+        from springer_harness.providers import github
+        from springer_harness.scheduler.engine import INFRA_FAILURE
+        project = git_project(self.root / "acme")
+        host = GitHubSourceHost(lambda slug: project)
+        jobs = {"jobs": [{"name": "worker image", "conclusion": "failure",
+                          "steps": [{"name": "Build worker image", "conclusion": "success"},
+                                    {"name": "Install Grype", "conclusion": "failure"},
+                                    {"name": "Grype gate", "conclusion": "skipped"}]},
+                         {"name": "build", "conclusion": "failure",
+                          "steps": [{"name": "Install dependencies", "conclusion": "failure"}]},
+                         {"name": "lint", "conclusion": "failure",
+                          "steps": [{"name": "Lint", "conclusion": "failure"}]}]}
+
+        def run(cmd, cwd):
+            if cmd[:3] == ["gh", "pr", "checks"]:
+                return subprocess.CompletedProcess(cmd, 0, json.dumps(
+                    [{"bucket": "fail", "link": "https://github.com/o/r/actions/runs/9/job/1"}]), "")
+            if "--json" in cmd and "jobs" in cmd:
+                return subprocess.CompletedProcess(cmd, 0, json.dumps(jobs), "")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        with mock.patch.object(github, "_run", side_effect=run):
+            log = host.failure_log("acme", 7)
+        self.assertIn("worker image: a tool install step failed before anything was checked (Install Grype)", log)
+        self.assertNotIn("build: a tool install", log, "the project's own install can fail on the change")
+        self.assertNotIn("lint: ", log.split("Install Grype")[0])
+        self.assertTrue(INFRA_FAILURE.search(log))
+
     def test_a_label_is_created_and_added_to_the_pr(self):
         project = git_project(self.root / "acme")
         GitHubSourceHost(lambda slug: project).label("acme", 7, "springer:hosted-ci")
