@@ -632,6 +632,16 @@ class RestackTest(unittest.TestCase):
         host.push("acme", branch)
         self.assertEqual(self.git(origin, "rev-parse", branch).stdout, self.git(self.project, "rev-parse", branch).stdout)
 
+    def test_changed_paths_are_the_branch_s_diff_against_its_base(self):
+        self.commit(self.project, {"f.txt": "a\n"})
+        tree, _ = self.trees.claim("U-0001", "main")
+        (tree / "packages" / "db" / "migrations").mkdir(parents=True)
+        self.commit(tree, {"packages/db/migrations/0041.sql": "create\n"})
+        self.commit(tree, {"app.ts": "fix\n"})
+        self.assertEqual(sorted(self.trees.changed_paths("U-0001", "main")),
+                         ["app.ts", "packages/db/migrations/0041.sql"])
+        self.assertEqual(self.trees.changed_paths("U-0001", "no-such-base"), [])
+
     def test_the_declared_files_a_shell_less_session_wrote_are_committed_and_the_run_store_is_not(self):
         """An Auth consultation wrote its docs copy, could not commit it with no shell, and
         failed seven sessions in a row saying so."""

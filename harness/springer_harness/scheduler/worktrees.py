@@ -268,6 +268,14 @@ class Worktrees:
         elif target.exists():
             target.unlink()
 
+    def changed_paths(self, unit_id, base):
+        """Every path the unit's branch changes against the base its PR targets. A retry
+        session reports only the files it touched, and a PR scored from that lost the
+        migration its first session added."""
+        branch = self.branch(unit_id)
+        done = _git(self.project, "diff", "--name-only", f"{base}...{branch}")
+        return [] if done.returncode else [p for p in done.stdout.splitlines() if p]
+
     def commit_declared(self, unit_id, declared, message):
         """Commit the declared repo files a session wrote and left uncommitted. An agent
         with no shell can write a docs file but cannot commit it. Run-store paths are the

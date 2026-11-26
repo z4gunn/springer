@@ -5,6 +5,7 @@ is safe to run again. The engine keeps nothing durable in memory. Session handle
 the only in-memory state, and losing them is what a crash is.
 """
 
+import dataclasses
 import os
 import re
 import signal
@@ -390,6 +391,11 @@ class RunEngine:
             self._finish_review(unit_id, state, result)
             return
         spec = self._spec(unit_id)
+        changed = self.worktrees.changed_paths(unit_id, self._base_for(unit_id))
+        if changed:
+            # The PR is scored by what it changes, not by what the last session said it
+            # touched: a fix retry that annotated lint lines scored a migration PR L1.
+            result = dataclasses.replace(result, touched_paths=tuple(sorted({*result.touched_paths, *changed})))
         reason = spec.get("risk_reason")
         level = risk_for(result, spec["risk_baseline"], reason)
         planned = [f"plan:{reason}"] if baseline_for(spec["risk_baseline"], reason) == "L2" else []
@@ -740,7 +746,16 @@ class RunEngine:
     # --- step 6: resolve gates ---
 
     def _level(self, unit_id):
-        return (read_json(self.units.unit_dir(unit_id) / "risk.json") or {}).get("level", "L0")
+        """The level Check recorded, raised when the PR's branch now changes a path the
+        risk rules flag. A PR scored before Check read the branch diff, or whose branch
+        changed after, keeps its gate."""
+        recorded = (read_json(self.units.unit_dir(unit_id) / "risk.json") or {}).get("level", "L0")
+        pr = self.units.state(unit_id).get("pr") or {}
+        if not pr.get("branch") or self._spec(unit_id).get("review_of"):
+            return recorded
+        if not triggers(self.worktrees.changed_paths(unit_id, pr.get("base") or self._base_for(unit_id))):
+            return recorded
+        return max(recorded, "L2", key=LEVELS.index)
 
     def resolve_gates(self):
         self._apply_answers()

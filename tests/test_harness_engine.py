@@ -1064,6 +1064,30 @@ class ReviewTest(EngineCase):
         self.assertIn(engine._level("U-0001"), ("L2", "L3"))
         self.assertEqual(engine.units.spec("U-0002")["model_tier"], "opus")
 
+    def test_a_pr_is_scored_by_its_branch_diff_not_the_last_session_s_paths(self):
+        """A fix retry touched only lint lines, reported those, and a PR that adds a
+        migration scored L1 and would have merged with no gate."""
+        self.provider.script["routine"] = [Attempt(result=pr_result(1, touched=("packages/api/src/app.ts",)))]
+        self.review("approve")
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        engine.worktrees.changed_paths = lambda unit_id, base: ["packages/db/migrations/0041_users.sql",
+                                                                "packages/api/src/app.ts"]
+        self.tick_until(engine, lambda: "U-0002" in engine.units.ids())
+        self.assertIn(engine._level("U-0001"), ("L2", "L3"))
+        risk = json.loads((engine.units.unit_dir("U-0001") / "risk.json").read_text())
+        self.assertTrue(risk["triggers"])
+
+    def test_a_pr_recorded_low_is_raised_at_merge_when_its_branch_changes_a_flagged_path(self):
+        """A PR already gated at L1 by the old scoring kept L1 across a restart, though its
+        branch adds a migration."""
+        self.host.check_states = {1: ("pending", "checks still running")}
+        engine = self.engine([batch(unit("a", agent="routine"))])
+        engine.settings = lambda: {"ci_signal": "self-hosted-actions"}
+        self.tick_until(engine, lambda: self.states(engine).get("U-0001") == "gated")
+        self.assertEqual(engine._level("U-0001"), "L0")
+        engine.worktrees.changed_paths = lambda unit_id, base: ["packages/db/migrations/0041_users.sql"]
+        self.assertEqual(engine._level("U-0001"), "L2")
+
     def test_a_review_session_that_fails_goes_again_on_opus(self):
         self.provider.script["U-0002"] = [Attempt(result=fail_result("defect")),
                                           Attempt(result={"status": "pass", "outcome": "review", "verdict": "approve",
