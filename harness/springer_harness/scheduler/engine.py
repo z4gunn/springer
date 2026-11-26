@@ -16,7 +16,7 @@ from ..check.gating import GatingRuns
 from ..check.mechanical import cannot_run, fails_at, hold_for_person, mechanical_check, needs_gating
 from ..check.risk import LEVELS, baseline_for, triggers
 from ..check.verdict import ADDENDA, BLOCK, POLICY, REDISPATCH, RETRY, read_result, risk_for
-from ..common import artifact_header, iso, next_id, parse_iso, read_json, write_json
+from ..common import agent_has_shell, artifact_header, iso, next_id, parse_iso, read_json, write_json
 from ..errors import IllegalTransition, RunExternallyHeld
 from ..providers.coding_agent import CheckResult, SpawnRequest
 from ..state.cycles import CycleStore
@@ -371,6 +371,14 @@ class RunEngine:
             # its question would be lost and the work would go on as if answered.
             self._on_failure(unit_id, state, CheckResult(status="fail", failure_class="request", detail=requested))
             return
+        spec = self._spec(unit_id)
+        if not agent_has_shell(self.project_path, spec["agent"]):
+            # Its role has no shell, so the files it wrote sit uncommitted, and every retry
+            # failed the same way. The harness commits them, and Check validates the run store.
+            committed = self.worktrees.commit_declared(
+                unit_id, spec.get("declared_paths") or [], f"docs: commit what {unit_id} ({spec['agent']}) wrote")
+            if committed:
+                self.ledger.append("committed_for_unit", unit_id=unit_id, paths=committed)
         result = self._result(unit_id, state, session_dir)
         if result is None:
             return  # the gating commands are still running, and a later tick reads the verdict

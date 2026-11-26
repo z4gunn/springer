@@ -60,3 +60,27 @@ def artifact_header(artifact_id, artifact_type, section, schema_version, epoch):
         "confidence_map": {section: "confirmed"},
         "decision_log": [],
     }
+
+
+def agent_has_shell(root, agent):
+    """False when the agent file declares its tools and Bash is not among them. A file
+    with no tools field inherits every tool, and a missing file is given the benefit."""
+    path = Path(root) / ".claude" / "agents" / f"{agent}.md"
+    try:
+        text = path.read_text()
+    except OSError:
+        return True
+    if not text.startswith("---"):
+        return True
+    lines = text.split("---", 2)[1].splitlines()
+    for at, line in enumerate(lines):
+        if line.startswith("tools:"):
+            named = line[len("tools:"):].strip().strip("[]")
+            tools = [t.strip().strip("'\"") for t in named.split(",") if t.strip()]
+            if not tools:
+                for item in lines[at + 1:]:
+                    if not item.lstrip().startswith("- "):
+                        break
+                    tools.append(item.lstrip()[2:].strip().strip("'\""))
+            return any(t == "Bash" or t.startswith("Bash(") for t in tools)
+    return True

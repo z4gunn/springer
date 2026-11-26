@@ -2,6 +2,7 @@
 source host, and onboard and doctor, each against a fake claude or gh on PATH, so the
 suite spends no tokens and touches no account."""
 
+import dataclasses
 import json
 import os
 import shutil
@@ -129,6 +130,25 @@ class ProviderTest(FakeBinCase):
         while handle.exit() is None and time.time() < deadline:
             time.sleep(0.05)
         return handle.exit()
+
+    def test_a_role_with_no_shell_is_told_the_harness_commits_and_validates(self):
+        from springer_harness.common import agent_has_shell
+        agents = self.root / ".claude" / "agents"
+        agents.mkdir(parents=True)
+        (agents / "spgr-agent-auth.md").write_text("---\nname: spgr-agent-auth\ntools: Read, Write, Grep, Glob\n---\nBody\n")
+        (agents / "listed.md").write_text("---\nname: listed\ntools:\n  - Read\n  - Bash\n---\nBody\n")
+        (agents / "inherits.md").write_text("---\nname: inherits\n---\nBody\n")
+        self.assertFalse(agent_has_shell(self.root, "spgr-agent-auth"))
+        self.assertTrue(agent_has_shell(self.root, "listed"))
+        self.assertTrue(agent_has_shell(self.root, "inherits"))
+        self.assertTrue(agent_has_shell(self.root, "missing"))
+        provider = ClaudeCodeProvider(str(self.claude))
+        request = self.request()
+        provider.prompt(request)
+        self.assertNotIn("no shell", (request.session_dir / "brief.md").read_text())
+        auth = dataclasses.replace(request, agent="spgr-agent-auth")
+        provider.prompt(auth)
+        self.assertIn("Your role has no shell", (auth.session_dir / "brief.md").read_text())
 
     def test_a_session_runs_as_its_agent_on_the_subscription_and_streams(self):
         provider = ClaudeCodeProvider(str(self.claude))
@@ -611,6 +631,20 @@ class RestackTest(unittest.TestCase):
         self.commit(self.project, {"f.txt": "the fix\n"})
         host.push("acme", branch)
         self.assertEqual(self.git(origin, "rev-parse", branch).stdout, self.git(self.project, "rev-parse", branch).stdout)
+
+    def test_the_declared_files_a_shell_less_session_wrote_are_committed_and_the_run_store_is_not(self):
+        """An Auth consultation wrote its docs copy, could not commit it with no shell, and
+        failed seven sessions in a row saying so."""
+        self.commit(self.project, {"f.txt": "a\n"})
+        tree, _ = self.trees.claim("U-0001", "main")
+        (tree / "docs" / "c").mkdir(parents=True)
+        (tree / "docs" / "c" / "auth.md").write_text("verdict\n")
+        (tree / "notes.md").write_text("not declared\n")
+        committed = self.trees.commit_declared("U-0001", ["runs/acme-1/artifacts/x.json", "docs/c/auth.md"], "docs: c")
+        self.assertEqual(committed, ["docs/c/auth.md"])
+        self.assertEqual(self.git(tree, "show", "--name-only", "--format=", "HEAD").stdout.split(), ["docs/c/auth.md"])
+        self.assertIn("notes.md", self.git(tree, "status", "--porcelain").stdout, "an undeclared file is left alone")
+        self.assertEqual(self.trees.commit_declared("U-0001", ["docs/c/auth.md"], "docs: c"), [], "nothing twice")
 
     def test_a_ruling_reaches_every_worktree_and_a_withdrawn_one_leaves(self):
         """The hook reads runs/_config-unlock.json from the session's own tree, and git

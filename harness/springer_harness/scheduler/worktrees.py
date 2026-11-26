@@ -268,6 +268,24 @@ class Worktrees:
         elif target.exists():
             target.unlink()
 
+    def commit_declared(self, unit_id, declared, message):
+        """Commit the declared repo files a session wrote and left uncommitted. An agent
+        with no shell can write a docs file but cannot commit it. Run-store paths are the
+        run's, never the branch's. Returns the paths committed."""
+        tree = self.path(unit_id)
+        paths = [p for p in declared if p and not p.startswith("runs/")]
+        if not paths or not tree.exists():
+            return []
+        status = _git(tree, "status", "--porcelain", "--untracked-files=all", "--", *paths).stdout
+        changed = [line[3:].strip() for line in status.splitlines() if line.strip()]
+        if not changed:
+            return []
+        if _git(tree, "add", "--", *changed).returncode:
+            return []
+        if _git(tree, "commit", "--quiet", "-m", message, "--", *changed).returncode:
+            return []
+        return changed
+
     def code_paths(self, unit_id):
         """The paths the unit's branch changes against the default branch that are not
         artifacts. A branch stacked on an unmerged parent carries the parent's code too,

@@ -22,6 +22,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..common import agent_has_shell
 from .coding_agent import SessionExit, SpawnRequest, Usage
 
 # The context window a session runs in. The stream names it only in the final result's
@@ -119,6 +120,15 @@ only the harness writes. Commit everything else
 If you need a person to decide something, do not ask in text: write gate-request.json
 to the session directory as spgr-notify-human describes, set status "pass" with
 detail "waiting on a person", and stop.
+"""
+
+# A role with no shell cannot validate or commit, and four sessions in a row failed
+# saying so. The harness does both for it.
+NO_SHELL = """
+Your role has no shell, and that is expected. Do not run validate.py or git, and do not
+fail for lacking them. Write your files, list every repo file you wrote in
+touched_paths, and return status "pass". The harness commits the files you wrote on
+{branch} and validates your run artifacts against their schemas.
 """
 
 
@@ -344,6 +354,8 @@ class ClaudeCodeProvider:
                                           base=env.get("SPRINGER_BASE", "main"),
                                           pr_step=PR_STEPS.get(env.get("SPRINGER_SOURCE_HOST"), PR_STEPS["github"])
                                           .format(base=env.get("SPRINGER_BASE", "main")))
+        if not agent_has_shell(request.cwd, request.agent):
+            contract += NO_SHELL.format(branch=env.get("SPRINGER_BRANCH", f"unit/{request.unit_id}"))
         brief_path.write_text(request.brief.rstrip() + "\n" + contract)
         preamble_file = Path(request.cwd) / PREAMBLE
         preamble = preamble_file.read_text() if preamble_file.exists() else "Your brief:\n"
