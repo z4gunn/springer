@@ -357,17 +357,24 @@ class Worktrees:
         after upstream was squash-merged there and its own commits would otherwise
         conflict with the squash. The rebase runs in a detached scratch worktree, so a
         unit worktree is never touched, and the push is leased to the old head, so work
-        pushed since is never overwritten. Returns None, or why it did nothing."""
+        pushed since is never overwritten. Returns None, or why it did nothing.
+
+        Upstream may have moved on after the branch was cut from it, as when its builder
+        merged the base in to clear a conflict. The branch then holds an older upstream
+        head, and its own commits start at the fork point. A fork point the base already
+        holds means the branch carries none of upstream's commits: nothing to restack."""
         old = _git(self.project, "rev-parse", "--verify", f"refs/heads/{branch}").stdout.strip()
         tip = _git(self.project, "rev-parse", "--verify", f"refs/heads/{upstream}").stdout.strip()
         if not old or not tip:
             return "a branch is missing"
-        if _git(self.project, "merge-base", "--is-ancestor", tip, old).returncode:
-            return "nothing to restack"
         remote = _git(self.project, "remote", "get-url", "origin").returncode == 0
         if remote:
             _git(self.project, "fetch", "--quiet", "origin", onto)
         target = f"origin/{onto}" if remote else onto
+        if _git(self.project, "merge-base", "--is-ancestor", tip, old).returncode:
+            tip = _git(self.project, "merge-base", old, tip).stdout.strip()
+            if not tip or _git(self.project, "merge-base", "--is-ancestor", tip, target).returncode == 0:
+                return "nothing to restack"
         scratch = self.root / f"_restack-{branch.replace('/', '-')}"
         _git(self.project, "worktree", "remove", "--force", str(scratch))
         self.root.mkdir(parents=True, exist_ok=True)

@@ -895,6 +895,30 @@ class RestackTest(unittest.TestCase):
                          ("A\nB\n", "child"))
         self.assertEqual(self.trees.restack("unit/U-0002", "unit/U-0001", "main"), "nothing to restack")
 
+    def test_a_stacked_branch_restacks_after_its_parent_moved_on_and_was_squashed(self):
+        """A parent's builder merged main into its branch to clear a conflict after the
+        child was cut from it. The parent's head was then no ancestor of the child's, the
+        restack said nothing to restack, and the child's PR reached main carrying the
+        parent's unsquashed commits: a 133-file diff, conflicting, gated L2 on paths the
+        child never touched. The child's own commits start at the fork point."""
+        self.commit(self.project, {"f.txt": "a\nb\n"})
+        parent, _ = self.trees.claim("U-0001", "main")
+        self.commit(parent, {"f.txt": "A\nb\n"})
+        child, _ = self.trees.claim("U-0002", "unit/U-0001")
+        self.commit(child, {"g.txt": "child"})
+        self.commit(self.project, {"h.txt": "main moved"})
+        self.git(parent, "merge", "--no-edit", "main")
+        self.commit(parent, {"f.txt": "A2\nb\n"})
+        self.git(self.project, "merge", "--squash", "unit/U-0001")
+        self.git(self.project, "commit", "-qm", "squash of U-0001")
+        self.trees.release("U-0002")
+        self.assertIsNone(self.trees.restack("unit/U-0002", "unit/U-0001", "main"))
+        own = self.git(self.project, "log", "--format=%s", "main..unit/U-0002").stdout.split()
+        self.assertEqual(len(own), 1, "only the child's own commit is left past main")
+        self.assertEqual(self.git(self.project, "diff", "--name-only", "main...unit/U-0002").stdout.split(),
+                         ["g.txt"])
+        self.assertEqual(self.trees.restack("unit/U-0002", "unit/U-0001", "main"), "nothing to restack")
+
     def test_a_restack_that_conflicts_leaves_the_branch_where_it_was(self):
         self.commit(self.project, {"f.txt": "a\n"})
         parent, _ = self.trees.claim("U-0001", "main")
