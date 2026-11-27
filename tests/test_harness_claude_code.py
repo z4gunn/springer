@@ -275,9 +275,9 @@ class MechanicalCheckTest(FakeBinCase):
         self.run_dir = self.project / "runs" / "acme-1"
         (self.run_dir / "artifacts").mkdir(parents=True)
 
-    def check(self, gating=None, baseline=None):
+    def check(self, gating=None, baseline=None, changed=None):
         return mechanical_check(self.session, self.project, self.run_dir, self.project, "U-0001", time.time() - 60,
-                                gating=gating, baseline=baseline)
+                                gating=gating, baseline=baseline, changed=changed)
 
     PR = {"status": "pass", "outcome": "pr", "pr": {"number": 3, "branch": "unit/U-0001", "base": "main"},
           "touched_paths": ["src/app.ts"]}
@@ -356,6 +356,66 @@ class MechanicalCheckTest(FakeBinCase):
         self.assertFalse(scratch.exists())
         self.assertNotIn(str(scratch), subprocess.run(["git", "-C", str(self.project), "worktree", "list"],
                                                       capture_output=True, text=True).stdout)
+
+    def flaky(self, file, fails):
+        """A test command that fails the first `fails` times it runs, naming `file` the way
+        vitest does, then passes. Its run count lives beside the session."""
+        counter = self.root / f"runs-{file.replace('/', '-')}"
+        script = self.root / f"flaky-{file.replace('/', '-')}.py"
+        script.write_text(
+            "import sys, pathlib\n"
+            f"p = pathlib.Path({str(counter)!r})\n"
+            "n = int(p.read_text()) + 1 if p.exists() else 1\n"
+            "p.write_text(str(n))\n"
+            f"if n <= {fails}:\n"
+            f"    print(' \\x1b[31mFAIL\\x1b[39m  {file} > boots once')\n"
+            "    print('Tests  1 failed | 9 passed (10)')\n"
+            "    sys.exit(1)\n"
+            "print('Tests  10 passed (10)')\n")
+        return {"name": "test-unit", "kind": "test", "command": f"python3 {script}",
+                "count_regex": r"Tests\s+(?:\d+ failed \| )?(\d+) passed"}, counter
+
+    def test_a_test_that_fails_only_outside_the_change_runs_again_before_it_counts(self):
+        """The reference run spent three retries in one afternoon on tests no unit had
+        touched, each timing out under a full suite on a loaded machine and passing alone.
+        A failure confined to files the change leaves alone gets one rerun, and a pass
+        there passes without holding the merge."""
+        self.write(**self.PR)
+        command, counter = self.flaky("packages/worker/src/index-boot.test.ts", fails=1)
+        result = self.check([command], changed=["src/app.ts"])
+        self.assertEqual((result.status, result.raised_level), ("pass", None))
+        self.assertEqual(counter.read_text(), "2")
+        kept = self.session / "check" / "first-run" / "test-unit.json"
+        self.assertEqual(json.loads(kept.read_text())["result"], "fail", "the first failure is kept as evidence")
+        self.assertEqual(sorted(p.name for p in (self.session / "check" / "receipts").iterdir()), ["test-unit.json"],
+                         "the first failure is not among the receipts a verify reads")
+
+    def test_a_failure_in_a_file_the_change_touches_is_its_defect_at_once(self):
+        self.write(**self.PR)
+        command, counter = self.flaky("src/app.test.ts", fails=1)
+        result = self.check([command], changed=["src/app.ts", "src/app.test.ts"])
+        self.assertEqual((result.status, result.failure_class), ("fail", "defect"))
+        self.assertEqual(counter.read_text(), "1", "no rerun for a test the change touched")
+
+    def test_a_failure_outside_the_change_that_fails_again_is_still_a_defect(self):
+        self.write(**self.PR)
+        command, counter = self.flaky("packages/api/src/routes/router-scope.test.ts", fails=2)
+        result = self.check([command], changed=["src/app.ts"])
+        self.assertEqual((result.status, result.failure_class), ("fail", "defect"))
+        self.assertEqual(counter.read_text(), "2", "one rerun, never more")
+
+    def test_failing_test_files_are_read_from_a_runner_s_tail(self):
+        from springer_harness.check.mechanical import failing_files
+        vitest = " \x1b[31mFAIL\x1b[39m  packages/worker/src/index-boot.test.ts > worker boot\n"
+        self.assertEqual(failing_files(vitest), {"packages/worker/src/index-boot.test.ts"})
+        # The tail was cut before the FAIL line, so the stack frame names the test file.
+        stack = (" \u276f waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27\n"
+                 " \u276f packages/web/src/features/newRole/NewRoleCriteria.test.tsx:212:27\n")
+        self.assertEqual(failing_files(stack), {"packages/web/src/features/newRole/NewRoleCriteria.test.tsx"})
+        self.assertEqual(failing_files("FAILED tests/test_app.py::test_login - AssertionError"),
+                         {"tests/test_app.py"})
+        self.assertEqual(failing_files("panic: nil map\nexit status 2"), set(),
+                         "a tail naming no file gets no rerun")
 
     def test_a_check_that_cannot_run_on_the_base_either_is_called_broken(self):
         """Run 9's YAML check imported a module the system python3 lacks. It failed on

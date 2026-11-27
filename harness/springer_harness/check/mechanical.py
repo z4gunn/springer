@@ -65,7 +65,7 @@ def needs_gating(result):
     return result.outcome == "pr" or not all(p.startswith(LEDGER_ONLY) for p in result.touched_paths)
 
 
-def run_gating(commands, out, cwd, warnings=None, baseline=None):
+def run_gating(commands, out, cwd, warnings=None, baseline=None, changed=None, reruns=None):
     """Run each gating command at the worktree's head through receipt.py, writing the
     receipts under out, in order. None when every one passes, else the defect detail
     naming the first that did not, with the tail of its output. A product command is
@@ -82,27 +82,37 @@ def run_gating(commands, out, cwd, warnings=None, baseline=None):
     when the command fails there, and such a command passes with a warning, so the
     merge waits on a person who sees both outputs. A base that could not run the
     command (a missing module or program) says nothing, so the failure stays the
-    change's, unless the change could not run it either: a broken check."""
+    change's, unless the change could not run it either: a broken check.
+
+    A test command whose failing test files all lie outside the unit's change
+    (changed, the paths its branch changes) runs once more before it counts. A full
+    suite on a loaded machine times out tests the change never touched, and the
+    reference run spent a retry on three of them in one afternoon. A pass on the rerun
+    passes, with the files named in reruns, and does not hold the merge. A second
+    failure is judged as any failure is."""
     script = Path(cwd) / SCRIPTS / "receipt.py"
     if not script.exists():
         return "receipt.py is missing from the worktree"
     out = Path(out)
     shutil.rmtree(out, ignore_errors=True)
     for command in commands:
-        name, kind = command["name"], "check" if command["kind"] == "product" else command["kind"]
-        args = [script, "run", out, "--name", name, "--kind", kind, "--cwd", cwd,
-                "--timeout", str(command.get("timeout") or GATING_TIMEOUT)]
-        if command.get("count_regex"):
-            args += ["--count-regex", command["count_regex"]]
-        try:
-            _run([*args, "--", command["command"]], cwd, timeout=(command.get("timeout") or GATING_TIMEOUT) + 60)
-        except subprocess.TimeoutExpired:
-            return f"gating command {name} ({command['command']}) did not finish"
-        receipt = out / "receipts" / f"{name}.json"
-        try:
-            body = json.loads(receipt.read_text())
-        except (OSError, ValueError):
-            return f"gating command {name} ({command['command']}) left no receipt"
+        name = command["name"]
+        body = _gate(script, command, out, cwd)
+        if isinstance(body, str):
+            return body
+        outside = outside_change(body, command, changed)
+        if outside:
+            # Kept beside the receipts, not among them, so a verify never reads it.
+            kept = out / "first-run"
+            kept.mkdir(parents=True, exist_ok=True)
+            (out / "receipts" / f"{name}.json").replace(kept / f"{name}.json")
+            body = _gate(script, command, out, cwd)
+            if isinstance(body, str):
+                return body
+            if body.get("result") == "pass":
+                if reruns is not None:
+                    reruns.append({"name": name, "files": outside})
+                continue
         if body.get("result") == "unknown-count" and body.get("exit_code") == 0:
             if warnings is not None:
                 warnings.append(f"{name} ({command['command']}) exited 0 but printed no test count the harness "
@@ -133,6 +143,49 @@ def run_gating(commands, out, cwd, warnings=None, baseline=None):
             tail = (body.get("output_tail") or "").strip()[-OUTPUT_SHOWN:]
             return f"gating command {name} ({command['command']}) {why}. Its output ends: {tail}"
     return None
+
+
+def _gate(script, command, out, cwd):
+    """Run one gating command through receipt.py. Its receipt body, or the defect
+    detail when it did not finish or left no receipt."""
+    name, kind = command["name"], "check" if command["kind"] == "product" else command["kind"]
+    timeout = command.get("timeout") or GATING_TIMEOUT
+    args = [script, "run", out, "--name", name, "--kind", kind, "--cwd", cwd, "--timeout", str(timeout)]
+    if command.get("count_regex"):
+        args += ["--count-regex", command["count_regex"]]
+    try:
+        _run([*args, "--", command["command"]], cwd, timeout=timeout + 60)
+    except subprocess.TimeoutExpired:
+        return f"gating command {name} ({command['command']}) did not finish"
+    try:
+        return json.loads((Path(out) / "receipts" / f"{name}.json").read_text())
+    except (OSError, ValueError):
+        return f"gating command {name} ({command['command']}) left no receipt"
+
+
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+# A runner's failure line (vitest and jest FAIL, pytest FAILED), and, for a tail cut
+# before those lines, a test file in a stack frame. node_modules is never the test.
+FAILED_LINE = re.compile(r"(?m)(?:^|\s)(?:FAIL|FAILED)\s+([\w@./-]+\.[A-Za-z]{1,5})\b")
+TEST_FILE = re.compile(r"([\w@./-]+(?:\.(?:test|spec)\.[A-Za-z]{1,4}|/test_\w+\.py|_test\.(?:py|go)))\b")
+
+
+def failing_files(tail):
+    """The test files a runner's output tail names as failing, or an empty set."""
+    text = ANSI.sub("", tail or "")
+    found = set(FAILED_LINE.findall(text)) or set(TEST_FILE.findall(text))
+    return {f for f in found if "node_modules/" not in f}
+
+
+def outside_change(body, command, changed):
+    """The failing test files, sorted, when a test command failed only in files the
+    unit's change leaves alone. Empty when it passed, is not a test, names no file,
+    or any failing file is one the change touches. No changed paths (a diff that could
+    not be read reads as none) means the change is unknown, and gets no rerun."""
+    if not changed or body.get("result") != "fail" or command.get("kind") != "test":
+        return []
+    files = failing_files(body.get("output_tail"))
+    return sorted(files) if files and not files & set(changed) else []
 
 
 # What a command prints when it never reached the thing it checks: a missing module,
@@ -211,7 +264,7 @@ def hold_for_person(result, warnings):
 
 
 def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch, require_receipts=True,
-                     gating=None, baseline=None):
+                     gating=None, baseline=None, changed=None):
     """A CheckResult for one returned session. The order is the in-session loop's:
     the result the session left, then the gating commands (or, for a unit with none,
     the session's receipts), then the artifacts it wrote."""
@@ -231,7 +284,7 @@ def mechanical_check(session_dir, cwd, run_dir, project, unit_id, started_epoch,
         # Run in place, for a caller with no tick to protect. The daemon runs them off
         # the tick through GatingRuns and passes none here.
         warnings = []
-        problem = run_gating(gating, session_dir / "check", cwd, warnings, baseline)
+        problem = run_gating(gating, session_dir / "check", cwd, warnings, baseline, changed)
         if problem:
             return replace(result, status="fail", failure_class="defect", detail=problem)
         result = hold_for_person(result, warnings)

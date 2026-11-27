@@ -456,9 +456,11 @@ class RunEngine:
             # product check can take minutes. None leaves the unit in checking.
             if said.status == "pass" and needs_gating(said):
                 verdict = self.gating_runs.poll((unit_id, state["sessions"][-1]), gating, session_dir,
-                                                self.worktrees.path(unit_id), self._baseline(unit_id))
+                                                self.worktrees.path(unit_id), self._baseline(unit_id),
+                                                self.worktrees.changed_paths(unit_id, self._base_for(unit_id)))
                 if verdict is None:
                     return None
+                self._record_reruns(unit_id, state, session_dir)
                 self._record_product_checks(unit_id, gating, session_dir)
                 if verdict:
                     return CheckResult(status="fail", failure_class="defect", detail=verdict)
@@ -473,6 +475,16 @@ class RunEngine:
             self._warned.add(said)
             self.ledger.append("check_warning", unit_id=unit_id, detail=said[2])
         return hold_for_person(result, warnings)
+
+    def _record_reruns(self, unit_id, state, session_dir):
+        """One flaky_test line per test command that failed only outside the change and
+        passed on its rerun, so the tests that cost the run time can be found and fixed.
+        Once per session, since a later tick reads the same verdict."""
+        for rerun in self.gating_runs.reruns(session_dir):
+            said = (unit_id, state["sessions"][-1], rerun["name"])
+            if said not in self._warned:
+                self._warned.add(said)
+                self.ledger.append("flaky_test", unit_id=unit_id, command=rerun["name"], files=rerun["files"])
 
     # --- review ---
 

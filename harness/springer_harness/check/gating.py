@@ -29,7 +29,7 @@ class GatingRuns:
         self._threads = {}
         self._lock = threading.Lock()
 
-    def poll(self, key, commands, session_dir, cwd, baseline=None):
+    def poll(self, key, commands, session_dir, cwd, baseline=None, changed=None):
         """None while the run is going (starting it when nothing is), else the verdict:
         an empty string when every command passed, or the defect detail."""
         found = read_json(Path(session_dir) / "check" / VERDICT)
@@ -39,8 +39,8 @@ class GatingRuns:
             thread = self._threads.get(key)
             if thread and thread.is_alive():
                 return None
-            thread = threading.Thread(target=self._run, args=(list(commands), Path(session_dir), Path(cwd), baseline),
-                                      name=f"gating-{key}", daemon=True)
+            thread = threading.Thread(target=self._run, name=f"gating-{key}", daemon=True,
+                                      args=(list(commands), Path(session_dir), Path(cwd), baseline, changed))
             self._threads[key] = thread
             thread.start()
         return None
@@ -51,18 +51,24 @@ class GatingRuns:
         found = read_json(Path(session_dir) / "check" / VERDICT)
         return list(found.get("warnings") or []) if isinstance(found, dict) else []
 
+    @staticmethod
+    def reruns(session_dir):
+        """The test commands that failed only outside the change and passed on a rerun."""
+        found = read_json(Path(session_dir) / "check" / VERDICT)
+        return list(found.get("reruns") or []) if isinstance(found, dict) else []
+
     def running(self, key):
         thread = self._threads.get(key)
         return bool(thread and thread.is_alive())
 
-    def _run(self, commands, session_dir, cwd, baseline=None):
+    def _run(self, commands, session_dir, cwd, baseline=None, changed=None):
         partial = session_dir / f".check-{uuid.uuid4().hex}"
-        warnings = []
+        warnings, reruns = [], []
         try:
-            problem = run_gating(commands, partial, cwd, warnings, baseline)
+            problem = run_gating(commands, partial, cwd, warnings, baseline, changed, reruns)
         except Exception as exc:  # noqa: BLE001, a crashed run is a verdict, never a hang
             problem = f"the gating run failed: {exc}"
-        write_json(partial / VERDICT, {"problem": problem, "warnings": warnings, "at": time.time()})
+        write_json(partial / VERDICT, {"problem": problem, "warnings": warnings, "reruns": reruns, "at": time.time()})
         final = session_dir / "check"
         shutil.rmtree(final, ignore_errors=True)
         os.replace(partial, final)
