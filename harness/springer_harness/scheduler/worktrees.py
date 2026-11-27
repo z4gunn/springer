@@ -362,7 +362,12 @@ class Worktrees:
         Upstream may have moved on after the branch was cut from it, as when its builder
         merged the base in to clear a conflict. The branch then holds an older upstream
         head, and its own commits start at the fork point. A fork point the base already
-        holds means the branch carries none of upstream's commits: nothing to restack."""
+        holds means the branch carries none of upstream's commits: nothing to restack.
+
+        Only the branch's own commits are replayed: not upstream's, not the base's, and no
+        merge commit. A builder that merged the base in to clear a conflict left base
+        commits on the branch, and a rebase replayed them against the base's later
+        versions of the same files and conflicted on work the branch never did."""
         old = _git(self.project, "rev-parse", "--verify", f"refs/heads/{branch}").stdout.strip()
         tip = _git(self.project, "rev-parse", "--verify", f"refs/heads/{upstream}").stdout.strip()
         if not old or not tip:
@@ -375,18 +380,22 @@ class Worktrees:
             tip = _git(self.project, "merge-base", old, tip).stdout.strip()
             if not tip or _git(self.project, "merge-base", "--is-ancestor", tip, target).returncode == 0:
                 return "nothing to restack"
+        own = _git(self.project, "rev-list", "--reverse", "--no-merges", "--cherry-pick", "--right-only",
+                   f"{target}...{old}", f"^{tip}").stdout.split()
+        if not own:
+            return "nothing to restack"
         scratch = self.root / f"_restack-{branch.replace('/', '-')}"
         _git(self.project, "worktree", "remove", "--force", str(scratch))
         self.root.mkdir(parents=True, exist_ok=True)
-        if _git(self.project, "worktree", "add", "--detach", str(scratch), old).returncode:
+        if _git(self.project, "worktree", "add", "--detach", str(scratch), target).returncode:
             return "could not make a scratch worktree"
         try:
             done = _git(scratch, "-c", "user.name=Springer", "-c", "user.email=springer@local",
-                        "rebase", "--onto", target, tip)
+                        "cherry-pick", "--empty=drop", *own)
             if done.returncode:
-                _git(scratch, "rebase", "--abort")
+                _git(scratch, "cherry-pick", "--abort")
                 said = [line for line in (done.stdout + done.stderr).splitlines() if line and not line.startswith("hint:")]
-                return " ".join(said)[-300:] or "git rebase failed"
+                return " ".join(said)[-300:] or "git cherry-pick failed"
             new = _git(scratch, "rev-parse", "HEAD").stdout.strip()
             if _git(self.project, "update-ref", f"refs/heads/{branch}", new, old).returncode:
                 return "the branch moved during the restack"

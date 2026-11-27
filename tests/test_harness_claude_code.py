@@ -919,6 +919,27 @@ class RestackTest(unittest.TestCase):
                          ["g.txt"])
         self.assertEqual(self.trees.restack("unit/U-0002", "unit/U-0001", "main"), "nothing to restack")
 
+    def test_a_restack_replays_only_the_branch_s_own_commits_not_the_base_it_merged_in(self):
+        """A child's builder merged main in to clear a conflict. The rebase replayed main's
+        commits from that merge against main's later version of the same file and
+        conflicted, though the child's own five commits applied cleanly."""
+        self.commit(self.project, {"f.txt": "a\n", "m.txt": "m1\n"})
+        parent, _ = self.trees.claim("U-0001", "main")
+        self.commit(parent, {"p.txt": "parent"})
+        child, _ = self.trees.claim("U-0002", "unit/U-0001")
+        self.commit(child, {"g.txt": "child"})
+        self.commit(self.project, {"m.txt": "m2\n"})
+        self.git(child, "merge", "--no-edit", "main")
+        self.commit(child, {"g.txt": "child 2"})
+        self.commit(self.project, {"m.txt": "m3\n"})
+        self.git(self.project, "merge", "--squash", "unit/U-0001")
+        self.git(self.project, "commit", "-qm", "squash of U-0001")
+        self.trees.release("U-0002")
+        self.assertIsNone(self.trees.restack("unit/U-0002", "unit/U-0001", "main"))
+        self.assertEqual(self.git(self.project, "diff", "--name-only", "main...unit/U-0002").stdout.split(),
+                         ["g.txt"])
+        self.assertEqual(self.git(self.project, "show", "unit/U-0002:m.txt").stdout, "m3\n")
+
     def test_a_restack_that_conflicts_leaves_the_branch_where_it_was(self):
         self.commit(self.project, {"f.txt": "a\n"})
         parent, _ = self.trees.claim("U-0001", "main")
