@@ -355,19 +355,17 @@ class Worktrees:
     def restack(self, branch, upstream, onto):
         """Replay the commits a stacked branch added on top of upstream onto the base,
         after upstream was squash-merged there and its own commits would otherwise
-        conflict with the squash. The rebase runs in a detached scratch worktree, so a
+        conflict with the squash. The replay runs in a detached scratch worktree, so a
         unit worktree is never touched, and the push is leased to the old head, so work
         pushed since is never overwritten. Returns None, or why it did nothing.
 
-        Upstream may have moved on after the branch was cut from it, as when its builder
-        merged the base in to clear a conflict. The branch then holds an older upstream
-        head, and its own commits start at the fork point. A fork point the base already
-        holds means the branch carries none of upstream's commits: nothing to restack.
-
-        Only the branch's own commits are replayed: not upstream's, not the base's, and no
-        merge commit. A builder that merged the base in to clear a conflict left base
-        commits on the branch, and a rebase replayed them against the base's later
-        versions of the same files and conflicted on work the branch never did."""
+        Only the branch's own commits are replayed: no merge commit, nothing the base
+        holds, nothing upstream holds or holds a copy of, and nothing from before the
+        branch was created, read from its reflog. A builder that merged the base in left
+        base commits on the branch, upstream may have been restacked or moved on since
+        the branch was cut, and a branch cut from a stack carries every commit below it,
+        which the base holds only as squashes. A branch that already sits on the base
+        with only its own commits past it has nothing to restack."""
         old = _git(self.project, "rev-parse", "--verify", f"refs/heads/{branch}").stdout.strip()
         tip = _git(self.project, "rev-parse", "--verify", f"refs/heads/{upstream}").stdout.strip()
         if not old or not tip:
@@ -376,13 +374,16 @@ class Worktrees:
         if remote:
             _git(self.project, "fetch", "--quiet", "origin", onto)
         target = f"origin/{onto}" if remote else onto
-        if _git(self.project, "merge-base", "--is-ancestor", tip, old).returncode:
-            tip = _git(self.project, "merge-base", old, tip).stdout.strip()
-            if not tip or _git(self.project, "merge-base", "--is-ancestor", tip, target).returncode == 0:
-                return "nothing to restack"
+        excluded = [f"^{target}"]
+        created = self.created_at(branch)
+        if created:
+            excluded.append(f"^{created}")
         own = _git(self.project, "rev-list", "--reverse", "--no-merges", "--cherry-pick", "--right-only",
-                   f"{target}...{old}", f"^{tip}").stdout.split()
+                   f"{tip}...{old}", *excluded).stdout.split()
         if not own:
+            return "nothing to restack"
+        on_base = _git(self.project, "merge-base", "--is-ancestor", target, old).returncode == 0
+        if on_base and set(_git(self.project, "rev-list", "--no-merges", old, f"^{target}").stdout.split()) == set(own):
             return "nothing to restack"
         scratch = self.root / f"_restack-{branch.replace('/', '-')}"
         _git(self.project, "worktree", "remove", "--force", str(scratch))
@@ -407,6 +408,16 @@ class Worktrees:
             return None
         finally:
             _git(self.project, "worktree", "remove", "--force", str(scratch))
+
+    def created_at(self, branch):
+        """The commit a branch was created at, from the oldest entry of its reflog, or
+        None when the reflog no longer records the creation."""
+        done = _git(self.project, "reflog", "show", "--format=%H %gs", f"refs/heads/{branch}")
+        lines = [line for line in done.stdout.splitlines() if line]
+        if done.returncode or not lines:
+            return None
+        sha, _, said = lines[-1].partition(" ")
+        return sha if said.startswith("branch: Created from") else None
 
     def release(self, unit_id):
         """Returns None on success, or git's reason for refusing. The rulings copy the

@@ -940,6 +940,32 @@ class RestackTest(unittest.TestCase):
                          ["g.txt"])
         self.assertEqual(self.git(self.project, "show", "unit/U-0002:m.txt").stdout, "m3\n")
 
+    def test_a_grandchild_restacks_to_its_own_commits_after_its_stack_was_squashed(self):
+        """A stack of three. The first merged as a squash and the second was restacked onto
+        main, rewriting it, while the third still carried the second's and the first's
+        original commits. When the second merged, the third's restack said nothing to
+        restack, and its PR reached main conflicting with both squashes."""
+        self.commit(self.project, {"f.txt": "a\n"})
+        first, _ = self.trees.claim("U-0001", "main")
+        self.commit(first, {"f.txt": "first\n"})
+        second, _ = self.trees.claim("U-0002", "unit/U-0001")
+        self.commit(second, {"s.txt": "second\n"})
+        third, _ = self.trees.claim("U-0003", "unit/U-0002")
+        self.commit(third, {"t.txt": "third\n"})
+        for unit in ("U-0001", "U-0002", "U-0003"):
+            self.trees.release(unit)
+        self.git(self.project, "merge", "--squash", "unit/U-0001")
+        self.git(self.project, "commit", "-qm", "squash of U-0001")
+        self.assertIsNone(self.trees.restack("unit/U-0002", "unit/U-0001", "main"))
+        self.git(self.project, "merge", "--squash", "unit/U-0002")
+        self.git(self.project, "commit", "-qm", "squash of U-0002")
+        self.assertIsNone(self.trees.restack("unit/U-0003", "unit/U-0002", "main"))
+        self.assertEqual(self.git(self.project, "diff", "--name-only", "main...unit/U-0003").stdout.split(),
+                         ["t.txt"])
+        self.assertEqual(self.git(self.project, "merge", "--no-edit", "unit/U-0003").returncode, 0)
+        self.assertEqual(self.trees.restack("unit/U-0003", "unit/U-0002", "main"), "nothing to restack",
+                         "a branch already on the base with only its own commits is left alone")
+
     def test_a_restack_that_conflicts_leaves_the_branch_where_it_was(self):
         self.commit(self.project, {"f.txt": "a\n"})
         parent, _ = self.trees.claim("U-0001", "main")
